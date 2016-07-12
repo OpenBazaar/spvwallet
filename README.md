@@ -11,6 +11,7 @@ These are the used interfaces:
 A sqlite implementation is included for testing but you should probably implement your own custom solution. Note there is no encryption in the example db.
 
 * Keys
+
 The wallet manages an hd keychain (m/0'/change/index/) and stores they keys in this database. Used keys are marked in the db and a lookahead window is maintained to ensure all transactions can be recovered when restoring from seed.
 
 * Utxos
@@ -35,7 +36,7 @@ This is currently a bolt db which stores the chain of headers as well as orphans
 
 ## Synchronization overview
 
-At startup addresses are gathered from the DNS seeds and it will maintain one or more connections (determined by the MAX_PEERS constant.  It first asks for headers, providing the last known header, then loops through asking for headers until it receives an empty header message, which signals that headers are fully synchronized.
+At startup addresses are gathered from the DNS seeds and it will maintain one or more connections (determined by the MAX_PEERS constant).  It first asks for headers, providing the last known header, then loops through asking for headers until it receives an empty header message, which signals that headers are fully synchronized.
 
 After header synchronization is complete, it requests merkle blocks starting at the last db height recorded in state. If the height is zero it requests from the last checkpoiint. Bloom filters are generated for the addresses and utxos known to the wallet.  If too many false positives are received, a new filter is generated and sent. Once the merkle blocks have been received up to the header height, the wallet is considered synchronized and it will listen for new inv messages from the remote node.
 
