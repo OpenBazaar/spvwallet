@@ -21,16 +21,14 @@ import (
 type Headers interface {
 	// Put a block header to the database
 	// Total work and height are required to be calculated prior to insertion
-	Put(header wire.BlockHeader, height uint32, totalWork *big.Int) error
+	// If this is the new best header, the chain tip should also be updated
+	Put(header StoredHeader, newBestHeader bool) error
 
 	// Returns all information about the previous header
-	GetPreviousHeader(header wire.BlockHeader) (hdr *wire.BlockHeader, height uint32, totalWork *big.Int, err error)
-
-	// Set the best known header in the database
-	SetBestHeader(header wire.BlockHeader, height uint32, totalWork *big.Int) error
+	GetPreviousHeader(header wire.BlockHeader) (StoredHeader, error)
 
 	// Retreive the best header from the database
-	GetBestHeader() (hdr *wire.BlockHeader, height uint32, totalWork *big.Int, err error)
+	GetBestHeader() (StoredHeader, error)
 
 	// Get the height of chain
 	Height() (uint32, error)
@@ -129,44 +127,45 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 }
 
 func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
-	// First things first, check that this is a legit new header
-	prevHeader, err := b.GetPreviousHeader(header)
+	newTip := false
+
+	// Fetch our current best header from the db
+	bestHeader, err := b.GetBestHeader()
 	if err != nil {
-		return false, errors.New("Header does not extend any known headers")
+		return false, err
 	}
-	valid, diffTarget := b.CheckHeader(header, prevHeader)
+	tipHash := bestHeader.header.BlockSha()
+	var parentHeader StoredHeader
+
+	// If the tip is also the parent of this header, then we can save a database read by skipping
+	// the lookup of the parent header. Otherwise (ophan?) we need to fetch the parent.
+	if header.PrevBlock.IsEqual(&tipHash){
+		parentHeader = bestHeader
+	} else {
+		parentHeader, err = b.GetPreviousHeader(header)
+		if err != nil {
+			return false, errors.New("Header does not extend any known headers")
+		}
+	}
+	valid, diffTarget := b.CheckHeader(header, parentHeader)
 	if !valid {
 		return false, nil
 	}
 
-	newTip := false
-	// Fetch the currect best header
-	bestSH, err := b.GetBestHeader()
-	if err != nil {
-		return newTip, err
-	}
-	tipHash := bestSH.header.BlockSha()
-	headerHash := header.BlockSha()
-
 	// If this block is already the tip, return
+	headerHash := header.BlockSha()
 	if tipHash.IsEqual(&headerHash) {
 		return newTip, nil
 	}
 
 	// Add the work of this header to the total work stored at the previous header
-	cumulativeWork := new(big.Int).Add(prevHeader.totalWork, blockchain.CalcWork(header.Bits))
+	cumulativeWork := new(big.Int).Add(parentHeader.totalWork, blockchain.CalcWork(header.Bits))
 
 	// If the cumulative work is greater than the total work of our best header
 	// then we have a new best header. Update the chain tip and check for a reorg.
-	if cumulativeWork.Cmp(bestSH.totalWork) == 1 {
+	if cumulativeWork.Cmp(bestHeader.totalWork) == 1 {
 		newTip = true
-		b.SetBestHeader(StoredHeader {
-			header: header,
-			height: prevHeader.height + 1,
-			totalWork: cumulativeWork,
-			diffTarget: diffTarget,
-		})
-		prevHash := prevHeader.header.BlockSha()
+		prevHash := parentHeader.header.BlockSha()
 		// If this header is not extending the previous best header then we have a reorg.
 		if !tipHash.IsEqual(&prevHash) {
 			log.Warning("REORG!!! REORG!!! REORG!!!")
@@ -175,10 +174,10 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 	// Put the header to the database
 	err = b.Put(StoredHeader {
 			header: header,
-			height: prevHeader.height + 1,
+			height: parentHeader.height + 1,
 			totalWork: cumulativeWork,
 			diffTarget: diffTarget,
-		})
+		}, newTip)
 	if err != nil {
 		return newTip, err
 	}
@@ -242,19 +241,29 @@ func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeade
 	return true, blockchain.BigToCompact(diffTarget) // it must have worked if there's no errors and got to the end.
 }
 
-func (b *Blockchain) Put(sh StoredHeader) error {
+func (b *Blockchain) Put(sh StoredHeader, newBestHeader bool) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	return b.db.Update(func(btx *bolt.Tx) error {
 		hdrs := btx.Bucket(BKTHeaders)
-		b, err := serializeHeader(sh)
+		ser, err := serializeHeader(sh)
 		if err != nil {
 			return err
 		}
 		hash := sh.header.BlockSha()
-		err = hdrs.Put(hash.Bytes(), b)
+		err = hdrs.Put(hash.Bytes(), ser)
 		if err != nil {
 			return err
+		}
+		if newBestHeader {
+			tip := btx.Bucket(BKTChainTip)
+			if err != nil {
+				return err
+			}
+			err = tip.Put(KEYChainTip, ser)
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	})
@@ -299,23 +308,6 @@ func (b *Blockchain) GetPreviousHeader(header wire.BlockHeader) (sh StoredHeader
 		return sh, err
 	}
 	return sh, nil
-}
-
-func (b *Blockchain) SetBestHeader(sh StoredHeader) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	return b.db.Update(func(btx *bolt.Tx) error {
-		tip := btx.Bucket(BKTChainTip)
-		b, err := serializeHeader(sh)
-		if err != nil {
-			return err
-		}
-		err = tip.Put(KEYChainTip, b)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
 }
 
 func (b *Blockchain) GetBestHeader() (sh StoredHeader, err error) {

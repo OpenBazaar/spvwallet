@@ -45,7 +45,7 @@ var log = logging.MustGetLogger("bitcoin")
 
 const WALLET_VERSION = "0.1.0"
 
-const MAX_PEERS = 10
+const MAX_PEERS = 1
 
 func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFee uint64, mediumFee uint64, highFee uint64, feeApi,
 	repoPath string, db Datastore, userAgent string, logger logging.Backend) *SPVWallet {
@@ -54,8 +54,6 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 
 	seed := b39.NewSeed(mnemonic, "")
 	mk, _ := b32.NewMasterKey(seed)
-
-	createCheckpoints()
 
 	w := new(SPVWallet)
 	w.masterPrivateKey = mk

@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 	"github.com/btcsuite/btcd/wire"
+	"time"
 )
 
 const (
@@ -198,7 +199,6 @@ func (p *Peer) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 		}
 		return false, nil
 	}
-
 	for _, resphdr := range m.Headers {
 		success, err := p.blockchain.CommitHeader(*resphdr)
 		if !success || err != nil {

@@ -23,7 +23,7 @@ func main() {
 	backendStdoutFormatter := logging.NewBackendFormatter(backendStdout, stdoutLogFormat)
 
 	// example database
-	database, err := db.Create("./")
+	database, err := db.Create("/home/chris/.openbazaar2")
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -31,6 +31,6 @@ func main() {
 	mnemonic := "salon around sketch ivory analyst vital erosion shift organ hub assault notice"
 
 	// Start up a new node
-	spvwallet.NewSPVWallet(mnemonic, &chaincfg.TestNet3Params, 1000, 60, 40, 20, "", "./", database, "OpenBazaar", backendStdoutFormatter)
+	spvwallet.NewSPVWallet(mnemonic, &chaincfg.TestNet3Params, 1000, 60, 40, 20, "", "/home/chris/.openbazaar2", database, "OpenBazaar", backendStdoutFormatter)
 	wg.Wait()
 }
