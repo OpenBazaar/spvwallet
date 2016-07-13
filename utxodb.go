@@ -85,11 +85,13 @@ func (ts *TxStore) PopulateAdrs() error {
 	if err != nil {
 		return err
 	}
+	ts.addrMutex.Lock()
 	ts.Adrs = []btcutil.Address{}
 	for _, k := range keys {
 		addr, _ := btcutil.NewAddressPubKey(k.PublicKey().Key, ts.Param)
 		ts.Adrs = append(ts.Adrs, addr.AddressPubKeyHash())
 	}
+	ts.addrMutex.Unlock()
 	return nil
 }
 
@@ -112,6 +114,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	// go through txouts, and then go through addresses to match
 
 	// generate PKscripts for all addresses
+	ts.addrMutex.Lock()
 	PKscripts := make([][]byte, len(ts.Adrs))
 	for i, _ := range ts.Adrs {
 		// iterate through all our addresses
@@ -120,6 +123,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 			return hits, err
 		}
 	}
+	ts.addrMutex.Unlock()
 	cachedSha := tx.TxSha()
 	// iterate through all outputs of this tx, see if we gain
 	for i, out := range tx.TxOut {
@@ -168,6 +172,5 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		ts.PopulateAdrs()
 		ts.db.Txns().Put(tx)
 	}
-
 	return hits, err
 }

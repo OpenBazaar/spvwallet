@@ -1,13 +1,12 @@
 package spvwallet
 
 import (
+	"fmt"
+	"sync"
 	"github.com/btcsuite/btcd/chaincfg"
-
-	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
-	"fmt"
 	b32 "github.com/tyler-smith/go-bip32"
 )
 
@@ -100,12 +99,11 @@ const (
 )
 
 type TxStore struct {
-	Adrs    []btcutil.Address  // endeavouring to acquire capital
-	StateDB *bolt.DB // place to write all this down
-	db      Datastore
+	Adrs      []btcutil.Address
+	addrMutex *sync.Mutex
+	db        Datastore
 
-	// Params live here, not SCon
-	Param *chaincfg.Params // network parameters (testnet3, testnetL)
+	Param *chaincfg.Params
 
 	masterPrivKey *b32.Key
 
@@ -134,6 +132,7 @@ func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *b32.Key) *TxSto
 	txs.Param = p
 	txs.db = db
 	txs.masterPrivKey = masterPrivKey
+	txs.addrMutex = new(sync.Mutex)
 	txs.PopulateAdrs()
 	return txs
 }
@@ -154,7 +153,7 @@ func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	t.addrMutex.Lock()
 	elem := uint32(len(t.Adrs) + len(allUtxos) + len(allStxos))
 	f := bloom.NewFilter(elem, 0, 0.00001, wire.BloomUpdateP2PubkeyOnly)
 
@@ -163,7 +162,7 @@ func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
 	for _, a := range t.Adrs { // add 20-byte pubkeyhash
 		f.Add(a.ScriptAddress())
 	}
-
+	t.addrMutex.Unlock()
 	for _, u := range allUtxos {
 		f.AddOutPoint(&u.Op)
 	}

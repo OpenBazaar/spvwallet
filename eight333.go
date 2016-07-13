@@ -103,7 +103,7 @@ func (p *Peer) IngestBlockAndHeader(m *wire.MsgMerkleBlock){
 	}
 	var height uint32
 	if success {
-		h, err := p.blockchain.Height()
+		h, err := p.blockchain.db.Height()
 		height = h
 		if err != nil {
 			log.Error(err)
@@ -111,7 +111,7 @@ func (p *Peer) IngestBlockAndHeader(m *wire.MsgMerkleBlock){
 		}
 		p.TS.SetDBSyncHeight(int32(h))
 	} else {
-		bestSH, err := p.blockchain.GetBestHeader()
+		bestSH, err := p.blockchain.db.GetBestHeader()
 		height = bestSH.height
 		if err != nil {
 			log.Error(err)
@@ -206,7 +206,7 @@ func (p *Peer) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 			return true, fmt.Errorf("Returned header didn't fit in chain")
 		}
 	}
-	height, _ := p.blockchain.Height()
+	height, _ := p.blockchain.db.Height()
 	log.Debugf("Headers to height %d OK.", height)
 	return true, nil
 }
@@ -215,8 +215,7 @@ func (p *Peer) AskForHeaders() error {
 	ghdr := wire.NewMsgGetHeaders()
 	ghdr.ProtocolVersion = p.localVersion
 
-	hashes := p.blockchain.GetBlockLocatorHashes()
-	ghdr.BlockLocatorHashes = hashes
+	ghdr.BlockLocatorHashes = p.blockchain.GetBlockLocatorHashes()
 
 	log.Debugf("Sending getheaders message to %s\n", p.con.RemoteAddr().String())
 	p.outMsgQueue <- ghdr
@@ -227,7 +226,7 @@ func (p *Peer) AskForHeaders() error {
 // right now this asks for 1 block per getData message.
 // Maybe it's faster to ask for many in a each message?
 func (p *Peer) AskForBlocks() error {
-	headerTip, err := p.blockchain.Height()
+	headerTip, err := p.blockchain.db.Height()
 	if err != nil {
 		return err
 	}

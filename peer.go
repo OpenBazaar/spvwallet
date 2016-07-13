@@ -87,6 +87,9 @@ func (p *Peer) run() {
 	mv, ok := m.(*wire.MsgVersion)
 	if ok {
 		log.Infof("Connected to %s on %s", mv.UserAgent, p.con.RemoteAddr().String())
+	} else {
+		p.disconnectChan <- p.remoteAddress
+		return
 	}
 	if !strings.Contains(mv.Services.String(), "SFNodeBloom") {
 		p.disconnectChan <- p.remoteAddress

@@ -24,6 +24,9 @@ type Headers interface {
 	// If this is the new best header, the chain tip should also be updated
 	Put(header StoredHeader, newBestHeader bool) error
 
+	// Delete all headers after the MAX_HEADERS most recent
+	Prune() error
+
 	// Returns all information about the previous header
 	GetPreviousHeader(header wire.BlockHeader) (StoredHeader, error)
 
@@ -32,23 +35,191 @@ type Headers interface {
 
 	// Get the height of chain
 	Height() (uint32, error)
+
+	// Print all headers
+	Print()
+}
+
+type HeaderDB struct {
+	lock     *sync.Mutex
+	db       *bolt.DB
+	filePath string
+}
+
+var (
+	BKTHeaders  = []byte("Headers")
+	BKTChainTip = []byte("ChainTip")
+	KEYChainTip = []byte("ChainTip")
+)
+
+func NewHeaderDB(filePath string) *HeaderDB {
+	h := new(HeaderDB)
+	db, _ := bolt.Open(path.Join(filePath, "headers.bin"), 0644, &bolt.Options{MmapFlags: syscall.MAP_POPULATE, InitialMmapSize: 5000000})
+	h.db = db
+	h.lock = new(sync.Mutex)
+	h.filePath = filePath
+
+	db.Update(func(btx *bolt.Tx) error {
+		_, err := btx.CreateBucketIfNotExists(BKTHeaders)
+		if err != nil {
+			return err
+		}
+		_, err = btx.CreateBucketIfNotExists(BKTChainTip)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	return h
+}
+
+func (h *HeaderDB) Put(sh StoredHeader, newBestHeader bool) error {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	return h.db.Update(func(btx *bolt.Tx) error {
+		hdrs := btx.Bucket(BKTHeaders)
+		ser, err := serializeHeader(sh)
+		if err != nil {
+			return err
+		}
+		hash := sh.header.BlockSha()
+		err = hdrs.Put(hash.Bytes(), ser)
+		if err != nil {
+			return err
+		}
+		if newBestHeader {
+			tip := btx.Bucket(BKTChainTip)
+			if err != nil {
+				return err
+			}
+			err = tip.Put(KEYChainTip, ser)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (h *HeaderDB) Prune() error {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	return h.db.Update(func(btx *bolt.Tx) error {
+		hdrs := btx.Bucket(BKTHeaders)
+		numHeaders := hdrs.Stats().KeyN
+		if  numHeaders > MAX_HEADERS {
+			for i:=0; i < numHeaders - MAX_HEADERS; i++ {
+				k, _ := hdrs.Cursor().First()
+				err := hdrs.Delete(k)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	})
+}
+
+func (h *HeaderDB) GetPreviousHeader(header wire.BlockHeader) (sh StoredHeader, err error) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	err = h.db.View(func(btx *bolt.Tx) error {
+		hdrs := btx.Bucket(BKTHeaders)
+		hash := header.PrevBlock
+		b := hdrs.Get(hash.Bytes())
+		if b == nil {
+			return errors.New("Header does not exist in database")
+		}
+		sh, err = deserializeHeader(b)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return sh, err
+	}
+	return sh, nil
+}
+
+func (h *HeaderDB) GetBestHeader() (sh StoredHeader, err error) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	err = h.db.View(func(btx *bolt.Tx) error {
+		tip := btx.Bucket(BKTChainTip)
+		b := tip.Get(KEYChainTip)
+		if b == nil {
+			return errors.New("ChainTip not set")
+		}
+		sh, err = deserializeHeader(b)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return sh, err
+	}
+	return sh, nil
+}
+
+func (h *HeaderDB) Height() (uint32, error) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	var height uint32
+	err := h.db.View(func(btx *bolt.Tx) error {
+		tip := btx.Bucket(BKTChainTip)
+		sh, err := deserializeHeader(tip.Get(KEYChainTip))
+		if err != nil {
+			return err
+		}
+		height = sh.height
+		return nil
+	})
+	if err != nil {
+		return height, err
+	}
+	return height, nil
+}
+
+func (h *HeaderDB) Print() {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	m := make(map[uint32]string)
+	h.db.View(func(tx *bolt.Tx) error {
+		// Assume bucket exists and has keys
+		bkt := tx.Bucket(BKTHeaders)
+		bkt.ForEach(func(k, v []byte) error {
+			sh, _ := deserializeHeader(v)
+			m[sh.height] = sh.header.BlockSha().String()
+			return nil
+		})
+
+		return nil
+	})
+	var keys []int
+	for k := range m {
+		keys = append(keys, int(k))
+	}
+	sort.Ints(keys)
+	for _, k := range keys {
+		fmt.Println(k, m[uint32(k)])
+	}
 }
 
 const (
 	MAX_HEADERS = 2000
-     	MAINNET_CHECKPOINT_HEIGHT = 407232
+	MAINNET_CHECKPOINT_HEIGHT = 407232
 	TESTNET3_CHECKPOINT_HEIGHT = 895104
 )
 
 var MainnetCheckpoint wire.BlockHeader
 var Testnet3Checkpoint wire.BlockHeader
 
-
 type Blockchain struct {
-	lock     *sync.Mutex
-	params   *chaincfg.Params
-	db       *bolt.DB
-	filePath string
+	lock        *sync.Mutex
+	params      *chaincfg.Params
+	db          Headers
 }
 
 type StoredHeader struct {
@@ -58,78 +229,47 @@ type StoredHeader struct {
 	diffTarget uint32
 }
 
-var (
-	BKTHeaders  = []byte("Headers")
-	BKTChainTip = []byte("ChainTip")
-	KEYChainTip = []byte("ChainTip")
-)
-
 func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 	b := &Blockchain{
 		lock: new(sync.Mutex),
 		params: params,
-		filePath: filePath,
+		db: NewHeaderDB(filePath),
 	}
-	db, _ := bolt.Open(path.Join(filePath, "headers.bin"), 0644, &bolt.Options{MmapFlags: syscall.MAP_POPULATE, InitialMmapSize: 5000000})
-	b.db = db
 
-	db.Update(func(btx *bolt.Tx) error {
-		hdrs, err := btx.CreateBucketIfNotExists(BKTHeaders)
-		if err != nil {
-			return err
-		}
-		tip, err := btx.CreateBucketIfNotExists(BKTChainTip)
-		if err != nil {
-			return err
-		}
-		best := tip.Get(KEYChainTip)
-		if best == nil {
-			log.Info("Initializing headers db with checkpoints")
-			createCheckpoints()
-			if b.params.Name == chaincfg.MainNetParams.Name {
-				// Put the checkpoint to the db
-				b, err := serializeHeader(
-					StoredHeader{
-						header: MainnetCheckpoint,
-						height: MAINNET_CHECKPOINT_HEIGHT,
-						totalWork: big.NewInt(0),
-						diffTarget: MainnetCheckpoint.Bits,
-					})
-				if err != nil {
-					return err
-				}
-				// Put to db
-				hash := MainnetCheckpoint.BlockSha()
-				hdrs.Put(hash.Bytes(), b)
-				tip.Put(KEYChainTip, b)
-			} else if b.params.Name == chaincfg.TestNet3Params.Name {
-				// Put the checkpoint to the db
-				b, err := serializeHeader(
-					StoredHeader{
-						header: Testnet3Checkpoint,
-						height: TESTNET3_CHECKPOINT_HEIGHT,
-						totalWork: big.NewInt(0),
-						diffTarget: Testnet3Checkpoint.Bits,
-					})
-				if err != nil {
-					return err
-				}
-				// Put to db
-				hash := Testnet3Checkpoint.BlockSha()
-				hdrs.Put(hash.Bytes(), b)
-				tip.Put(KEYChainTip, b)
+	h, err := b.db.Height()
+	if h == 0 || err != nil {
+		log.Info("Initializing headers db with checkpoints")
+		createCheckpoints()
+		if b.params.Name == chaincfg.MainNetParams.Name {
+			// Put the checkpoint to the db
+			sh := StoredHeader{
+				header: MainnetCheckpoint,
+				height: MAINNET_CHECKPOINT_HEIGHT,
+				totalWork: big.NewInt(0),
+				diffTarget: MainnetCheckpoint.Bits,
 			}
+			b.db.Put(sh, true)
+		} else if b.params.Name == chaincfg.TestNet3Params.Name {
+			// Put the checkpoint to the db
+			sh := StoredHeader{
+				header: Testnet3Checkpoint,
+				height: TESTNET3_CHECKPOINT_HEIGHT,
+				totalWork: big.NewInt(0),
+				diffTarget: Testnet3Checkpoint.Bits,
+			}
+			// Put to db
+			b.db.Put(sh, true)
 		}
-		return nil
-	})
-
+	}
 	return b
 }
 
 func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	newTip := false
 	// Fetch our current best header from the db
-	bestHeader, err := b.GetBestHeader()
+	bestHeader, err := b.db.GetBestHeader()
 	if err != nil {
 		return false, err
 	}
@@ -141,7 +281,7 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 	if header.PrevBlock.IsEqual(&tipHash){
 		parentHeader = bestHeader
 	} else {
-		parentHeader, err = b.GetPreviousHeader(header)
+		parentHeader, err = b.db.GetPreviousHeader(header)
 		if err != nil {
 			return false, errors.New("Header does not extend any known headers")
 		}
@@ -169,7 +309,7 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 		}
 	}
 	// Put the header to the database
-	err = b.Put(StoredHeader {
+	err = b.db.Put(StoredHeader {
 			header: header,
 			height: parentHeader.height + 1,
 			totalWork: cumulativeWork,
@@ -238,103 +378,13 @@ func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeade
 	return true, blockchain.BigToCompact(diffTarget) // it must have worked if there's no errors and got to the end.
 }
 
-func (b *Blockchain) Put(sh StoredHeader, newBestHeader bool) error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	return b.db.Update(func(btx *bolt.Tx) error {
-		hdrs := btx.Bucket(BKTHeaders)
-		ser, err := serializeHeader(sh)
-		if err != nil {
-			return err
-		}
-		hash := sh.header.BlockSha()
-		err = hdrs.Put(hash.Bytes(), ser)
-		if err != nil {
-			return err
-		}
-		if newBestHeader {
-			tip := btx.Bucket(BKTChainTip)
-			if err != nil {
-				return err
-			}
-			err = tip.Put(KEYChainTip, ser)
-			if err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-}
-
-func (b *Blockchain) Prune() error {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	return b.db.Update(func(btx *bolt.Tx) error {
-		hdrs := btx.Bucket(BKTHeaders)
-		numHeaders := hdrs.Stats().KeyN
-		if  numHeaders > MAX_HEADERS {
-			for i:=0; i < numHeaders - MAX_HEADERS; i++ {
-				k, _ := hdrs.Cursor().First()
-				err := hdrs.Delete(k)
-				if err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	})
-}
-
-func (b *Blockchain) GetPreviousHeader(header wire.BlockHeader) (sh StoredHeader, err error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	err = b.db.View(func(btx *bolt.Tx) error {
-		hdrs := btx.Bucket(BKTHeaders)
-		hash := header.PrevBlock
-		b := hdrs.Get(hash.Bytes())
-		if b == nil {
-			return errors.New("Header does not exist in database")
-		}
-		sh, err = deserializeHeader(b)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return sh, err
-	}
-	return sh, nil
-}
-
-func (b *Blockchain) GetBestHeader() (sh StoredHeader, err error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	err = b.db.View(func(btx *bolt.Tx) error {
-		tip := btx.Bucket(BKTChainTip)
-		b := tip.Get(KEYChainTip)
-		if b == nil {
-			return errors.New("ChainTip not set")
-		}
-		sh, err = deserializeHeader(b)
-		if err != nil {
-			return err
-		}
-		return nil
-	})
-	if err != nil {
-		return sh, err
-	}
-	return sh, nil
-}
-
 func (b *Blockchain) GetEpoch() (*wire.BlockHeader, error) {
-	sh, err := b.GetBestHeader()
+	sh, err := b.db.GetBestHeader()
 	if err != nil {
 		return &sh.header, err
 	}
 	for i:=0; i<2015; i++ {
-		sh, err = b.GetPreviousHeader(sh.header)
+		sh, err = b.db.GetPreviousHeader(sh.header)
 		if err != nil {
 			return &sh.header, err
 		}
@@ -345,14 +395,14 @@ func (b *Blockchain) GetEpoch() (*wire.BlockHeader, error) {
 
 func (b *Blockchain) GetNPrevBlockHashes(n int) []*wire.ShaHash {
 	var ret []*wire.ShaHash
-	hdr, err := b.GetBestHeader()
+	hdr, err := b.db.GetBestHeader()
 	if err != nil {
 		return ret
 	}
 	tipSha := hdr.header.BlockSha()
 	ret = append(ret, &tipSha)
 	for i:=0; i<n-1; i++ {
-		hdr, err = b.GetPreviousHeader(hdr.header)
+		hdr, err = b.db.GetPreviousHeader(hdr.header)
 		if err != nil {
 			return ret
 		}
@@ -364,14 +414,14 @@ func (b *Blockchain) GetNPrevBlockHashes(n int) []*wire.ShaHash {
 
 func (b *Blockchain) GetBlockLocatorHashes() []*wire.ShaHash {
 	var ret []*wire.ShaHash
-	parent, err := b.GetBestHeader()
+	parent, err := b.db.GetBestHeader()
 	if err != nil {
 		return ret
 	}
 
 	rollback := func(parent StoredHeader, n int) (StoredHeader, error){
 		for i:=0; i<n; i++ {
-			parent, err = b.GetPreviousHeader(parent.header)
+			parent, err = b.db.GetPreviousHeader(parent.header)
 			if err != nil {
 				return parent, err
 			}
@@ -398,50 +448,6 @@ func (b *Blockchain) GetBlockLocatorHashes() []*wire.ShaHash {
 		start += 1
 	}
 	return ret
-}
-
-func (b *Blockchain) Height() (uint32, error) {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	var height uint32
-	err := b.db.View(func(btx *bolt.Tx) error {
-		tip := btx.Bucket(BKTChainTip)
-		sh, err := deserializeHeader(tip.Get(KEYChainTip))
-		if err != nil {
-			return err
-		}
-		height = sh.height
-		return nil
-	})
-	if err != nil {
-		return height, err
-	}
-	return height, nil
-}
-
-func (b *Blockchain) Print() {
-	b.lock.Lock()
-	defer b.lock.Unlock()
-	m := make(map[uint32]string)
-	b.db.View(func(tx *bolt.Tx) error {
-		// Assume bucket exists and has keys
-		bkt := tx.Bucket(BKTHeaders)
-		bkt.ForEach(func(k, v []byte) error {
-			sh, _ := deserializeHeader(v)
-			m[sh.height] = sh.header.BlockSha().String()
-			return nil
-		})
-
-		return nil
-	})
-	var keys []int
-	for k := range m {
-		keys = append(keys, int(k))
-	}
-	sort.Ints(keys)
-	for _, k := range keys {
-		fmt.Println(k, m[uint32(k)])
-	}
 }
 
 /*----- header serialization ------- */

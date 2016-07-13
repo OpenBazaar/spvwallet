@@ -153,8 +153,8 @@ func (p *Peer) TxHandler(m *wire.MsgTx) {
 		return
 	}
 	if hits == 0 {
-		log.Debugf("Tx %s had no hits, filter false positive.",
-			m.TxSha().String())
+		log.Debugf("Tx %s from %s had no hits, filter false positive.",
+			m.TxSha().String(), p.con.RemoteAddr().String())
 		p.fPositives <- 1 // add one false positive to chan
 		return
 	}
