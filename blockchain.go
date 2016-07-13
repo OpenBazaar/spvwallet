@@ -128,7 +128,6 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 
 func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 	newTip := false
-
 	// Fetch our current best header from the db
 	bestHeader, err := b.GetBestHeader()
 	if err != nil {
@@ -151,13 +150,11 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 	if !valid {
 		return false, nil
 	}
-
 	// If this block is already the tip, return
 	headerHash := header.BlockSha()
 	if tipHash.IsEqual(&headerHash) {
 		return newTip, nil
 	}
-
 	// Add the work of this header to the total work stored at the previous header
 	cumulativeWork := new(big.Int).Add(parentHeader.totalWork, blockchain.CalcWork(header.Bits))
 
@@ -346,19 +343,59 @@ func (b *Blockchain) GetEpoch() (*wire.BlockHeader, error) {
 	return &sh.header, nil
 }
 
-func (b *Blockchain) GetNPrevBlockHashes(n int) []wire.ShaHash {
-	var ret []wire.ShaHash
+func (b *Blockchain) GetNPrevBlockHashes(n int) []*wire.ShaHash {
+	var ret []*wire.ShaHash
 	hdr, err := b.GetBestHeader()
 	if err != nil {
 		return ret
 	}
-	ret = append(ret, hdr.header.BlockSha())
+	tipSha := hdr.header.BlockSha()
+	ret = append(ret, &tipSha)
 	for i:=0; i<n-1; i++ {
 		hdr, err = b.GetPreviousHeader(hdr.header)
 		if err != nil {
 			return ret
 		}
-		ret = append(ret, hdr.header.BlockSha())
+		shaHash := hdr.header.BlockSha()
+		ret = append(ret, &shaHash)
+	}
+	return ret
+}
+
+func (b *Blockchain) GetBlockLocatorHashes() []*wire.ShaHash {
+	var ret []*wire.ShaHash
+	parent, err := b.GetBestHeader()
+	if err != nil {
+		return ret
+	}
+
+	rollback := func(parent StoredHeader, n int) (StoredHeader, error){
+		for i:=0; i<n; i++ {
+			parent, err = b.GetPreviousHeader(parent.header)
+			if err != nil {
+				return parent, err
+			}
+		}
+		return parent, nil
+	}
+
+	step := 1
+	start := 0
+	for {
+		if start >= 10 {
+			step *= 2
+			start = 0
+		}
+		hash := parent.header.BlockSha()
+		ret = append(ret, &hash)
+		if len(ret) == 500 {
+			break
+		}
+		parent, err = rollback(parent, step)
+		if err != nil {
+			break
+		}
+		start += 1
 	}
 	return ret
 }

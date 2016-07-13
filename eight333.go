@@ -5,7 +5,6 @@ import (
 	"net"
 	"sync"
 	"github.com/btcsuite/btcd/wire"
-	"time"
 )
 
 const (
@@ -200,8 +199,8 @@ func (p *Peer) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 		return false, nil
 	}
 	for _, resphdr := range m.Headers {
-		success, err := p.blockchain.CommitHeader(*resphdr)
-		if !success || err != nil {
+		_, err := p.blockchain.CommitHeader(*resphdr)
+		if err != nil {
 			// probably should disconnect from spv node at this point,
 			// since they're giving us invalid headers.
 			return true, fmt.Errorf("Returned header didn't fit in chain")
@@ -216,16 +215,9 @@ func (p *Peer) AskForHeaders() error {
 	ghdr := wire.NewMsgGetHeaders()
 	ghdr.ProtocolVersion = p.localVersion
 
-	bestHeader, err:= p.blockchain.GetBestHeader()
-	if err != nil {
-		return err
-	}
+	hashes := p.blockchain.GetBlockLocatorHashes()
+	ghdr.BlockLocatorHashes = hashes
 
-	cHash := bestHeader.header.BlockSha()
-	err = ghdr.AddBlockLocatorHash(&cHash)
-	if err != nil {
-		return err
-	}
 	log.Debugf("Sending getheaders message to %s\n", p.con.RemoteAddr().String())
 	p.outMsgQueue <- ghdr
 	return nil
@@ -268,7 +260,7 @@ func (p *Peer) AskForBlocks() error {
 	// loop through all heights where we want merkleblocks.
 	for i := len(hashes)-1; i >= 0; i-- {
 		dbTip ++
-		iv1 := wire.NewInvVect(wire.InvTypeFilteredBlock, &hashes[i])
+		iv1 := wire.NewInvVect(wire.InvTypeFilteredBlock, hashes[i])
 		gdataMsg := wire.NewMsgGetData()
 		// add inventory
 		err = gdataMsg.AddInvVect(iv1)
@@ -276,7 +268,7 @@ func (p *Peer) AskForBlocks() error {
 			return err
 		}
 
-		hah := NewRootAndHeight(hashes[i], dbTip)
+		hah := NewRootAndHeight(*hashes[i], dbTip)
 		if uint32(dbTip) == headerTip { // if this is the last block, indicate finality
 			hah.final = true
 		}
