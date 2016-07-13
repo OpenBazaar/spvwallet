@@ -262,3 +262,7 @@ func (w *SPVWallet) Balance() (confirmed, unconfirmed int64) {
 	}
 	return confirmed, unconfirmed
 }
+
+func (w *SPVWallet) Params() *chaincfg.Params {
+	return w.params
+}
