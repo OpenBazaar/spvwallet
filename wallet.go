@@ -50,7 +50,7 @@ const MAX_PEERS = 10
 func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFee uint64, mediumFee uint64, highFee uint64, feeApi,
 	repoPath string, db Datastore, userAgent string, logger logging.Backend) *SPVWallet {
 
-	logging.SetBackend(logger)
+	log.SetBackend(logger)
 
 	seed := b39.NewSeed(mnemonic, "")
 	mk, _ := b32.NewMasterKey(seed)
