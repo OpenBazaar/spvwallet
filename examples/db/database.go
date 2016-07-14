@@ -75,8 +75,7 @@ func (db *SQLiteDatastore) State() spvwallet.State{
 func initDatabaseTables(db *sql.DB) error {
 	var sqlStmt string
 	sqlStmt = sqlStmt + `
-	create table if not exists keys (key text primary key not null, scriptPubKey text, purpose integer, used integer);
-	create index if not exists keys_scriptPubKey ON keys(scriptPubKey);
+	create table if not exists keys (scriptPubKey text primary key not null, purpose integer, keyIndex integer, used integer);
 	create table if not exists utxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text);
 	create table if not exists stxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, spendHeight integer, spendTxid text);
 	create table if not exists txns (txid text primary key not null, tx blob);

@@ -19,11 +19,14 @@ func (u *UtxoDB) Put(utxo spvwallet.Utxo) error {
 	u.lock.Lock()
 	defer u.lock.Unlock()
 	tx, _ := u.db.Begin()
-	stmt, _ := tx.Prepare("insert or replace into utxos(outpoint, value, height, scriptPubKey) values(?,?,?,?)")
+	stmt, err := tx.Prepare("insert or replace into utxos(outpoint, value, height, scriptPubKey) values(?,?,?,?)")
 	defer stmt.Close()
-
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
 	outpoint := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
-	_, err := stmt.Exec(outpoint, int(utxo.Value), int(utxo.AtHeight), hex.EncodeToString(utxo.ScriptPubkey))
+	_, err = stmt.Exec(outpoint, int(utxo.Value), int(utxo.AtHeight), hex.EncodeToString(utxo.ScriptPubkey))
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -38,6 +41,7 @@ func (u *UtxoDB) GetAll() ([]spvwallet.Utxo, error) {
 	var ret []spvwallet.Utxo
 	stm := "select outpoint, value, height, scriptPubKey from utxos"
 	rows, err := u.db.Query(stm)
+	defer rows.Close()
 	if err != nil {
 		return ret, err
 	}
