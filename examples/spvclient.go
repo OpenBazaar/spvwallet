@@ -32,6 +32,7 @@ func main() {
 	mnemonic := "salon around sketch ivory analyst vital erosion shift organ hub assault notice"
 
 	// Start up a new node
-	spvwallet.NewSPVWallet(mnemonic, &chaincfg.TestNet3Params, 1000, 60, 40, 20, "", "/home/chris/.openbazaar2", database, "OpenBazaar", ml)
+	wallet := spvwallet.NewSPVWallet(mnemonic, &chaincfg.TestNet3Params, 1000, 60, 40, 20, "", "/home/chris/.openbazaar2", database, "OpenBazaar", ml)
+	go wallet.Start()
 	wg.Wait()
 }
