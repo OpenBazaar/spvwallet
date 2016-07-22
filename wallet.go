@@ -144,23 +144,20 @@ func (w *SPVWallet) connectToPeers() {
 }
 
 func (w *SPVWallet) onPeerDisconnect() {
-	for {
-		select {
-		case addr := <- w.diconnectChan:
-			w.pgMutex.Lock()
-			p, ok := w.peerGroup[addr]
-			if ok {
-				p.con.Close()
-				p.connectionState = DEAD
-				if p.downloadPeer {
-					w.downloadPeer = nil
-				}
-				delete(w.peerGroup, addr)
+	for addr := range w.diconnectChan {
+		w.pgMutex.Lock()
+		p, ok := w.peerGroup[addr]
+		if ok {
+			p.con.Close()
+			p.connectionState = DEAD
+			if p.downloadPeer {
+				w.downloadPeer = nil
 			}
-			w.pgMutex.Unlock()
-			log.Infof("Disconnected from peer %s", addr)
-			w.connectToPeers()
+			delete(w.peerGroup, addr)
 		}
+		w.pgMutex.Unlock()
+		log.Infof("Disconnected from peer %s", addr)
+		w.connectToPeers()
 	}
 }
 

@@ -11,6 +11,8 @@ const (
 	VERSION = 70012
 )
 
+// Peer represents a remote Bitcoin node and provides methods for interacting
+// with them via the Bitcoin protocol
 type Peer struct {
 	con net.Conn // the (probably tcp) connection to the node
 
@@ -173,11 +175,7 @@ func (p *Peer) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 		// this way the only thing that triggers waitstate is asking for headers,
 		// getting 0, calling AskForMerkBlocks(), and seeing you don't need any.
 		// that way you are pretty sure you're synced up.
-		err = p.AskForHeaders()
-		if err != nil {
-			log.Errorf("Merkle block error: %s\n", err.Error())
-			return
-		}
+		p.AskForHeaders()
 	}
 	log.Debugf("Ingested Merkle Block %s at height %d", m.Header.BlockSha().String(), hah.height)
 	return
@@ -211,7 +209,8 @@ func (p *Peer) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	return true, nil
 }
 
-func (p *Peer) AskForHeaders() error {
+// AskForHeaders enqueues an outgoing getheaders message
+func (p *Peer) AskForHeaders() {
 	ghdr := wire.NewMsgGetHeaders()
 	ghdr.ProtocolVersion = p.localVersion
 
@@ -219,7 +218,6 @@ func (p *Peer) AskForHeaders() error {
 
 	log.Debugf("Sending getheaders message to %s\n", p.con.RemoteAddr().String())
 	p.outMsgQueue <- ghdr
-	return nil
 }
 
 // AskForMerkBlocks requests blocks from current to last

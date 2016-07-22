@@ -74,8 +74,8 @@ func (p *Peer) outgoingMessageHandler() {
 //
 func (p *Peer) fPositiveHandler() {
 	var fpAccumulator int32
-	for {
-		fpAccumulator += <-p.fPositives // blocks here
+	for newFps := range p.fPositives {
+		fpAccumulator += newFps
 		if fpAccumulator > 7 {
 			p.UpdateFilterAndSend()
 			// clear the channel
@@ -104,10 +104,7 @@ func (p *Peer) HeaderHandler(m *wire.MsgHeaders) {
 	}
 	// more to get? if so, ask for them and return
 	if moar {
-		err = p.AskForHeaders()
-		if err != nil {
-			log.Errorf("AskForHeaders error: %s", err.Error())
-		}
+		p.AskForHeaders()
 		return
 	}
 
