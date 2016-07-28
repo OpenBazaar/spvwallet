@@ -1,44 +1,46 @@
 package spvwallet
 
 import (
-	"net"
-	"os"
 	"bytes"
 	"io/ioutil"
-	"sync"
 	"math/rand"
+	"net"
+	"os"
+	"sync"
+
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/op/go-logging"
-	b39 "github.com/tyler-smith/go-bip39"
 	btc "github.com/btcsuite/btcutil"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/op/go-logging"
+	b39 "github.com/tyler-smith/go-bip39"
 )
 
+// SPVWallet implements a wallet with Bitcoin-style simplified payment verification
 type SPVWallet struct {
-	params           *chaincfg.Params
+	params *chaincfg.Params
 
-	peerGroup         map[string] *Peer
-	pgMutex           sync.Mutex
-	downloadPeer      *Peer
-	diconnectChan     chan string
+	peerGroup     map[string]*Peer
+	pgMutex       sync.Mutex
+	downloadPeer  *Peer
+	diconnectChan chan string
 
 	masterPrivateKey *hd.ExtendedKey
 	masterPublicKey  *hd.ExtendedKey
 
-	maxFee            uint64
-	priorityFee       uint64
-	normalFee         uint64
-	economicFee       uint64
-	feeAPI            string
+	maxFee      uint64
+	priorityFee uint64
+	normalFee   uint64
+	economicFee uint64
+	feeAPI      string
 
-	repoPath          string
+	repoPath string
 
-	addrs             []string
-	userAgent         string
+	addrs     []string
+	userAgent string
 
-	db                Datastore
-	blockchain        *Blockchain
-	state             *TxStore
+	db         Datastore
+	blockchain *Blockchain
+	state      *TxStore
 }
 
 var log = logging.MustGetLogger("bitcoin")
@@ -123,7 +125,9 @@ func (w *SPVWallet) connectToPeers() {
 				// Set this temporarily to avoid a race condition which sets two download peers
 				w.downloadPeer = &Peer{}
 			}
-			peer, err := NewPeer(addr, w.blockchain, w.state, w.params, w.userAgent, w.diconnectChan, dp)
+
+			peer := NewPeer(addr, w.blockchain, w.state, w.params, w.userAgent, w.diconnectChan, dp)
+			err := peer.start()
 			if err != nil {
 				if dp {
 					// Unset as download peer on failure
@@ -131,6 +135,7 @@ func (w *SPVWallet) connectToPeers() {
 				}
 				continue
 			}
+
 			if dp {
 				w.downloadPeer = peer
 			}
@@ -144,36 +149,32 @@ func (w *SPVWallet) connectToPeers() {
 }
 
 func (w *SPVWallet) onPeerDisconnect() {
-	for {
-		select {
-		case addr := <- w.diconnectChan:
-			w.pgMutex.Lock()
-			p, ok := w.peerGroup[addr]
-			if ok {
-				p.con.Close()
-				p.connectionState = DEAD
-				if p.downloadPeer {
-					w.downloadPeer = nil
-				}
-				delete(w.peerGroup, addr)
+	for addr := range w.diconnectChan {
+		w.pgMutex.Lock()
+		p, ok := w.peerGroup[addr]
+		if ok {
+			p.stop()
+			if p.downloadPeer {
+				w.downloadPeer = nil
 			}
-			w.pgMutex.Unlock()
-			log.Infof("Disconnected from peer %s", addr)
-			w.connectToPeers()
+			delete(w.peerGroup, addr)
 		}
+		w.pgMutex.Unlock()
+		log.Infof("Disconnected from peer %s", addr)
+		w.connectToPeers()
 	}
 }
 
 func (w *SPVWallet) queryDNSSeeds() {
 	// Query DNS seeds for addrs. Eventually we will cache these.
 	log.Info("Querying DNS seeds...")
-	for _, seed := range(w.params.DNSSeeds) {
+	for _, seed := range w.params.DNSSeeds {
 		addrs, err := net.LookupHost(seed)
 		if err != nil {
 			continue
 		}
-		for _, addr := range(addrs) {
-			w.addrs = append(w.addrs, addr + ":" + w.params.DefaultPort)
+		for _, addr := range addrs {
+			w.addrs = append(w.addrs, addr+":"+w.params.DefaultPort)
 		}
 	}
 	log.Infof("DNS seeds returned %d addresses.", len(w.addrs))
@@ -185,14 +186,14 @@ func (w *SPVWallet) openHeaderFile(hfn string) error {
 		if os.IsNotExist(err) {
 			var b bytes.Buffer
 			if w.params.Name == chaincfg.MainNetParams.Name {
-				pad := make([]byte, MAINNET_CHECKPOINT_HEIGHT * 80)
+				pad := make([]byte, MAINNET_CHECKPOINT_HEIGHT*80)
 				b.Write(pad)
 				err = MainnetCheckpoint.Serialize(&b)
 				if err != nil {
 					return err
 				}
 			} else if w.params.Name == chaincfg.TestNet3Params.Name {
-				pad := make([]byte, TESTNET3_CHECKPOINT_HEIGHT * 80)
+				pad := make([]byte, TESTNET3_CHECKPOINT_HEIGHT*80)
 				b.Write(pad)
 				err = Testnet3Checkpoint.Serialize(&b)
 				if err != nil {
@@ -211,7 +212,7 @@ func (w *SPVWallet) openHeaderFile(hfn string) error {
 }
 
 func (w *SPVWallet) checkIfStxoIsConfirmed(utxo Utxo, stxos []Stxo) bool {
-	for _, stxo := range(stxos) {
+	for _, stxo := range stxos {
 		if stxo.SpendTxid == utxo.Op.Hash {
 			if stxo.Utxo.AtHeight > 0 {
 				return true
@@ -222,7 +223,6 @@ func (w *SPVWallet) checkIfStxoIsConfirmed(utxo Utxo, stxos []Stxo) bool {
 	}
 	return false
 }
-
 
 //////////////////////////
 //

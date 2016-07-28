@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+
 	"github.com/btcsuite/btcd/wire"
 )
 
@@ -11,6 +12,8 @@ const (
 	VERSION = 70012
 )
 
+// Peer represents a remote Bitcoin node and provides methods for interacting
+// with them via the Bitcoin protocol
 type Peer struct {
 	con net.Conn // the (probably tcp) connection to the node
 
@@ -28,8 +31,6 @@ type Peer struct {
 	localVersion  uint32 // version we report
 	remoteVersion uint32 // version remote node
 
-	// what's the point of the input queue? remove? leave for now...
-	inMsgQueue  chan wire.Message // Messages coming in from remote node
 	outMsgQueue chan wire.Message // Messages going out to remote node
 
 	WBytes uint64 // total bytes written
@@ -52,6 +53,9 @@ type Peer struct {
 	// known good txids and their heights
 	OKTxids map[wire.ShaHash]int32
 	OKMutex sync.Mutex
+
+	// Notifies goroutines to exit
+	shutdownCh chan (struct{})
 }
 
 // AskForTx requests a tx we heard about from an inv message.
@@ -83,13 +87,13 @@ func NewRootAndHeight(b wire.ShaHash, h int32) (hah HashAndHeight) {
 	return
 }
 
-func (p *Peer) AskForMerkleBlock(hash wire.ShaHash){
+func (p *Peer) AskForMerkleBlock(hash wire.ShaHash) {
 	m := wire.NewMsgGetData()
 	m.AddInvVect(wire.NewInvVect(wire.InvTypeFilteredBlock, &hash))
 	p.outMsgQueue <- m
 }
 
-func (p *Peer) IngestBlockAndHeader(m *wire.MsgMerkleBlock){
+func (p *Peer) IngestBlockAndHeader(m *wire.MsgMerkleBlock) {
 	txids, err := checkMBlock(m) // check self-consistency
 	if err != nil {
 		log.Errorf("Merkle block error: %s\n", err.Error())
@@ -173,11 +177,7 @@ func (p *Peer) IngestMerkleBlock(m *wire.MsgMerkleBlock) {
 		// this way the only thing that triggers waitstate is asking for headers,
 		// getting 0, calling AskForMerkBlocks(), and seeing you don't need any.
 		// that way you are pretty sure you're synced up.
-		err = p.AskForHeaders()
-		if err != nil {
-			log.Errorf("Merkle block error: %s\n", err.Error())
-			return
-		}
+		p.AskForHeaders()
 	}
 	log.Debugf("Ingested Merkle Block %s at height %d", m.Header.BlockSha().String(), hah.height)
 	return
@@ -193,7 +193,7 @@ func (p *Peer) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 		log.Debugf("Received %d headers from %s, validating...", gotNum, p.con.RemoteAddr().String())
 	} else {
 		log.Debugf("Received 0 headers from %s, we're probably synced up", p.con.RemoteAddr().String())
-		if  p.TS.chainState == SYNCING {
+		if p.TS.chainState == SYNCING {
 			log.Info("Headers fully synced")
 		}
 		return false, nil
@@ -211,7 +211,8 @@ func (p *Peer) IngestHeaders(m *wire.MsgHeaders) (bool, error) {
 	return true, nil
 }
 
-func (p *Peer) AskForHeaders() error {
+// AskForHeaders enqueues an outgoing getheaders message
+func (p *Peer) AskForHeaders() {
 	ghdr := wire.NewMsgGetHeaders()
 	ghdr.ProtocolVersion = p.localVersion
 
@@ -219,7 +220,6 @@ func (p *Peer) AskForHeaders() error {
 
 	log.Debugf("Sending getheaders message to %s\n", p.con.RemoteAddr().String())
 	p.outMsgQueue <- ghdr
-	return nil
 }
 
 // AskForMerkBlocks requests blocks from current to last
@@ -257,8 +257,8 @@ func (p *Peer) AskForBlocks() error {
 	hashes := p.blockchain.GetNPrevBlockHashes(int(headerTip - uint32(dbTip)))
 
 	// loop through all heights where we want merkleblocks.
-	for i := len(hashes)-1; i >= 0; i-- {
-		dbTip ++
+	for i := len(hashes) - 1; i >= 0; i-- {
+		dbTip++
 		iv1 := wire.NewInvVect(wire.InvTypeFilteredBlock, hashes[i])
 		gdataMsg := wire.NewMsgGetData()
 		// add inventory

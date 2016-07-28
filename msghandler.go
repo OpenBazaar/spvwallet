@@ -6,76 +6,78 @@ import (
 
 func (p *Peer) incomingMessageHandler() {
 	for {
-		n, xm, _, err := wire.ReadMessageN(p.con, p.localVersion, p.TS.Param.Net)
-		if err != nil {
-			p.disconnectChan <- p.remoteAddress
+		select {
+		case <-p.shutdownCh:
 			return
-		}
-		p.RBytes += uint64(n)
-		switch m := xm.(type) {
-		case *wire.MsgVersion:
-			log.Debugf("Got version message.  Agent %s, version %d, at height %d\n",
-				m.UserAgent, m.ProtocolVersion, m.LastBlock)
-			p.remoteVersion = uint32(m.ProtocolVersion) // weird cast! bug?
-		case *wire.MsgVerAck:
-			log.Debugf("Got verack from %s. Whatever.\n", p.con.RemoteAddr().String())
-		case *wire.MsgAddr:
-			log.Debugf("Received %d addresses from %s\n", len(m.AddrList), p.con.RemoteAddr().String())
-		case *wire.MsgPing:
-			// log.Debugf("Got a ping message.  We should pong back or they will kick us off.")
-			go p.PongBack(m.Nonce)
-		case *wire.MsgPong:
-			log.Debugf("Got a pong response. OK.\n")
-		case *wire.MsgMerkleBlock:
-			if p.TS.chainState == WAITING {
-				p.IngestBlockAndHeader(m)
-			} else {
-				p.IngestMerkleBlock(m)
-			}
-		case *wire.MsgHeaders: // concurrent because we keep asking for blocks
-			go p.HeaderHandler(m)
-		case *wire.MsgTx: // not concurrent! txs must be in order
-			p.TxHandler(m)
-		case *wire.MsgReject:
-			log.Warningf("Rejected! cmd: %s code: %s tx: %s reason: %s",
-				m.Cmd, m.Code.String(), m.Hash.String(), m.Reason)
-		case *wire.MsgInv:
-			p.InvHandler(m)
-		case *wire.MsgNotFound:
-			log.Warningf("Got not found response from %s:\n", p.con.RemoteAddr().String())
-			for i, thing := range m.InvList {
-				log.Warningf("\t$d) %s: %s", i, thing.Type, thing.Hash)
-			}
-		case *wire.MsgGetData:
-			p.GetDataHandler(m)
-
 		default:
-			log.Warningf("Received unknown message type %s from %s\n", m.Command(), p.con.RemoteAddr().String())
+			n, xm, _, err := wire.ReadMessageN(p.con, p.localVersion, p.TS.Param.Net)
+			if err != nil {
+				p.disconnectChan <- p.remoteAddress
+				return
+			}
+			p.RBytes += uint64(n)
+			switch m := xm.(type) {
+			case *wire.MsgVersion:
+				log.Debugf("Got version message.  Agent %s, version %d, at height %d\n",
+					m.UserAgent, m.ProtocolVersion, m.LastBlock)
+				p.remoteVersion = uint32(m.ProtocolVersion) // weird cast! bug?
+			case *wire.MsgVerAck:
+				log.Debugf("Got verack from %s. Whatever.\n", p.con.RemoteAddr().String())
+			case *wire.MsgAddr:
+				log.Debugf("Received %d addresses from %s\n", len(m.AddrList), p.con.RemoteAddr().String())
+			case *wire.MsgPing:
+				// log.Debugf("Got a ping message.  We should pong back or they will kick us off.")
+				go p.PongBack(m.Nonce)
+			case *wire.MsgPong:
+				log.Debugf("Got a pong response. OK.\n")
+			case *wire.MsgMerkleBlock:
+				if p.TS.chainState == WAITING {
+					p.IngestBlockAndHeader(m)
+				} else {
+					p.IngestMerkleBlock(m)
+				}
+			case *wire.MsgHeaders: // concurrent because we keep asking for blocks
+				go p.HeaderHandler(m)
+			case *wire.MsgTx: // not concurrent! txs must be in order
+				p.TxHandler(m)
+			case *wire.MsgReject:
+				log.Warningf("Rejected! cmd: %s code: %s tx: %s reason: %s",
+					m.Cmd, m.Code.String(), m.Hash.String(), m.Reason)
+			case *wire.MsgInv:
+				p.InvHandler(m)
+			case *wire.MsgNotFound:
+				log.Warningf("Got not found response from %s:\n", p.con.RemoteAddr().String())
+				for i, thing := range m.InvList {
+					log.Warningf("\t$d) %s: %s", i, thing.Type, thing.Hash)
+				}
+			case *wire.MsgGetData:
+				p.GetDataHandler(m)
+
+			default:
+				log.Warningf("Received unknown message type %s from %s\n", m.Command(), p.con.RemoteAddr().String())
+			}
 		}
 	}
-	return
 }
 
 // this one seems kindof pointless?  could get ridf of it and let
 // functions call WriteMessageN themselves...
 func (p *Peer) outgoingMessageHandler() {
-	for {
-		msg := <-p.outMsgQueue
+	for msg := range p.outMsgQueue {
 		n, err := wire.WriteMessageN(p.con, msg, p.localVersion, p.TS.Param.Net)
 		if err != nil {
 			log.Errorf("Write message error: %s", err.Error())
 		}
 		p.WBytes += uint64(n)
 	}
-	return
 }
 
 // fPositiveHandler monitors false positives and when it gets enough of them,
 //
 func (p *Peer) fPositiveHandler() {
 	var fpAccumulator int32
-	for {
-		fpAccumulator += <-p.fPositives // blocks here
+	for newFps := range p.fPositives {
+		fpAccumulator += newFps
 		if fpAccumulator > 7 {
 			p.UpdateFilterAndSend()
 			// clear the channel
@@ -104,10 +106,7 @@ func (p *Peer) HeaderHandler(m *wire.MsgHeaders) {
 	}
 	// more to get? if so, ask for them and return
 	if moar {
-		err = p.AskForHeaders()
-		if err != nil {
-			log.Errorf("AskForHeaders error: %s", err.Error())
-		}
+		p.AskForHeaders()
 		return
 	}
 
@@ -204,10 +203,10 @@ func (p *Peer) InvHandler(m *wire.MsgInv) {
 		if thing.Type == wire.InvTypeBlock { // new block what to do?
 			switch {
 			case p.TS.chainState == WAITING:
-			// start getting headers
+				// start getting headers
 				p.AskForMerkleBlock(thing.Hash)
 			default:
-			// drop it as if its component particles had high thermal energies
+				// drop it as if its component particles had high thermal energies
 				log.Debug("Received inv block but ignoring; not synched\n")
 			}
 		}

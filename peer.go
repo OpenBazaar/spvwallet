@@ -2,10 +2,10 @@ package spvwallet
 
 import (
 	"net"
+	"strings"
+
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/wire"
-	"fmt"
-	"strings"
 )
 
 type ConnectionState int
@@ -16,98 +16,107 @@ const (
 	DEAD       = 2
 )
 
-
-// OpenPV starts a
-func NewPeer(remoteNode string, blockchain *Blockchain, inTs *TxStore, params *chaincfg.Params, userAgent string, diconnectChan chan string, downloadPeer bool) (*Peer, error) {
-
-	// create new SPVCon
-	var err error
-	p := new(Peer)
-
+// NewPeer creates a a new *Peer and begins communicating with it.
+func NewPeer(remoteNode string, blockchain *Blockchain, inTs *TxStore, params *chaincfg.Params, userAgent string, diconnectChan chan string, downloadPeer bool) *Peer {
 	// I should really merge SPVCon and TxStore, they're basically the same
 	inTs.Param = params
-	p.TS = inTs // copy pointer of txstore into spvcon
-
-	p.blockchain = blockchain
-	p.remoteAddress = remoteNode
-	p.disconnectChan = diconnectChan
-	p.downloadPeer = downloadPeer
-	p.OKTxids = make(map[wire.ShaHash]int32)
 
 	// format if ipv6 addr
 	ip := net.ParseIP(remoteNode)
 	if ip.To4() == nil {
 		li := strings.LastIndex(remoteNode, ":")
-		remoteNode = "[" + remoteNode[:li] +"]" + remoteNode[li: len(remoteNode)]
+		remoteNode = "[" + remoteNode[:li] + "]" + remoteNode[li:len(remoteNode)]
 	}
 
-	// open TCP connection
-	p.con, err = net.Dial("tcp", remoteNode)
-	if err != nil {
-		log.Debugf("Connection to %s failed", remoteNode)
-		return p, err
-	}
-	// assign version bits for local node
-	p.localVersion = VERSION
-	p.userAgent = userAgent
-	go p.run()
+	// create new peer
+	return &Peer{
+		TS: inTs, // copy pointer of txstore into peer
 
-	return p, nil
+		blockchain:     blockchain,
+		remoteAddress:  remoteNode,
+		disconnectChan: diconnectChan,
+		downloadPeer:   downloadPeer,
+		OKTxids:        make(map[wire.ShaHash]int32),
+		shutdownCh:     make(chan struct{}),
+
+		// assign version bits for local node
+		localVersion: VERSION,
+		userAgent:    userAgent,
+	}
 }
 
-func (p *Peer) run() {
+// start begins communicating with the peer. It sends a version message and waits
+// for a reply. If that handshake completes it sets the data returned and then
+// spawns read/write loops.
+func (p *Peer) start() error {
+	var err error
+
+	// open TCP connection
+	p.con, err = net.Dial("tcp", p.remoteAddress)
+	if err != nil {
+		log.Debugf("Connection to %s failed", p.remoteAddress)
+		p.disconnectChan <- p.remoteAddress
+		return err
+	}
+
+	// prepare a version message for our node
 	myMsgVer, err := wire.NewMsgVersionFromConn(p.con, 0, 0)
 	if err != nil {
 		p.disconnectChan <- p.remoteAddress
-		return
+		return err
 	}
 	err = myMsgVer.AddUserAgent(p.userAgent, WALLET_VERSION)
 	if err != nil {
 		p.disconnectChan <- p.remoteAddress
-		return
+		return err
 	}
 	myMsgVer.DisableRelayTx = true
 
-	// this actually sends
+	// send the message
 	n, err := wire.WriteMessageN(p.con, myMsgVer, p.localVersion, p.TS.Param.Net)
 	if err != nil {
 		p.disconnectChan <- p.remoteAddress
-		return
+		return err
 	}
 	p.WBytes += uint64(n)
 	log.Debugf("Sent version message to %s\n", p.con.RemoteAddr().String())
+
+	// read a response
 	n, m, _, err := wire.ReadMessageN(p.con, p.localVersion, p.TS.Param.Net)
 	if err != nil {
 		p.disconnectChan <- p.remoteAddress
-		return
+		return err
 	}
 	p.RBytes += uint64(n)
 	log.Debugf("Received %s message from %s\n", m.Command(), p.con.RemoteAddr().String())
 
+	// if the response is correct and supports bloom filtering we're connected
 	mv, ok := m.(*wire.MsgVersion)
 	if ok {
 		log.Infof("Connected to %s on %s", mv.UserAgent, p.con.RemoteAddr().String())
 	} else {
 		p.disconnectChan <- p.remoteAddress
-		return
+		return err
 	}
 	if !strings.Contains(mv.Services.String(), "SFNodeBloom") {
 		p.disconnectChan <- p.remoteAddress
-		return
+		return err
 	}
+
+	// set remote height and connected state
+	p.remoteHeight = mv.LastBlock
 	p.connectionState = CONNECTED
 
-	// set remote height
-	p.remoteHeight = mv.LastBlock
+	// ack the received message
 	mva := wire.NewMsgVerAck()
 	n, err = wire.WriteMessageN(p.con, mva, p.localVersion, p.TS.Param.Net)
 	if err != nil {
 		p.disconnectChan <- p.remoteAddress
-		return
+		return err
 	}
 	p.WBytes += uint64(n)
 
-	p.inMsgQueue = make(chan wire.Message)
+	// begin read/write loops
 	go p.incomingMessageHandler()
 	p.outMsgQueue = make(chan wire.Message)
 	go p.outgoingMessageHandler()
@@ -116,24 +125,33 @@ func (p *Peer) run() {
 	filt, err := p.TS.GimmeFilter()
 	if err != nil {
 		p.disconnectChan <- p.remoteAddress
-		return
+		return err
 	}
+
 	// send filter
 	p.SendFilter(filt)
 	log.Debugf("Sent filter to %s\n", p.con.RemoteAddr().String())
 
+	// create queues for blocks and false positives
 	p.blockQueue = make(chan HashAndHeight, 32)
-	p.fPositives = make(chan int32, 4000)       // a block full, approx
+	p.fPositives = make(chan int32, 4000) // a block full, approx
 	go p.fPositiveHandler()
 
+	// if this peer is a downloadPeer ask it for headers
 	if p.downloadPeer {
 		log.Infof("Set %s as download peer", p.con.RemoteAddr().String())
-		err := p.AskForHeaders()
-		if err != nil {
-			fmt.Println(err)
-		}
+		p.AskForHeaders()
 	}
+
+	return nil
 }
 
+// stop shuts down all communication and closes all goroutines
+func (p *Peer) stop() {
+	close(p.outMsgQueue)
+	close(p.fPositives)
+	close(p.shutdownCh)
 
-
+	p.con.Close()
+	p.connectionState = DEAD
+}
