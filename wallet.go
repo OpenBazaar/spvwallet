@@ -2,9 +2,6 @@ package spvwallet
 
 import (
 	"net"
-	"os"
-	"bytes"
-	"io/ioutil"
 	"sync"
 	"math/rand"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -179,37 +176,6 @@ func (w *SPVWallet) queryDNSSeeds() {
 	log.Infof("DNS seeds returned %d addresses.", len(w.addrs))
 }
 
-func (w *SPVWallet) openHeaderFile(hfn string) error {
-	_, err := os.Stat(hfn)
-	if err != nil {
-		if os.IsNotExist(err) {
-			var b bytes.Buffer
-			if w.params.Name == chaincfg.MainNetParams.Name {
-				pad := make([]byte, MAINNET_CHECKPOINT_HEIGHT * 80)
-				b.Write(pad)
-				err = MainnetCheckpoint.Serialize(&b)
-				if err != nil {
-					return err
-				}
-			} else if w.params.Name == chaincfg.TestNet3Params.Name {
-				pad := make([]byte, TESTNET3_CHECKPOINT_HEIGHT * 80)
-				b.Write(pad)
-				err = Testnet3Checkpoint.Serialize(&b)
-				if err != nil {
-					return err
-				}
-			}
-			err = ioutil.WriteFile(hfn, b.Bytes(), 0600)
-			if err != nil {
-				return err
-			}
-			log.Debugf("Created hardcoded checkpoint header at %s\n", hfn)
-		}
-	}
-
-	return nil
-}
-
 func (w *SPVWallet) checkIfStxoIsConfirmed(utxo Utxo, stxos []Stxo) bool {
 	for _, stxo := range(stxos) {
 		if stxo.SpendTxid == utxo.Op.Hash {
@@ -241,10 +207,10 @@ func (w *SPVWallet) MasterPublicKey() *hd.ExtendedKey {
 	return w.masterPublicKey
 }
 
-func (w *SPVWallet) CurrentAddress(purpose KeyPurpose) *btc.AddressPubKeyHash {
+func (w *SPVWallet) CurrentAddress(purpose KeyPurpose) btc.Address {
 	key := w.state.GetCurrentKey(purpose)
 	addr, _ := key.Address(w.params)
-	return addr
+	return btc.Address(addr)
 }
 
 func (w *SPVWallet) Balance() (confirmed, unconfirmed int64) {

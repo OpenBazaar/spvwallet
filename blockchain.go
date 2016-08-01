@@ -364,7 +364,7 @@ func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeade
 	headerBigBits := blockchain.CompactToBig(header.Bits)
 	if (difficultyNerfing && headerBigBits.Cmp(testnetDiff) == 1) ||  (!difficultyNerfing && headerBigBits.Cmp(diffTarget) == 1){
 		log.Warningf("Block %d %s incorrect difficuly.  Read %x, expect %x\n",
-			height, header.BlockSha().String(), header.Bits, diffTarget)
+			height+1, header.BlockSha().String(), headerBigBits, diffTarget)
 		return false, 0
 	}
 
@@ -382,7 +382,7 @@ func (b *Blockchain) GetEpoch() (*wire.BlockHeader, error) {
 	if err != nil {
 		return &sh.header, err
 	}
-	for i:=0; i<2015; i++ {
+	for i:=0; i<2014; i++ {
 		sh, err = b.db.GetPreviousHeader(sh.header)
 		if err != nil {
 			return &sh.header, err

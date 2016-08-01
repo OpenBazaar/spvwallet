@@ -82,6 +82,5 @@ func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) *big.Int {
 		newTarget.Set(p.PowLimit)
 	}
 
-	// calculate and return 4-byte 'bits' difficulty from 32-byte target
 	return newTarget
 }
