@@ -6,6 +6,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"fmt"
 	"strings"
+	"time"
 )
 
 type ConnectionState int
@@ -42,7 +43,7 @@ func NewPeer(remoteNode string, blockchain *Blockchain, inTs *TxStore, params *c
 	}
 
 	// open TCP connection
-	p.con, err = net.Dial("tcp", remoteNode)
+	p.con, err = net.DialTimeout("tcp", remoteNode, time.Second*5)
 	if err != nil {
 		log.Debugf("Connection to %s failed", remoteNode)
 		return p, err
