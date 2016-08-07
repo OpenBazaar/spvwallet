@@ -209,7 +209,7 @@ func (h *HeaderDB) Print() {
 const (
 	MAX_HEADERS = 2000
 	MAINNET_CHECKPOINT_HEIGHT = 407232
-	TESTNET3_CHECKPOINT_HEIGHT = 895104
+	TESTNET3_CHECKPOINT_HEIGHT = 919296
 )
 
 var MainnetCheckpoint wire.BlockHeader
@@ -225,7 +225,6 @@ type StoredHeader struct {
 	header     wire.BlockHeader
 	height     uint32
 	totalWork  *big.Int
-	diffTarget uint32
 }
 
 func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
@@ -245,7 +244,6 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 				header: MainnetCheckpoint,
 				height: MAINNET_CHECKPOINT_HEIGHT,
 				totalWork: big.NewInt(0),
-				diffTarget: MainnetCheckpoint.Bits,
 			}
 			b.db.Put(sh, true)
 		} else if b.params.Name == chaincfg.TestNet3Params.Name {
@@ -254,7 +252,6 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 				header: Testnet3Checkpoint,
 				height: TESTNET3_CHECKPOINT_HEIGHT,
 				totalWork: big.NewInt(0),
-				diffTarget: Testnet3Checkpoint.Bits,
 			}
 			// Put to db
 			b.db.Put(sh, true)
@@ -285,7 +282,7 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 			return false, errors.New("Header does not extend any known headers")
 		}
 	}
-	valid, diffTarget := b.CheckHeader(header, parentHeader)
+	valid := b.CheckHeader(header, parentHeader)
 	if !valid {
 		return false, nil
 	}
@@ -312,7 +309,6 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 			header: header,
 			height: parentHeader.height + 1,
 			totalWork: cumulativeWork,
-			diffTarget: diffTarget,
 		}, newTip)
 	if err != nil {
 		return newTip, err
@@ -325,7 +321,7 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 	return newTip, nil
 }
 
-func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeader) (bool, uint32) {
+func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeader) bool {
 
 	// get hash of n-1 header
 	prevHash := prevHeader.header.BlockSha()
@@ -334,25 +330,25 @@ func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeade
 	// check if headers link together.  That whole 'blockchain' thing.
 	if prevHash.IsEqual(&header.PrevBlock) == false {
 		log.Errorf("Headers %d and %d don't link.\n", height, height+1)
-		return false, 0
+		return false
 	}
 
 	// check the header meets the difficulty requirement
 	diffTarget, err := b.calcRequiredWork(header, int32(height+1), prevHeader)
 	if err != nil {
 		log.Errorf("Error calclating difficulty", err)
-		return false, 0
+		return false
 	}
 	if header.Bits != diffTarget {
 		log.Warningf("Block %d %s incorrect difficuly.  Read %d, expect %d\n",
 			height+1, header.BlockSha().String(), header.Bits, diffTarget)
-		return false, 0
+		return false
 	}
 
 	// check if there's a valid proof of work.  That whole "Bitcoin" thing.
 	if !checkProofOfWork(header, b.params) {
 		log.Debugf("Block %d Bad proof of work.\n", height)
-		return false, 0
+		return false
 	}
 
 	// TODO: Check header timestamps: from Core
@@ -366,7 +362,7 @@ func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeade
         	return state.Invalid(false, REJECT_INVALID, "time-too-new", "block timestamp too far in the future");
 	 */
 
-	return true, diffTarget // it must have worked if there's no errors and got to the end.
+	return true // it must have worked if there's no errors and got to the end.
 }
 
 // Get the PoW target this block should meet. We may need to handle a difficlty adjustment
@@ -485,7 +481,6 @@ func (b *Blockchain) GetBlockLocatorHashes() []*wire.ShaHash {
       80	 header	             0
        4	 height             80
       32	 total work         84
-       4         difficulty target  116
 */
 func serializeHeader(sh StoredHeader) ([]byte, error) {
 	var buf bytes.Buffer
@@ -501,10 +496,6 @@ func serializeHeader(sh StoredHeader) ([]byte, error) {
 	pad := make([]byte, 32 - len(biBytes))
 	serializedBI := append(pad, biBytes...)
 	buf.Write(serializedBI)
-	err = binary.Write(&buf, binary.BigEndian, sh.diffTarget)
-	if err != nil {
-		return nil, err
-	}
 	return buf.Bytes(), nil
 }
 
@@ -527,16 +518,10 @@ func deserializeHeader(b []byte) (sh StoredHeader, err error) {
 	}
 	bi := new(big.Int)
 	bi.SetBytes(biBytes)
-	var difficultyTarget uint32
-	err = binary.Read(r, binary.BigEndian, &difficultyTarget)
-	if err != nil {
-		return sh, err
-	}
 	sh = StoredHeader{
 		header: *hdr,
 		height: height,
 		totalWork: bi,
-		diffTarget: difficultyTarget,
 	}
 	return sh, nil
 }
@@ -553,14 +538,14 @@ func createCheckpoints() {
 		Nonce: 3800536668,
 	}
 
-	testnet3Prev, _ := wire.NewShaHashFromStr("0000000000001323db1ab3f247bcb1e92592004b43e4bed0966ed09f675cf269")
-	testnet3Merk, _ := wire.NewShaHashFromStr("9ec9629ada4429e4a6e80776d7c22cb1c9d6672ce0f1b5a9829f8c69db640a86")
+	testnet3Prev, _ := wire.NewShaHashFromStr("00000000000002fb1337228db02ac464565271f22f045c1b6ee5e449f057a829")
+	testnet3Merk, _ := wire.NewShaHashFromStr("dd76d3c93254b05c6316eaf3bdb94ed4bd9dfeb464f8f9487fbd1eca2a12ca6e")
 	Testnet3Checkpoint = wire.BlockHeader {
 		Version: 536870912,
 		PrevBlock: *testnet3Prev,
 		MerkleRoot: *testnet3Merk,
-		Timestamp: time.Unix(1467640552, 0),
-		Bits: 436611976,
-		Nonce: 693901454,
+		Timestamp: time.Unix(1470087051, 0),
+		Bits: 437256176,
+		Nonce: 2288429377,
 	}
 }
