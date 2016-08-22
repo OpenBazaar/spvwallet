@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 type ConnectionState int
@@ -33,7 +34,7 @@ func NewPeer(remoteNode string, blockchain *Blockchain, inTs *TxStore, params *c
 	p.remoteAddress = remoteNode
 	p.disconnectChan = diconnectChan
 	p.downloadPeer = downloadPeer
-	p.OKTxids = make(map[wire.ShaHash]int32)
+	p.OKTxids = make(map[chainhash.Hash]int32)
 
 	// format if ipv6 addr
 	ip := net.ParseIP(remoteNode)

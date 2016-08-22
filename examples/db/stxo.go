@@ -8,6 +8,7 @@ import (
 	"strings"
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 type StxoDB struct {
@@ -59,7 +60,7 @@ func (s *StxoDB) GetAll() ([]spvwallet.Stxo, error) {
 		if err != nil {
 			continue
 		}
-		shaHash, err := wire.NewShaHashFromStr(s[0])
+		shaHash, err := chainhash.NewHashFromStr(s[0])
 		if err != nil {
 			continue
 		}
@@ -71,7 +72,7 @@ func (s *StxoDB) GetAll() ([]spvwallet.Stxo, error) {
 		if err != nil {
 			continue
 		}
-		spentHash, err := wire.NewShaHashFromStr(spendTxid)
+		spentHash, err := chainhash.NewHashFromStr(spendTxid)
 		if err != nil {
 			continue
 		}

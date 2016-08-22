@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"strings"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 type UtxoDB struct {
@@ -57,7 +58,7 @@ func (u *UtxoDB) GetAll() ([]spvwallet.Utxo, error) {
 		if err != nil {
 			continue
 		}
-		shaHash, err := wire.NewShaHashFromStr(s[0])
+		shaHash, err := chainhash.NewHashFromStr(s[0])
 		if err != nil {
 			continue
 		}
