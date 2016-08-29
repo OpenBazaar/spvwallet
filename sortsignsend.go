@@ -249,7 +249,17 @@ func (w *SPVWallet) getFeePerByte(feeLevel FeeLevel) uint64 {
 		return defaultFee()
 	}
 
-	resp, err := http.Get(w.feeAPI)
+	var resp *http.Response
+	var err error
+	if w.proxy == nil {
+		resp, err = http.Get(w.feeAPI)
+	} else {
+		tr := &http.Transport{
+			Dial: w.proxy.Dial,
+		}
+		client := &http.Client{Transport: tr}
+		resp, err = client.Get(w.feeAPI)
+	}
 	if err != nil {
 		return defaultFee()
 	}

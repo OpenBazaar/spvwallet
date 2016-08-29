@@ -9,6 +9,7 @@ import (
 	b39 "github.com/tyler-smith/go-bip39"
 	btc "github.com/btcsuite/btcutil"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/btcsuite/go-socks/socks"
 )
 
 type SPVWallet struct {
@@ -36,6 +37,8 @@ type SPVWallet struct {
 	db                Datastore
 	blockchain        *Blockchain
 	state             *TxStore
+
+	proxy             *socks.Proxy
 }
 
 var log = logging.MustGetLogger("bitcoin")
@@ -45,7 +48,7 @@ const WALLET_VERSION = "0.1.0"
 const MAX_PEERS = 10
 
 func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFee uint64, mediumFee uint64, highFee uint64, feeApi,
-	repoPath string, db Datastore, userAgent string, logger logging.LeveledBackend) *SPVWallet {
+	repoPath string, db Datastore, userAgent string, logger logging.LeveledBackend, proxy *socks.Proxy) *SPVWallet {
 
 	log.SetBackend(logger)
 
@@ -68,6 +71,7 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 	w.userAgent = userAgent
 	w.diconnectChan = make(chan string)
 	w.peerGroup = make(map[string]*Peer)
+	w.proxy = proxy
 	return w
 }
 
@@ -116,7 +120,7 @@ func (w *SPVWallet) connectToPeers() {
 				// Set this temporarily to avoid a race condition which sets two download peers
 				w.downloadPeer = &Peer{}
 			}
-			peer, err := NewPeer(addr, w.blockchain, w.state, w.params, w.userAgent, w.diconnectChan, dp)
+			peer, err := NewPeer(addr, w.blockchain, w.state, w.params, w.userAgent, w.diconnectChan, dp, w.proxy)
 			if err != nil {
 				if dp {
 					// Unset as download peer on failure
@@ -160,13 +164,31 @@ func (w *SPVWallet) onPeerDisconnect() {
 func (w *SPVWallet) queryDNSSeeds() {
 	// Query DNS seeds for addrs. Eventually we will cache these.
 	log.Info("Querying DNS seeds...")
-	for _, seed := range(w.params.DNSSeeds) {
-		addrs, err := net.LookupHost(seed)
-		if err != nil {
-			continue
+	if w.proxy == nil {
+		for _, seed := range (w.params.DNSSeeds) {
+			log.Debug(seed)
+
+			addrs, err := net.LookupHost(seed)
+			if err != nil {
+				continue
+			}
+			for _, addr := range (addrs) {
+				w.addrs = append(w.addrs, addr + ":" + w.params.DefaultPort)
+			}
 		}
-		for _, addr := range(addrs) {
-			w.addrs = append(w.addrs, addr + ":" + w.params.DefaultPort)
+	} else {
+		for i:=0; i<10; i++ {
+			for _, seed := range (w.params.DNSSeeds) {
+				addrs, err := TorResolve(seed, w.proxy)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				for _, addr := range (addrs) {
+					log.Notice(addr)
+					w.addrs = append(w.addrs, addr.String() + ":" + w.params.DefaultPort)
+				}
+			}
 		}
 	}
 	log.Infof("DNS seeds returned %d addresses.", len(w.addrs))

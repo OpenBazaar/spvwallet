@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/go-socks/socks"
 )
 
 type ConnectionState int
@@ -18,9 +19,8 @@ const (
 	DEAD       = 2
 )
 
-
 // OpenPV starts a
-func NewPeer(remoteNode string, blockchain *Blockchain, inTs *TxStore, params *chaincfg.Params, userAgent string, diconnectChan chan string, downloadPeer bool) (*Peer, error) {
+func NewPeer(remoteNode string, blockchain *Blockchain, inTs *TxStore, params *chaincfg.Params, userAgent string, diconnectChan chan string, downloadPeer bool, proxy *socks.Proxy) (*Peer, error) {
 
 	// create new SPVCon
 	var err error
@@ -40,11 +40,14 @@ func NewPeer(remoteNode string, blockchain *Blockchain, inTs *TxStore, params *c
 	ip := net.ParseIP(remoteNode)
 	if ip.To4() == nil {
 		li := strings.LastIndex(remoteNode, ":")
-		remoteNode = "[" + remoteNode[:li] +"]" + remoteNode[li: len(remoteNode)]
+		remoteNode = "[" + remoteNode[:li] + "]" + remoteNode[li: len(remoteNode)]
 	}
-
 	// open TCP connection
-	p.con, err = net.DialTimeout("tcp", remoteNode, time.Second*5)
+	if proxy != nil {
+		p.con, err = proxy.Dial("tcp", remoteNode)
+	} else {
+		p.con, err = net.DialTimeout("tcp", remoteNode, time.Second * 5)
+	}
 	if err != nil {
 		log.Debugf("Connection to %s failed", remoteNode)
 		return p, err
@@ -52,19 +55,45 @@ func NewPeer(remoteNode string, blockchain *Blockchain, inTs *TxStore, params *c
 	// assign version bits for local node
 	p.localVersion = VERSION
 	p.userAgent = userAgent
-	go p.run()
+	go p.run(proxy != nil)
 
 	return p, nil
 }
 
-func (p *Peer) run() {
-	myMsgVer, err := wire.NewMsgVersionFromConn(p.con, 0, 0)
-	if err != nil {
-		p.disconnectChan <- p.remoteAddress
-		return
+func (p *Peer) run(proxy bool) {
+	var myMsgVer *wire.MsgVersion
+	var err error
+	if proxy {
+		lna, err := wire.NewNetAddress(&net.TCPAddr{
+			IP: net.ParseIP(p.con.LocalAddr().(*socks.ProxiedAddr).Host),
+			Port: p.con.LocalAddr().(*socks.ProxiedAddr).Port,
+		}, 0)
+		if err != nil {
+			log.Error(err)
+			p.disconnectChan <- p.remoteAddress
+			return
+		}
+		rna, err := wire.NewNetAddress(&net.TCPAddr{
+			IP: net.ParseIP(p.con.RemoteAddr().(*socks.ProxiedAddr).Host),
+			Port: p.con.RemoteAddr().(*socks.ProxiedAddr).Port,
+		}, 0)
+		if err != nil {
+			log.Error(err)
+			p.disconnectChan <- p.remoteAddress
+			return
+		}
+		myMsgVer = wire.NewMsgVersion(lna, rna, 0, 0)
+	} else {
+		myMsgVer, err = wire.NewMsgVersionFromConn(p.con, 0, 0)
+		if err != nil {
+			log.Error(err)
+			p.disconnectChan <- p.remoteAddress
+			return
+		}
 	}
 	err = myMsgVer.AddUserAgent(p.userAgent, WALLET_VERSION)
 	if err != nil {
+		log.Error(err)
 		p.disconnectChan <- p.remoteAddress
 		return
 	}
@@ -73,6 +102,7 @@ func (p *Peer) run() {
 	// this actually sends
 	n, err := wire.WriteMessageN(p.con, myMsgVer, p.localVersion, p.TS.Param.Net)
 	if err != nil {
+		log.Error(err)
 		p.disconnectChan <- p.remoteAddress
 		return
 	}
@@ -80,6 +110,7 @@ func (p *Peer) run() {
 	log.Debugf("Sent version message to %s\n", p.con.RemoteAddr().String())
 	n, m, _, err := wire.ReadMessageN(p.con, p.localVersion, p.TS.Param.Net)
 	if err != nil {
+		log.Error(err)
 		p.disconnectChan <- p.remoteAddress
 		return
 	}
@@ -90,6 +121,7 @@ func (p *Peer) run() {
 	if ok {
 		log.Infof("Connected to %s on %s", mv.UserAgent, p.con.RemoteAddr().String())
 	} else {
+		log.Error(err)
 		p.disconnectChan <- p.remoteAddress
 		return
 	}

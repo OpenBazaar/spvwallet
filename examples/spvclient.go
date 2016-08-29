@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/op/go-logging"
 	"github.com/OpenBazaar/spvwallet/examples/db"
+	"github.com/btcsuite/go-socks/socks"
 )
 
 var stdoutLogFormat = logging.MustStringFormatter(
@@ -34,7 +35,11 @@ func main() {
 	mnemonic := "salon around sketch ivory analyst vital erosion shift organ hub assault notice"
 
 	// Start up a new node
-	wallet := spvwallet.NewSPVWallet(mnemonic, &chaincfg.TestNet3Params, 1000, 60, 40, 20, "", dirPath, database, "OpenBazaar", ml)
+	tor := socks.Proxy {
+		Addr: "127.0.0.1:9050",
+		TorIsolation: true,
+	}
+	wallet := spvwallet.NewSPVWallet(mnemonic, &chaincfg.TestNet3Params, 1000, 60, 40, 20, "", dirPath, database, "OpenBazaar", ml, &tor)
 	go wallet.Start()
 	wg.Wait()
 }
