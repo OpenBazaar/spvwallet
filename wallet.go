@@ -185,7 +185,6 @@ func (w *SPVWallet) queryDNSSeeds() {
 					continue
 				}
 				for _, addr := range (addrs) {
-					log.Notice(addr)
 					w.addrs = append(w.addrs, addr.String() + ":" + w.params.DefaultPort)
 				}
 			}

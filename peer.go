@@ -9,6 +9,7 @@ import (
 	"time"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/go-socks/socks"
+	"strconv"
 )
 
 type ConnectionState int
@@ -64,9 +65,15 @@ func (p *Peer) run(proxy bool) {
 	var myMsgVer *wire.MsgVersion
 	var err error
 	if proxy {
+		port, err := strconv.Atoi(p.blockchain.params.DefaultPort)
+		if err != nil {
+			log.Error(err)
+			p.disconnectChan <- p.remoteAddress
+			return
+		}
 		lna, err := wire.NewNetAddress(&net.TCPAddr{
-			IP: net.ParseIP(p.con.LocalAddr().(*socks.ProxiedAddr).Host),
-			Port: p.con.LocalAddr().(*socks.ProxiedAddr).Port,
+			IP: net.ParseIP("127.0.0.1"),
+			Port: port,
 		}, 0)
 		if err != nil {
 			log.Error(err)
@@ -86,14 +93,12 @@ func (p *Peer) run(proxy bool) {
 	} else {
 		myMsgVer, err = wire.NewMsgVersionFromConn(p.con, 0, 0)
 		if err != nil {
-			log.Error(err)
 			p.disconnectChan <- p.remoteAddress
 			return
 		}
 	}
 	err = myMsgVer.AddUserAgent(p.userAgent, WALLET_VERSION)
 	if err != nil {
-		log.Error(err)
 		p.disconnectChan <- p.remoteAddress
 		return
 	}
@@ -102,7 +107,6 @@ func (p *Peer) run(proxy bool) {
 	// this actually sends
 	n, err := wire.WriteMessageN(p.con, myMsgVer, p.localVersion, p.TS.Param.Net)
 	if err != nil {
-		log.Error(err)
 		p.disconnectChan <- p.remoteAddress
 		return
 	}
@@ -110,7 +114,6 @@ func (p *Peer) run(proxy bool) {
 	log.Debugf("Sent version message to %s\n", p.con.RemoteAddr().String())
 	n, m, _, err := wire.ReadMessageN(p.con, p.localVersion, p.TS.Param.Net)
 	if err != nil {
-		log.Error(err)
 		p.disconnectChan <- p.remoteAddress
 		return
 	}
@@ -121,7 +124,6 @@ func (p *Peer) run(proxy bool) {
 	if ok {
 		log.Infof("Connected to %s on %s", mv.UserAgent, p.con.RemoteAddr().String())
 	} else {
-		log.Error(err)
 		p.disconnectChan <- p.remoteAddress
 		return
 	}
