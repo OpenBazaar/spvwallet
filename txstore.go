@@ -109,6 +109,8 @@ type TxStore struct {
 	masterPrivKey *hd.ExtendedKey
 
 	chainState ChainState
+
+	listeners []func(btcutil.Address, int64)
 }
 
 type Utxo struct { // cash money.
@@ -128,13 +130,14 @@ type Stxo struct {
 	SpendTxid   chainhash.Hash // the tx that consumed it
 }
 
-func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey) *TxStore {
+func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey, listeners []func(btcutil.Address, int64)) *TxStore {
 	txs := new(TxStore)
 	txs.Param = p
 	txs.db = db
 	txs.masterPrivKey = masterPrivKey
 	txs.addrMutex = new(sync.Mutex)
 	txs.PopulateAdrs()
+	txs.listeners = listeners
 	return txs
 }
 

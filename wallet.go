@@ -36,6 +36,8 @@ type SPVWallet struct {
 	db                Datastore
 	blockchain        *Blockchain
 	state             *TxStore
+
+	listeners          []func(btc.Address, int64)
 }
 
 var log = logging.MustGetLogger("bitcoin")
@@ -75,7 +77,7 @@ func (w *SPVWallet) Start() {
 	w.queryDNSSeeds()
 
 	// setup TxStore first (before spvcon)
-	w.state = NewTxStore(w.params, w.db, w.masterPrivateKey)
+	w.state = NewTxStore(w.params, w.db, w.masterPrivateKey, w.listeners)
 
 	// shuffle addrs
 	for i := range w.addrs {
@@ -228,4 +230,8 @@ func (w *SPVWallet) Balance() (confirmed, unconfirmed int64) {
 
 func (w *SPVWallet) Params() *chaincfg.Params {
 	return w.params
+}
+
+func (w *SPVWallet) AddTransactionListener(callback func(btc.Address, int64)) {
+	w.listeners = append(w.listeners, callback)
 }
