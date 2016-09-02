@@ -37,7 +37,7 @@ type SPVWallet struct {
 	blockchain        *Blockchain
 	state             *TxStore
 
-	listeners          []func(btc.Address, int64)
+	listeners          []func(btc.Address, int64, bool)
 }
 
 var log = logging.MustGetLogger("bitcoin")
@@ -232,6 +232,6 @@ func (w *SPVWallet) Params() *chaincfg.Params {
 	return w.params
 }
 
-func (w *SPVWallet) AddTransactionListener(callback func(btc.Address, int64)) {
+func (w *SPVWallet) AddTransactionListener(callback func(btc.Address, int64, bool)) {
 	w.listeners = append(w.listeners, callback)
 }

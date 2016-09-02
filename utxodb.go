@@ -171,11 +171,9 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		_, err := ts.db.Txns().Get(tx.TxHash())
 		if err != nil {
 			// Callback on listeners
-			if value > 0 {
-				for _, listener := range ts.listeners {
-					for addr, val := range fundedAddrs {
-						listener(addr, val)
-					}
+			for _, listener := range ts.listeners {
+				for addr, val := range fundedAddrs {
+					listener(addr, val, value>0)
 				}
 			}
 			ts.PopulateAdrs()
