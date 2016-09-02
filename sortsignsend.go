@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"bytes"
+	"time"
 )
 
 func (p *Peer) PongBack(nonce uint64) {
@@ -175,6 +176,13 @@ func (w *SPVWallet) BroadcastRawTx(tx []byte) error {
 	return nil
 }
 
+func (w *SPVWallet) CheckSuffientFunds(amount int64, feeLevel FeeLevel) error {
+	// Dummy address for dust check
+	addr, _ := btc.DecodeAddress("1Np27iik7DNATt3aNAHpzBPnhKHymxaQnM", w.params)
+	_, err := w.buildTx(amount, addr, feeLevel)
+	return err
+}
+
 func (w *SPVWallet) buildTx(amount int64, addr btc.Address, feeLevel FeeLevel) (*wire.MsgTx, error) {
 	// Check for dust
 	script, _ := txscript.PayToAddrScript(addr)
@@ -276,6 +284,19 @@ const (
 	ECONOMIC = 2
 )
 
+type feeCache struct {
+	fees        *Fees
+	lastUpdated time.Time
+}
+
+type Fees struct {
+	FastestFee  uint64
+	HalfHourFee uint64
+	HourFee     uint64
+}
+
+var cache *feeCache
+
 func (w *SPVWallet) getFeePerByte(feeLevel FeeLevel) uint64 {
 	defaultFee := func() uint64 {
 		switch feeLevel {
@@ -292,23 +313,24 @@ func (w *SPVWallet) getFeePerByte(feeLevel FeeLevel) uint64 {
 	if w.feeAPI == "" {
 		return defaultFee()
 	}
-
-	resp, err := http.Get(w.feeAPI)
-	if err != nil {
-		return defaultFee()
-	}
-
-	defer resp.Body.Close()
-
-	type Fees struct {
-		FastestFee  uint64
-		HalfHourFee uint64
-		HourFee     uint64
-	}
 	fees := new(Fees)
-	err = json.NewDecoder(resp.Body).Decode(&fees)
-	if err != nil {
-		return defaultFee()
+	if time.Since(cache.lastUpdated) > time.Minute {
+		resp, err := http.Get(w.feeAPI)
+		if err != nil {
+			return defaultFee()
+		}
+
+		defer resp.Body.Close()
+
+		fees := new(Fees)
+		err = json.NewDecoder(resp.Body).Decode(&fees)
+		if err != nil {
+			return defaultFee()
+		}
+		cache.lastUpdated = time.Now()
+		cache.fees = fees
+	} else {
+		fees = cache.fees
 	}
 	switch feeLevel {
 	case PRIOIRTY:
