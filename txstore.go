@@ -26,6 +26,9 @@ type Utxos interface {
 	// Fetch all utxos from the db
 	GetAll() ([]Utxo, error)
 
+	// Make a utxo unspendable
+	Freeze(utxo Utxo) error
+
 	// Delete a utxo from the db
 	Delete(utxo Utxo) error
 }
@@ -121,6 +124,9 @@ type Utxo struct { // cash money.
 	Value    int64  // higher is better
 
 	ScriptPubkey []byte
+
+	// If true this utxo will not be selected for spending
+	Freeze bool
 }
 
 // Stxo is a utxo that has moved on.
@@ -140,8 +146,6 @@ func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey,
 	txs.listeners = listeners
 	return txs
 }
-
-
 
 // ... or I'm gonna fade away
 func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {

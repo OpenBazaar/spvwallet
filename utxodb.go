@@ -137,6 +137,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 				newop.Hash = cachedSha
 				newop.Index = uint32(i)
 				newu.Op = newop
+				newu.Freeze = false
 				ts.db.Utxos().Put(newu)
 				hits++
 				// For listener

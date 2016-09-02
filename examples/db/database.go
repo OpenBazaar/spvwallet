@@ -76,7 +76,7 @@ func initDatabaseTables(db *sql.DB) error {
 	var sqlStmt string
 	sqlStmt = sqlStmt + `
 	create table if not exists keys (scriptPubKey text primary key not null, purpose integer, keyIndex integer, used integer);
-	create table if not exists utxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text);
+	create table if not exists utxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, freeze integer);
 	create table if not exists stxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, spendHeight integer, spendTxid text);
 	create table if not exists txns (txid text primary key not null, tx blob);
 	create table if not exists state (key text primary key not null, value text);
