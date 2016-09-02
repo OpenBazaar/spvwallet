@@ -161,6 +161,20 @@ func (w *SPVWallet) ExportRawTx(amount int64, addr btc.Address, feeLevel FeeLeve
 	return output.Bytes(), nil
 }
 
+func (w *SPVWallet) BroadcastRawTx(tx []byte) error {
+	msgtx := wire.NewMsgTx()
+	err := msgtx.Deserialize(bytes.NewReader(tx))
+	if err != nil {
+		return err
+	}
+	// broadcast
+	for _, peer := range w.peerGroup {
+		peer.NewOutgoingTx(msgtx)
+	}
+	log.Infof("Broadcasting tx %s to network", msgtx.TxHash().String())
+	return nil
+}
+
 func (w *SPVWallet) buildTx(amount int64, addr btc.Address, feeLevel FeeLevel) (*wire.MsgTx, error) {
 	// Check for dust
 	script, _ := txscript.PayToAddrScript(addr)
