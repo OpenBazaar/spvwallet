@@ -123,9 +123,10 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	ts.addrMutex.Unlock()
 	cachedSha := tx.TxHash()
 	// iterate through all outputs of this tx, see if we gain
-	var value int64
-	fundedAddrs := make(map[btcutil.Address]int64)
+	cb := TransactionCallback{Txid: cachedSha.CloneBytes()}
 	for i, out := range tx.TxOut {
+		_, addrs, _, _ := txscript.ExtractPkScriptAddrs(out.PkScript, ts.Param)
+		o := Output{Addr: addrs[0], Value: out.Value}
 		for _, script := range PKscripts {
 			if bytes.Equal(out.PkScript, script) { // new utxo found
 				ts.db.Keys().MarkKeyAsUsed(out.PkScript)
@@ -141,12 +142,11 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 				ts.db.Utxos().Put(newu)
 				hits++
 				// For listener
-				value += out.Value
-				_, addrs, _, _ := txscript.ExtractPkScriptAddrs(out.PkScript, ts.Param)
-				fundedAddrs[addrs[0]] = out.Value
+				o.Ours = true
 				break // txos can match only 1 script
 			}
 		}
+		cb.Outputs = append(cb.Outputs, o)
 	}
 	for _, txin := range tx.TxIn {
 		utxos, err := ts.db.Utxos().GetAll()
@@ -162,7 +162,6 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 				st.SpendTxid = cachedSha  // spent by txid
 				ts.db.Stxos().Put(st)
 				ts.db.Utxos().Delete(u)
-				value -= u.Value
 			}
 		}
 	}
@@ -173,9 +172,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		if err != nil {
 			// Callback on listeners
 			for _, listener := range ts.listeners {
-				for addr, val := range fundedAddrs {
-					listener(addr, val, value>0)
-				}
+				listener(cb)
 			}
 			ts.PopulateAdrs()
 			ts.db.Txns().Put(tx)
