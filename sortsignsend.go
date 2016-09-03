@@ -295,7 +295,7 @@ type Fees struct {
 	HourFee     uint64
 }
 
-var cache *feeCache
+var cache *feeCache = &feeCache{}
 
 func (w *SPVWallet) getFeePerByte(feeLevel FeeLevel) uint64 {
 	defaultFee := func() uint64 {
