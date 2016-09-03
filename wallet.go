@@ -9,6 +9,7 @@ import (
 	b39 "github.com/tyler-smith/go-bip39"
 	btc "github.com/btcsuite/btcutil"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
+	btci "github.com/OpenBazaar/openbazaar-go/bitcoin"
 )
 
 type SPVWallet struct {
@@ -37,7 +38,7 @@ type SPVWallet struct {
 	blockchain        *Blockchain
 	state             *TxStore
 
-	listeners          []func(TransactionCallback)
+	listeners          []func(btci.TransactionCallback)
 }
 
 var log = logging.MustGetLogger("bitcoin")
@@ -215,13 +216,15 @@ func (w *SPVWallet) Balance() (confirmed, unconfirmed int64) {
 	utxos, _ := w.db.Utxos().GetAll()
 	stxos, _ := w.db.Stxos().GetAll()
 	for _, utxo := range utxos {
-		if utxo.AtHeight > 0 {
-			confirmed += utxo.Value
-		} else {
-			if w.checkIfStxoIsConfirmed(utxo, stxos) {
+		if !utxo.Freeze {
+			if utxo.AtHeight > 0 {
 				confirmed += utxo.Value
 			} else {
-				unconfirmed += utxo.Value
+				if w.checkIfStxoIsConfirmed(utxo, stxos) {
+					confirmed += utxo.Value
+				} else {
+					unconfirmed += utxo.Value
+				}
 			}
 		}
 	}
@@ -232,17 +235,15 @@ func (w *SPVWallet) Params() *chaincfg.Params {
 	return w.params
 }
 
-type Output struct {
-	Addr  btc.Address
-	Value int64
-	Ours  bool
-}
-
-type TransactionCallback struct {
-	Txid    []byte
-	Outputs []Output
-}
-
-func (w *SPVWallet) AddTransactionListener(callback func(TransactionCallback)) {
+func (w *SPVWallet) AddTransactionListener(callback func(btci.TransactionCallback)) {
 	w.listeners = append(w.listeners, callback)
+}
+
+func (w *SPVWallet) AddWatchedScript(script []byte) error {
+	err := w.state.db.WatchedScripts().Put(script)
+	w.state.PopulateAdrs()
+	for _, peer := range w.peerGroup {
+		peer.UpdateFilterAndSend()
+	}
+	return err
 }

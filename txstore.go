@@ -9,14 +9,16 @@ import (
 	"github.com/btcsuite/btcutil/bloom"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	btci "github.com/OpenBazaar/openbazaar-go/bitcoin"
 )
 
 type Datastore interface {
-	Utxos() Utxos
-	Stxos() Stxos
-	Txns()  Txns
-	Keys()  Keys
-	State() State
+	Utxos()          Utxos
+	Stxos()          Stxos
+	Txns()           Txns
+	Keys()           Keys
+	State()          State
+	WatchedScripts() WatchedScripts
 }
 
 type Utxos interface {
@@ -94,6 +96,17 @@ type State interface {
 	Get(key string) (string, error)
 }
 
+type WatchedScripts interface {
+	// Add a script to watch
+	Put(scriptPubKey []byte) error
+
+	// Return all watched scripts
+	GetAll() ([][]byte, error)
+
+	// Delete a watched script
+	Delete(scriptPubKey []byte) error
+}
+
 type ChainState int
 
 const (
@@ -103,17 +116,18 @@ const (
 )
 
 type TxStore struct {
-	Adrs      []btcutil.Address
-	addrMutex *sync.Mutex
-	db        Datastore
+	Adrs           []btcutil.Address
+	WatchedScripts [][]byte
+	addrMutex      *sync.Mutex
+	db             Datastore
 
-	Param *chaincfg.Params
+	Param          *chaincfg.Params
 
-	masterPrivKey *hd.ExtendedKey
+	masterPrivKey  *hd.ExtendedKey
 
-	chainState ChainState
+	chainState     ChainState
 
-	listeners []func(TransactionCallback)
+	listeners      []func(btci.TransactionCallback)
 }
 
 type Utxo struct { // cash money.
@@ -136,7 +150,7 @@ type Stxo struct {
 	SpendTxid   chainhash.Hash // the tx that consumed it
 }
 
-func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey, listeners []func(TransactionCallback)) *TxStore {
+func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey, listeners []func(btci.TransactionCallback)) *TxStore {
 	txs := new(TxStore)
 	txs.Param = p
 	txs.db = db
@@ -178,7 +192,9 @@ func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
 	for _, s := range allStxos {
 		f.AddOutPoint(&s.Utxo.Op)
 	}
-
+	for _, w := range t.WatchedScripts {
+		f.Add(w)
+	}
 	return f, nil
 }
 
