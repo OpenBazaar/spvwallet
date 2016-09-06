@@ -143,46 +143,6 @@ func (w *SPVWallet) Spend(amount int64, addr btc.Address, feeLevel FeeLevel) err
 	return nil
 }
 
-func (w *SPVWallet) ExportRawTx(amount int64, addr btc.Address, feeLevel FeeLevel) ([]byte, error) {
-	tx, err := w.buildTx(amount, addr, feeLevel)
-	if err != nil {
-		return nil, err
-	}
-	for _, txin := range tx.TxIn {
-		err := w.state.db.Utxos().Freeze(Utxo{Op:txin.PreviousOutPoint})
-		if err != nil {
-			return nil, err
-		}
-	}
-	output := new(bytes.Buffer)
-	err = tx.Serialize(output)
-	if err != nil {
-		return nil, err
-	}
-	return output.Bytes(), nil
-}
-
-func (w *SPVWallet) BroadcastRawTx(tx []byte) error {
-	msgtx := wire.NewMsgTx()
-	err := msgtx.Deserialize(bytes.NewReader(tx))
-	if err != nil {
-		return err
-	}
-	// broadcast
-	for _, peer := range w.peerGroup {
-		peer.NewOutgoingTx(msgtx)
-	}
-	log.Infof("Broadcasting tx %s to network", msgtx.TxHash().String())
-	return nil
-}
-
-func (w *SPVWallet) CheckSuffientFunds(amount int64, feeLevel FeeLevel) error {
-	// Dummy address for dust check
-	addr, _ := btc.DecodeAddress("1Np27iik7DNATt3aNAHpzBPnhKHymxaQnM", w.params)
-	_, err := w.buildTx(amount, addr, feeLevel)
-	return err
-}
-
 func (w *SPVWallet) buildTx(amount int64, addr btc.Address, feeLevel FeeLevel) (*wire.MsgTx, error) {
 	// Check for dust
 	script, _ := txscript.PayToAddrScript(addr)

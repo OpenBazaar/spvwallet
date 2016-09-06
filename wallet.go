@@ -285,6 +285,11 @@ func (w *SPVWallet) AddTransactionListener(callback func(TransactionCallback)) {
 	w.listeners = append(w.listeners, callback)
 }
 
+func (w *SPVWallet) ChainTip() uint32 {
+	height, _  := w.state.GetDBSyncHeight()
+	return uint32(height)
+}
+
 func (w *SPVWallet) AddWatchedScript(script []byte) error {
 	err := w.state.db.WatchedScripts().Put(script)
 	w.state.PopulateAdrs()
