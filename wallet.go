@@ -9,8 +9,6 @@ import (
 	b39 "github.com/tyler-smith/go-bip39"
 	btc "github.com/btcsuite/btcutil"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
-	"github.com/btcsuite/btcwallet/waddrmgr"
-	"github.com/roasbeef/btcwallet/waddrmgr"
 )
 
 type SPVWallet struct {

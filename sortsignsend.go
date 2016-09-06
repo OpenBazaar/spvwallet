@@ -15,7 +15,6 @@ import (
 	"github.com/btcsuite/btcutil/txsort"
 	"encoding/json"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"bytes"
 	"time"
 )
 
