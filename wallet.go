@@ -9,6 +9,8 @@ import (
 	b39 "github.com/tyler-smith/go-bip39"
 	btc "github.com/btcsuite/btcutil"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
+	"github.com/btcsuite/btcwallet/waddrmgr"
+	"github.com/roasbeef/btcwallet/waddrmgr"
 )
 
 type SPVWallet struct {
@@ -297,4 +299,11 @@ func (w *SPVWallet) AddWatchedScript(script []byte) error {
 		peer.UpdateFilterAndSend()
 	}
 	return err
+}
+
+func (w *SPVWallet) Shutdown() {
+	for _, peer := range w.peerGroup {
+		peer.con.Close()
+	}
+	w.blockchain.Close()
 }
