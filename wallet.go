@@ -299,9 +299,11 @@ func (w *SPVWallet) AddWatchedScript(script []byte) error {
 	return err
 }
 
-func (w *SPVWallet) Shutdown() {
+func (w *SPVWallet) Close() {
+	log.Info("Disconnecting from peers and shutting down")
 	for _, peer := range w.peerGroup {
 		peer.con.Close()
+		log.Debugf("Disconnnected from %s", peer.con.RemoteAddr().String())
 	}
 	w.blockchain.Close()
 }
