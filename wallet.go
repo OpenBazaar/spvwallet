@@ -75,10 +75,10 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 }
 
 func (w *SPVWallet) Start() {
-	w.queryDNSSeeds()
-
 	// setup TxStore first (before spvcon)
 	w.state = NewTxStore(w.params, w.db, w.masterPrivateKey, w.listeners)
+
+	w.queryDNSSeeds()
 
 	// shuffle addrs
 	for i := range w.addrs {
