@@ -9,6 +9,7 @@ import (
 	"github.com/btcsuite/btcutil/bloom"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
 )
 
 type Datastore interface {
@@ -192,7 +193,11 @@ func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
 		f.AddOutPoint(&s.Utxo.Op)
 	}
 	for _, w := range t.WatchedScripts {
-		f.Add(w)
+		_, addrs, _, err := txscript.ExtractPkScriptAddrs(w, t.Param)
+		if err != nil {
+			continue
+		}
+		f.Add(addrs[0].ScriptAddress())
 	}
 	return f, nil
 }
