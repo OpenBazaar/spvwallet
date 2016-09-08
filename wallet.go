@@ -333,3 +333,14 @@ func (w *SPVWallet) Close() {
 	}
 	w.blockchain.Close()
 }
+
+func (w *SPVWallet) ReSyncBlockchain(fromHeight int32) {
+	w.Close()
+	if w.params.Name == chaincfg.MainNetParams.Name && fromHeight < MAINNET_CHECKPOINT_HEIGHT {
+		fromHeight = MAINNET_CHECKPOINT_HEIGHT
+	} else if w.params.Name == chaincfg.TestNet3Params.Name && fromHeight < TESTNET3_CHECKPOINT_HEIGHT {
+		fromHeight = TESTNET3_CHECKPOINT_HEIGHT
+	}
+	w.state.SetDBSyncHeight(fromHeight)
+	go w.Start()
+}
