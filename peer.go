@@ -38,7 +38,7 @@ func NewPeer(remoteNode string, blockchain *Blockchain, inTs *TxStore, params *c
 
 	// format if ipv6 addr
 	ip := net.ParseIP(remoteNode)
-	if ip.To4() == nil {
+	if ip.To4() == nil && !strings.Contains(remoteNode, "127.0.0.1"){
 		li := strings.LastIndex(remoteNode, ":")
 		remoteNode = "[" + remoteNode[:li] +"]" + remoteNode[li: len(remoteNode)]
 	}
