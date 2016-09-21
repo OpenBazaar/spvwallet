@@ -38,8 +38,6 @@ type SPVWallet struct {
 	db                Datastore
 	blockchain        *Blockchain
 	state             *TxStore
-
-	listeners          []func(TransactionCallback)
 }
 
 var log = logging.MustGetLogger("bitcoin")
@@ -73,12 +71,11 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 	w.trustedPeer = trustedPeer
 	w.diconnectChan = make(chan string)
 	w.peerGroup = make(map[string]*Peer)
+	w.state = NewTxStore(w.params, w.db, w.masterPrivateKey)
 	return w
 }
 
 func (w *SPVWallet) Start() {
-	// setup TxStore first (before spvcon)
-	w.state = NewTxStore(w.params, w.db, w.masterPrivateKey, w.listeners)
 
 	w.queryDNSSeeds()
 
@@ -121,7 +118,7 @@ func (w *SPVWallet) Start() {
 // If we don't have a download peer set we will set one
 func (w *SPVWallet) connectToPeers() {
 	for {
-		if len(w.peerGroup) < MAX_PEERS {
+		if len(w.peerGroup) < MAX_PEERS && len(w.addrs) > 0 {
 			var addr string
 			addr, w.addrs = w.addrs[len(w.addrs)-1], w.addrs[:len(w.addrs)-1]
 			var dp bool
@@ -166,7 +163,9 @@ func (w *SPVWallet) onPeerDisconnect() {
 			}
 			w.pgMutex.Unlock()
 			log.Infof("Disconnected from peer %s", addr)
-			w.connectToPeers()
+			if w.trustedPeer == "" {
+				w.connectToPeers()
+			}
 		}
 	}
 }
@@ -294,7 +293,7 @@ func (w *SPVWallet) Params() *chaincfg.Params {
 }
 
 func (w *SPVWallet) AddTransactionListener(callback func(TransactionCallback)) {
-	w.listeners = append(w.listeners, callback)
+	w.state.listeners = append(w.state.listeners, callback)
 }
 
 func (w *SPVWallet) ChainTip() uint32 {
