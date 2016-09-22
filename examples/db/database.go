@@ -1,24 +1,24 @@
 package db
 
 import (
-	"path"
-	"sync"
 	"database/sql"
 	"github.com/OpenBazaar/spvwallet"
 	_ "github.com/mattn/go-sqlite3"
+	"path"
+	"sync"
 )
 
 // This database is mostly just an example implementation used for testing.
 // End users are free to user their own database.
 type SQLiteDatastore struct {
-	keys 	        spvwallet.Keys
-	utxos           spvwallet.Utxos
-	stxos           spvwallet.Stxos
-	txns            spvwallet.Txns
-	state           spvwallet.State
-	watchedScripts  spvwallet.WatchedScripts
-	db              *sql.DB
-	lock            *sync.Mutex
+	keys           spvwallet.Keys
+	utxos          spvwallet.Utxos
+	stxos          spvwallet.Stxos
+	txns           spvwallet.Txns
+	state          spvwallet.State
+	watchedScripts spvwallet.WatchedScripts
+	db             *sql.DB
+	lock           *sync.Mutex
 }
 
 func Create(repoPath string) (*SQLiteDatastore, error) {
@@ -64,19 +64,19 @@ func Create(repoPath string) (*SQLiteDatastore, error) {
 func (db *SQLiteDatastore) Keys() spvwallet.Keys {
 	return db.keys
 }
-func (db *SQLiteDatastore) Utxos() spvwallet.Utxos{
+func (db *SQLiteDatastore) Utxos() spvwallet.Utxos {
 	return db.utxos
 }
-func (db *SQLiteDatastore) Stxos() spvwallet.Stxos{
+func (db *SQLiteDatastore) Stxos() spvwallet.Stxos {
 	return db.stxos
 }
-func (db *SQLiteDatastore) Txns() spvwallet.Txns{
+func (db *SQLiteDatastore) Txns() spvwallet.Txns {
 	return db.txns
 }
-func (db *SQLiteDatastore) State() spvwallet.State{
+func (db *SQLiteDatastore) State() spvwallet.State {
 	return db.state
 }
-func (db *SQLiteDatastore) WatchedScripts() spvwallet.WatchedScripts{
+func (db *SQLiteDatastore) WatchedScripts() spvwallet.WatchedScripts {
 	return db.watchedScripts
 }
 

@@ -1,11 +1,11 @@
 package db
 
 import (
-	"database/sql"
-	"sync"
-	"github.com/btcsuite/btcd/wire"
 	"bytes"
+	"database/sql"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/wire"
+	"sync"
 )
 
 type TxnsDB struct {

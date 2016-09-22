@@ -1,13 +1,13 @@
 package main
 
 import (
-	"os"
-	"sync"
 	"fmt"
 	"github.com/OpenBazaar/spvwallet"
+	"github.com/OpenBazaar/spvwallet/examples/db"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/op/go-logging"
-	"github.com/OpenBazaar/spvwallet/examples/db"
+	"os"
+	"sync"
 )
 
 var stdoutLogFormat = logging.MustStringFormatter(

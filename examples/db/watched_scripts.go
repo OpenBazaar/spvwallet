@@ -2,8 +2,8 @@ package db
 
 import (
 	"database/sql"
-	"sync"
 	"encoding/hex"
+	"sync"
 )
 
 type WatchedScriptsDB struct {
@@ -63,4 +63,3 @@ func (w *WatchedScriptsDB) Delete(scriptPubKey []byte) error {
 	}
 	return nil
 }
-

@@ -1,43 +1,43 @@
 package spvwallet
 
 import (
-	"net"
-	"sync"
-	"math/rand"
 	"github.com/btcsuite/btcd/chaincfg"
-	"github.com/op/go-logging"
-	b39 "github.com/tyler-smith/go-bip39"
+	"github.com/btcsuite/btcd/txscript"
 	btc "github.com/btcsuite/btcutil"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
-	"github.com/btcsuite/btcd/txscript"
+	"github.com/op/go-logging"
+	b39 "github.com/tyler-smith/go-bip39"
+	"math/rand"
+	"net"
+	"sync"
 )
 
 type SPVWallet struct {
-	params           *chaincfg.Params
+	params *chaincfg.Params
 
-	peerGroup         map[string] *Peer
-	pgMutex           sync.Mutex
-	downloadPeer      *Peer
-	trustedPeer       string
-	diconnectChan     chan string
+	peerGroup     map[string]*Peer
+	pgMutex       sync.Mutex
+	downloadPeer  *Peer
+	trustedPeer   string
+	diconnectChan chan string
 
 	masterPrivateKey *hd.ExtendedKey
 	masterPublicKey  *hd.ExtendedKey
 
-	maxFee            uint64
-	priorityFee       uint64
-	normalFee         uint64
-	economicFee       uint64
-	feeAPI            string
+	maxFee      uint64
+	priorityFee uint64
+	normalFee   uint64
+	economicFee uint64
+	feeAPI      string
 
-	repoPath          string
+	repoPath string
 
-	addrs             []string
-	userAgent         string
+	addrs     []string
+	userAgent string
 
-	db                Datastore
-	blockchain        *Blockchain
-	state             *TxStore
+	db         Datastore
+	blockchain *Blockchain
+	state      *TxStore
 }
 
 var log = logging.MustGetLogger("bitcoin")
@@ -150,7 +150,7 @@ func (w *SPVWallet) connectToPeers() {
 func (w *SPVWallet) onPeerDisconnect() {
 	for {
 		select {
-		case addr := <- w.diconnectChan:
+		case addr := <-w.diconnectChan:
 			w.pgMutex.Lock()
 			p, ok := w.peerGroup[addr]
 			if ok {
@@ -173,20 +173,20 @@ func (w *SPVWallet) onPeerDisconnect() {
 func (w *SPVWallet) queryDNSSeeds() {
 	// Query DNS seeds for addrs. Eventually we will cache these.
 	log.Info("Querying DNS seeds...")
-	for _, seed := range(w.params.DNSSeeds) {
+	for _, seed := range w.params.DNSSeeds {
 		addrs, err := net.LookupHost(seed)
 		if err != nil {
 			continue
 		}
-		for _, addr := range(addrs) {
-			w.addrs = append(w.addrs, addr + ":" + w.params.DefaultPort)
+		for _, addr := range addrs {
+			w.addrs = append(w.addrs, addr+":"+w.params.DefaultPort)
 		}
 	}
 	log.Infof("DNS seeds returned %d addresses.", len(w.addrs))
 }
 
 func (w *SPVWallet) checkIfStxoIsConfirmed(utxo Utxo, stxos []Stxo) bool {
-	for _, stxo := range(stxos) {
+	for _, stxo := range stxos {
 		if stxo.SpendTxid == utxo.Op.Hash {
 			if stxo.Utxo.AtHeight > 0 {
 				return true
@@ -197,7 +197,6 @@ func (w *SPVWallet) checkIfStxoIsConfirmed(utxo Utxo, stxos []Stxo) bool {
 	}
 	return false
 }
-
 
 //////////////////////////
 //
@@ -212,15 +211,15 @@ type FeeLevel int
 
 const (
 	PRIOIRTY FeeLevel = 0
-	NORMAL   = 1
-	ECONOMIC = 2
+	NORMAL            = 1
+	ECONOMIC          = 2
 )
 
 type KeyPurpose int
 
 const (
 	EXTERNAL KeyPurpose = 0
-	INTERNAL = 1
+	INTERNAL            = 1
 )
 
 type TransactionCallback struct {
@@ -298,7 +297,7 @@ func (w *SPVWallet) AddTransactionListener(callback func(TransactionCallback)) {
 }
 
 func (w *SPVWallet) ChainTip() uint32 {
-	height, _  := w.state.GetDBSyncHeight()
+	height, _ := w.state.GetDBSyncHeight()
 	return uint32(height)
 }
 
@@ -311,7 +310,7 @@ func (w *SPVWallet) AddWatchedScript(script []byte) error {
 	return err
 }
 
-func (w *SPVWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int) (addr btc.Address, redeemScript []byte, err error){
+func (w *SPVWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int) (addr btc.Address, redeemScript []byte, err error) {
 	var addrPubKeys []*btc.AddressPubKey
 	for _, key := range keys {
 		ecKey, err := key.ECPubKey()
