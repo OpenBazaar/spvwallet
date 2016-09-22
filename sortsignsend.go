@@ -142,7 +142,7 @@ func (w *SPVWallet) Spend(amount int64, addr btc.Address, feeLevel FeeLevel) err
 	return nil
 }
 
-func (w *SPVWallet) SweepUtxo(utxos []Utxo, key *hd.ExtendedKey, feeLevel FeeLevel) error {
+func (w *SPVWallet) SweepMultisig(utxos []Utxo, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) error {
 	internalAddr := w.CurrentAddress(INTERNAL)
 	script, _ := txscript.PayToAddrScript(internalAddr)
 
@@ -159,7 +159,6 @@ func (w *SPVWallet) SweepUtxo(utxos []Utxo, key *hd.ExtendedKey, feeLevel FeeLev
 
 	estimatedSize := EstimateSerializeSize(len(utxos), []*wire.TxOut{out}, false)
 
-
 	// Calculate the fee
 	feePerByte := int(w.getFeePerByte(feeLevel))
 	fee := estimatedSize * feePerByte
@@ -169,8 +168,6 @@ func (w *SPVWallet) SweepUtxo(utxos []Utxo, key *hd.ExtendedKey, feeLevel FeeLev
 		outVal = 0
 	}
 	out.Value = outVal
-
-	// Inputs
 
 	tx := &wire.MsgTx{
 		Version:  wire.TxVersion,
@@ -191,9 +188,8 @@ func (w *SPVWallet) SweepUtxo(utxos []Utxo, key *hd.ExtendedKey, feeLevel FeeLev
 		}
 		return wif.PrivKey, wif.CompressPubKey, nil
 	})
-	getScript := txscript.ScriptClosure(func(
-	addr btc.Address) ([]byte, error) {
-		return []byte{}, nil
+	getScript := txscript.ScriptClosure(func(addr btc.Address) ([]byte, error) {
+		return redeemScript, nil
 	})
 
 	for i, txIn := range tx.TxIn {
