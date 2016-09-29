@@ -142,6 +142,45 @@ func (w *SPVWallet) Spend(amount int64, addr btc.Address, feeLevel FeeLevel) err
 	return nil
 }
 
+func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]Signature, error){
+	var sigs []Signature
+	tx := new(wire.MsgTx)
+	for _, in := range ins {
+		ch, err := chainhash.NewHash(in.OutpointHash)
+		if err != nil {
+			return sigs, err
+		}
+		outpoint := wire.NewOutPoint(ch, in.OutpointIndex)
+		input := wire.NewTxIn(outpoint, []byte{})
+		tx.TxIn = append(tx.TxIn, input)
+	}
+	for _, out := range outs {
+		output := wire.NewTxOut(out.Value, out.ScriptPubKey)
+		tx.TxOut = append(tx.TxOut, output)
+	}
+
+	// Subtract fee
+	estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false)
+	fee := estimatedSize * feePerByte
+	feePerOutput := fee/len(tx.TxOut)
+	for _, output := range tx.TxOut {
+		output.Value -= feePerOutput
+	}
+
+	// BIP 69 sorting
+	txsort.InPlaceSort(tx)
+
+	for i, _ := range tx.TxIn {
+		sig, err := txscript.RawTxInSignature(tx, i, redeemScript, txscript.SigHashAll, key)
+		if err != nil {
+			continue
+		}
+		bs := Signature{InputIndex: i, Signature:sig}
+		sigs = append(sigs, bs)
+	}
+	return sigs, nil
+}
+
 func (w *SPVWallet) SweepMultisig(utxos []Utxo, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) error {
 	internalAddr := w.CurrentAddress(INTERNAL)
 	script, err := txscript.PayToAddrScript(internalAddr)
@@ -163,7 +202,7 @@ func (w *SPVWallet) SweepMultisig(utxos []Utxo, key *hd.ExtendedKey, redeemScrip
 	estimatedSize := EstimateSerializeSize(len(utxos), []*wire.TxOut{out}, false)
 
 	// Calculate the fee
-	feePerByte := int(w.getFeePerByte(feeLevel))
+	feePerByte := int(w.GetFeePerByte(feeLevel))
 	fee := estimatedSize * feePerByte
 
 	outVal := val - int64(fee)
@@ -178,6 +217,9 @@ func (w *SPVWallet) SweepMultisig(utxos []Utxo, key *hd.ExtendedKey, redeemScrip
 		TxOut:    []*wire.TxOut{out},
 		LockTime: 0,
 	}
+
+	// BIP 69 sorting
+	txsort.InPlaceSort(tx)
 
 	// Sign tx
 	privKey, err := key.ECPrivKey()
@@ -269,7 +311,7 @@ func (w *SPVWallet) buildTx(amount int64, addr btc.Address, feeLevel FeeLevel) (
 	}
 
 	// Get the fee per kilobyte
-	feePerKB := int64(w.getFeePerByte(feeLevel)) * 1000
+	feePerKB := int64(w.GetFeePerByte(feeLevel)) * 1000
 
 	// outputs
 	out := wire.NewTxOut(amount, script)
@@ -328,7 +370,7 @@ type Fees struct {
 
 var cache *feeCache = &feeCache{}
 
-func (w *SPVWallet) getFeePerByte(feeLevel FeeLevel) uint64 {
+func (w *SPVWallet) GetFeePerByte(feeLevel FeeLevel) uint64 {
 	defaultFee := func() uint64 {
 		switch feeLevel {
 		case PRIOIRTY:

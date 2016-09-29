@@ -140,8 +140,6 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 				newu.Freeze = false
 				ts.db.Utxos().Put(newu)
 				hits++
-				// For listener
-				out.IsOurs = true
 				break // txos can match only 1 script
 			}
 		}
@@ -179,12 +177,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 				ts.db.Utxos().Delete(u)
 				utxos = append(utxos[:i], utxos[i+1:]...)
 
-				// For listener
-				ours := true
-				if u.Freeze {
-					ours = false
-				}
-				in := TransactionInput{OutpointHash: u.Op.Hash.CloneBytes(), OutpointIndex: u.Op.Index, LinkedScriptPubKey: u.ScriptPubkey, Value: u.Value, IsOurs: ours}
+				in := TransactionInput{OutpointHash: u.Op.Hash.CloneBytes(), OutpointIndex: u.Op.Index, LinkedScriptPubKey: u.ScriptPubkey, Value: u.Value}
 				cb.Inputs = append(cb.Inputs, in)
 				break
 			}
