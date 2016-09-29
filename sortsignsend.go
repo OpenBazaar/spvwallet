@@ -161,21 +161,26 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 
 	// Subtract fee
 	estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false)
-	fee := estimatedSize * feePerByte
+	fee := estimatedSize * int(feePerByte)
 	feePerOutput := fee/len(tx.TxOut)
 	for _, output := range tx.TxOut {
-		output.Value -= feePerOutput
+		output.Value -= int64(feePerOutput)
 	}
 
 	// BIP 69 sorting
 	txsort.InPlaceSort(tx)
 
+	signingKey, err := key.ECPrivKey()
+	if err != nil {
+		return sigs, err
+	}
+
 	for i, _ := range tx.TxIn {
-		sig, err := txscript.RawTxInSignature(tx, i, redeemScript, txscript.SigHashAll, key)
+		sig, err := txscript.RawTxInSignature(tx, i, redeemScript, txscript.SigHashAll, signingKey)
 		if err != nil {
 			continue
 		}
-		bs := Signature{InputIndex: i, Signature:sig}
+		bs := Signature{InputIndex: uint32(i), Signature:sig}
 		sigs = append(sigs, bs)
 	}
 	return sigs, nil

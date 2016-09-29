@@ -10,7 +10,6 @@ import (
 	"math/rand"
 	"net"
 	"sync"
-	"github.com/OpenBazaar/openbazaar-go/pb"
 )
 
 type SPVWallet struct {
