@@ -142,7 +142,7 @@ func (w *SPVWallet) Spend(amount int64, addr btc.Address, feeLevel FeeLevel) err
 	return nil
 }
 
-func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]Signature, error){
+func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]Signature, error){
 	var sigs []Signature
 	tx := new(wire.MsgTx)
 	for _, in := range ins {
