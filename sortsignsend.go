@@ -1,6 +1,7 @@
 package spvwallet
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"github.com/btcsuite/btcd/btcec"
@@ -138,15 +139,14 @@ func (w *SPVWallet) Spend(amount int64, addr btc.Address, feeLevel FeeLevel) err
 	for _, peer := range w.peerGroup {
 		peer.NewOutgoingTx(tx)
 	}
-	log.Infof("Broadcasting tx %s to network", tx.TxHash().String())
 	return nil
 }
 
-func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]Signature, error){
+func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]Signature, error) {
 	var sigs []Signature
 	tx := new(wire.MsgTx)
 	for _, in := range ins {
-		ch, err := chainhash.NewHash(in.OutpointHash)
+		ch, err := chainhash.NewHashFromStr(hex.EncodeToString(in.OutpointHash))
 		if err != nil {
 			return sigs, err
 		}
@@ -162,7 +162,7 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 	// Subtract fee
 	estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false)
 	fee := estimatedSize * int(feePerByte)
-	feePerOutput := fee/len(tx.TxOut)
+	feePerOutput := fee / len(tx.TxOut)
 	for _, output := range tx.TxOut {
 		output.Value -= int64(feePerOutput)
 	}
@@ -180,7 +180,7 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 		if err != nil {
 			continue
 		}
-		bs := Signature{InputIndex: uint32(i), Signature:sig}
+		bs := Signature{InputIndex: uint32(i), Signature: sig}
 		sigs = append(sigs, bs)
 	}
 	return sigs, nil
@@ -189,7 +189,7 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte uint64) error {
 	tx := new(wire.MsgTx)
 	for _, in := range ins {
-		ch, err := chainhash.NewHash(in.OutpointHash)
+		ch, err := chainhash.NewHashFromStr(hex.EncodeToString(in.OutpointHash))
 		if err != nil {
 			return err
 		}
@@ -205,7 +205,7 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 	// Subtract fee
 	estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false)
 	fee := estimatedSize * int(feePerByte)
-	feePerOutput := fee/len(tx.TxOut)
+	feePerOutput := fee / len(tx.TxOut)
 	for _, output := range tx.TxOut {
 		output.Value -= int64(feePerOutput)
 	}
@@ -221,11 +221,16 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 				sig1 = sig.Signature
 			}
 		}
+		for _, sig := range sigs2 {
+			if int(sig.InputIndex) == i {
+				sig2 = sig.Signature
+			}
+		}
 		builder := txscript.NewScriptBuilder()
 		builder.AddOp(txscript.OP_0)
 		builder.AddData(sig1)
 		builder.AddData(sig2)
-		builder.AddOps(redeemScript)
+		builder.AddData(redeemScript)
 		scriptSig, err := builder.Script()
 		if err != nil {
 			return err
@@ -236,7 +241,6 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 	for _, peer := range w.peerGroup {
 		peer.NewOutgoingTx(tx)
 	}
-	log.Infof("Broadcasting tx %s to network", tx.TxHash().String())
 	return nil
 }
 
@@ -318,8 +322,6 @@ func (w *SPVWallet) SweepMultisig(utxos []Utxo, key *hd.ExtendedKey, redeemScrip
 	for _, peer := range w.peerGroup {
 		peer.NewOutgoingTx(tx)
 	}
-	log.Infof("Broadcasting tx %s to network", tx.TxHash().String())
-
 	return nil
 }
 
@@ -400,7 +402,7 @@ func (w *SPVWallet) buildTx(amount int64, addr btc.Address, feeLevel FeeLevel) (
 		return wif.PrivKey, wif.CompressPubKey, nil
 	})
 	getScript := txscript.ScriptClosure(func(
-		addr btc.Address) ([]byte, error) {
+	addr btc.Address) ([]byte, error) {
 		return []byte{}, nil
 	})
 	for i, txIn := range authoredTx.Tx.TxIn {
