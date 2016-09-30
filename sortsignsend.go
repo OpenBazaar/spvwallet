@@ -186,6 +186,60 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 	return sigs, nil
 }
 
+func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte uint64) error {
+	tx := new(wire.MsgTx)
+	for _, in := range ins {
+		ch, err := chainhash.NewHash(in.OutpointHash)
+		if err != nil {
+			return err
+		}
+		outpoint := wire.NewOutPoint(ch, in.OutpointIndex)
+		input := wire.NewTxIn(outpoint, []byte{})
+		tx.TxIn = append(tx.TxIn, input)
+	}
+	for _, out := range outs {
+		output := wire.NewTxOut(out.Value, out.ScriptPubKey)
+		tx.TxOut = append(tx.TxOut, output)
+	}
+
+	// Subtract fee
+	estimatedSize := EstimateSerializeSize(len(ins), tx.TxOut, false)
+	fee := estimatedSize * int(feePerByte)
+	feePerOutput := fee/len(tx.TxOut)
+	for _, output := range tx.TxOut {
+		output.Value -= int64(feePerOutput)
+	}
+
+	// BIP 69 sorting
+	txsort.InPlaceSort(tx)
+
+	for i, input := range tx.TxIn {
+		var sig1 []byte
+		var sig2 []byte
+		for _, sig := range sigs1 {
+			if int(sig.InputIndex) == i {
+				sig1 = sig.Signature
+			}
+		}
+		builder := txscript.NewScriptBuilder()
+		builder.AddOp(txscript.OP_0)
+		builder.AddData(sig1)
+		builder.AddData(sig2)
+		builder.AddOps(redeemScript)
+		scriptSig, err := builder.Script()
+		if err != nil {
+			return err
+		}
+		input.SignatureScript = scriptSig
+	}
+	// broadcast
+	for _, peer := range w.peerGroup {
+		peer.NewOutgoingTx(tx)
+	}
+	log.Infof("Broadcasting tx %s to network", tx.TxHash().String())
+	return nil
+}
+
 func (w *SPVWallet) SweepMultisig(utxos []Utxo, key *hd.ExtendedKey, redeemScript []byte, feeLevel FeeLevel) error {
 	internalAddr := w.CurrentAddress(INTERNAL)
 	script, err := txscript.PayToAddrScript(internalAddr)
