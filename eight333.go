@@ -6,6 +6,8 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"net"
 	"sync"
+	"bytes"
+	"encoding/hex"
 )
 
 const (
