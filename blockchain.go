@@ -297,6 +297,7 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 	} else {
 		parentHeader, err = b.db.GetPreviousHeader(header)
 		if err != nil {
+			log.Error(header.PrevBlock.String())
 			return false, errors.New("Header does not extend any known headers")
 		}
 	}
