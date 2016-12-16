@@ -200,62 +200,11 @@ func (w *SPVWallet) checkIfStxoIsConfirmed(utxo Utxo, stxos []Stxo) bool {
 	return false
 }
 
-//////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //
 // API
 //
-
-// A TransactionCallback which is sent from the wallet implementation to the transaction
-// listener. It contains enough data to tell which part of the transaction affects our
-// wallet and which addresses coins were sent to and from.
-
-type FeeLevel int
-
-const (
-	PRIOIRTY FeeLevel = 0
-	NORMAL            = 1
-	ECONOMIC          = 2
-)
-
-type KeyPurpose int
-
-const (
-	EXTERNAL KeyPurpose = 0
-	INTERNAL            = 1
-)
-
-type TransactionCallback struct {
-	Txid    []byte
-	Outputs []TransactionOutput
-	Inputs  []TransactionInput
-}
-
-type TransactionOutput struct {
-	ScriptPubKey []byte
-	Value        int64
-	Index        uint32
-}
-
-type TransactionInput struct {
-	OutpointHash       []byte
-	OutpointIndex      uint32
-	LinkedScriptPubKey []byte
-	Value              int64
-}
-
-// A transaction suitable for saving in the database
-type TransactionRecord struct {
-	Txid         string
-	Index        uint32
-	Value        int64
-	ScriptPubKey string
-	Spent        bool
-}
-
-type Signature struct {
-	InputIndex uint32
-	Signature  []byte
-}
+//////////////
 
 func (w *SPVWallet) CurrencyCode() string {
 	return "btc"
