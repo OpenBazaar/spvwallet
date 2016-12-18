@@ -5,35 +5,26 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
-	"sync"
 )
 
-type Eight333 struct {
-	*Blockchain
-	*TxStore
-	blockQueue chan HashAndHeight
-	toDownload map[*chainhash.Hash]int32
-	mutex      *sync.Mutex
-}
-
-func (e *Eight333) askForTx(p *peer.Peer, txid chainhash.Hash) {
+func (s *SPVWallet) askForTx(p *peer.Peer, txid chainhash.Hash) {
 	gdata := wire.NewMsgGetData()
 	inv := wire.NewInvVect(wire.InvTypeTx, &txid)
 	gdata.AddInvVect(inv)
 	p.QueueMessage(gdata, nil)
 }
 
-func (e *Eight333) askForMerkleBlock(p *peer.Peer, hash chainhash.Hash) {
+func (s *SPVWallet) askForMerkleBlock(p *peer.Peer, hash chainhash.Hash) {
 	m := wire.NewMsgGetData()
 	m.AddInvVect(wire.NewInvVect(wire.InvTypeFilteredBlock, &hash))
 	p.QueueMessage(m, nil)
 }
 
-func (e *Eight333) askForHeaders(p *peer.Peer) {
+func (s *SPVWallet) askForHeaders(p *peer.Peer) {
 	ghdr := wire.NewMsgGetHeaders()
 	ghdr.ProtocolVersion = p.ProtocolVersion()
 
-	ghdr.BlockLocatorHashes = e.GetBlockLocatorHashes()
+	ghdr.BlockLocatorHashes = s.blockchain.GetBlockLocatorHashes()
 
 	log.Debugf("Sending getheaders message to peer%d\n", p.ID())
 	p.QueueMessage(ghdr, nil)
@@ -58,16 +49,13 @@ func NewRootAndHeight(b chainhash.Hash, h int32) (hah HashAndHeight) {
 	return
 }
 
-func (e *Eight333) askForBlocks(p *peer.Peer) error {
-	headerTip, err := e.db.Height()
+func (s *SPVWallet) askForBlocks(p *peer.Peer) error {
+	headerTip, err := s.blockchain.db.Height()
 	if err != nil {
 		return err
 	}
 
-	walletTip, err := e.GetDBSyncHeight()
-	if err != nil {
-		return err
-	}
+	walletTip := s.walletSyncHeight
 
 	log.Debugf("WalletTip %d HeaderTip %d\n", walletTip, headerTip)
 	if uint32(walletTip) > headerTip {
@@ -77,17 +65,18 @@ func (e *Eight333) askForBlocks(p *peer.Peer) error {
 	if uint32(walletTip) == headerTip {
 		// nothing to ask for; set wait state and return
 		log.Debugf("No blocks to request, entering wait state\n")
-		if e.ChainState() != WAITING {
+		if s.blockchain.ChainState() != WAITING {
 			log.Info("Blockchain fully synced")
 		}
-		e.SetChainState(WAITING)
+		s.txstore.SetDBSyncHeight(walletTip)
+		s.blockchain.SetChainState(WAITING)
 		// also advertise any unconfirmed txs here
-		//TODO p.Rebroadcast()
+		s.rebroadcast()
 		return nil
 	}
 
 	log.Debugf("Will request blocks %d to %d\n", walletTip+1, headerTip)
-	hashes := e.GetNPrevBlockHashes(int(headerTip - uint32(walletTip)))
+	hashes := s.blockchain.GetNPrevBlockHashes(int(headerTip - uint32(walletTip)))
 
 	// loop through all heights where we want merkleblocks.
 	for i := len(hashes) - 1; i >= 0; i-- {
@@ -105,36 +94,44 @@ func (e *Eight333) askForBlocks(p *peer.Peer) error {
 			hah.final = true
 		}
 		// waits here most of the time for the queue to empty out
-		e.blockQueue <- hah // push height and mroot of requested block on queue
+		s.blockQueue <- hah // push height and mroot of requested block on queue
 		p.QueueMessage(gdataMsg, nil)
-		p.q
 	}
 	return nil
 }
 
-func (e *Eight333) IngestBlockAndHeader(p *peer.Peer, m *wire.MsgMerkleBlock) {
+func (s *SPVWallet) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
+	if s.blockchain.ChainState() == WAITING {
+		go s.ingestBlockAndHeader(p, m)
+	} else {
+		go s.ingestMerkleBlock(p, m)
+	}
+}
+
+func (s *SPVWallet) ingestBlockAndHeader(p *peer.Peer, m *wire.MsgMerkleBlock) {
 	txids, err := checkMBlock(m) // check self-consistency
 	if err != nil {
 		log.Errorf("Merkle block error: %s\n", err.Error())
 		return
 	}
 
-	success, err := e.CommitHeader(m.Header)
+	success, err := s.blockchain.CommitHeader(m.Header)
 	if err != nil {
 		log.Error(err)
 		return
 	}
 	var height uint32
 	if success {
-		h, err := e.db.Height()
+		h, err := s.blockchain.db.Height()
 		height = h
 		if err != nil {
 			log.Error(err)
 			return
 		}
-		e.SetDBSyncHeight(int32(h))
+		s.walletSyncHeight = int32(h)
+		s.txstore.SetDBSyncHeight(int32(h))
 	} else {
-		bestSH, err := e.db.GetBestHeader()
+		bestSH, err := s.blockchain.db.GetBestHeader()
 		height = bestSH.height
 		if err != nil {
 			log.Error(err)
@@ -146,16 +143,17 @@ func (e *Eight333) IngestBlockAndHeader(p *peer.Peer, m *wire.MsgMerkleBlock) {
 			return
 		}
 	}
-	e.mutex.Lock()
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	for _, txid := range txids {
-		e.toDownload[txid] = int32(height)
+		s.toDownload[*txid] = int32(height)
 	}
-	e.mutex.Unlock()
 	log.Debugf("Received Merkle Block %s from peer%d", m.Header.BlockHash().String(), p.ID())
 }
 
-func (e *Eight333) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
-	// TODO: maybe acquire lock?
+func (s *SPVWallet) ingestMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
 	txids, err := checkMBlock(m) // check self-consistency
 	if err != nil {
 		log.Debugf("Merkle block error: %s\n", err.Error())
@@ -163,7 +161,7 @@ func (e *Eight333) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
 	}
 	var hah HashAndHeight
 	select { // select here so we don't block on an unrequested mblock
-	case hah = <-e.blockQueue: // pop height off mblock queue
+	case hah = <-s.blockQueue: // pop height off mblock queue
 		break
 	default:
 		log.Warning("Unrequested merkle block")
@@ -180,79 +178,176 @@ func (e *Eight333) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
 		return
 	}
 	for _, txid := range txids {
-		e.toDownload[txid] = hah.height
+		s.toDownload[*txid] = hah.height
 	}
-	// write to db that we've sync'd to the height indicated in the
-	// merkle block.  This isn't QUITE true since we haven't actually gotten
-	// the txs yet but if there are problems with the txs we should backtrack.
-	err = e.SetDBSyncHeight(hah.height)
-	if err != nil {
-		log.Errorf("Merkle block error: %s\n", err.Error())
-		return
+	s.walletSyncHeight = hah.height
+	if hah.height%2016 == 0 {
+		s.txstore.SetDBSyncHeight(hah.height)
 	}
 	if hah.final {
 		// don't set waitstate; instead, ask for headers again!
 		// this way the only thing that triggers waitstate is asking for headers,
 		// getting 0, calling AskForMerkBlocks(), and seeing you don't need any.
 		// that way you are pretty sure you're synced up.
-		e.askForHeaders(p)
+		s.askForHeaders(p)
 	}
 	log.Debugf("Ingested Merkle Block %s at height %d", m.Header.BlockHash().String(), hah.height)
 	return
 }
 
-func (e *Eight333) onHeaders(p *peer.Peer, m *wire.MsgHeaders) {
-	moar, err := e.IngestHeaders(p, m)
+func (s *SPVWallet) onHeaders(p *peer.Peer, m *wire.MsgHeaders) {
+	moar, err := s.IngestHeaders(p, m)
 	if err != nil {
 		log.Errorf("Header error: %s\n", err.Error())
 		return
 	}
 	// more to get? if so, ask for them and return
 	if moar {
-		e.askForHeaders(p)
+		s.askForHeaders(p)
 		return
 	}
 
 	// no moar, done w/ headers, get blocks
-	err = e.askForBlocks(p)
-	if err != nil {
-		log.Errorf("AskForBlocks error: %s", err.Error())
+	go s.askForBlocks(p)
+}
+
+// TxHandler takes in transaction messages that come in from either a request
+// after an inv message or after a merkle block message.
+func (s *SPVWallet) onTx(p *peer.Peer, m *wire.MsgTx) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	height, ok := s.toDownload[m.TxHash()]
+	if !ok {
+		log.Warningf("Received unknown tx: %s", m.TxHash().String())
 		return
 	}
+	hits, err := s.txstore.Ingest(m, height)
+	if err != nil {
+		log.Errorf("Incoming Tx error: %s\n", err.Error())
+		return
+	}
+	delete(s.toDownload, m.TxHash())
+	if hits == 0 {
+		log.Debugf("Tx %s from peer%d had no hits, filter false positive.",
+			m.TxHash().String(), p.ID())
+		s.fPositives <- p // add one false positive to chan
+		return
+	}
+	s.UpdateFilterAndSend(p)
+	log.Noticef("Tx %s ingested and matches %d utxo/adrs.", m.TxHash().String(), hits)
+}
+
+func (s *SPVWallet) onInv(p *peer.Peer, m *wire.MsgInv) {
+	for _, thing := range m.InvList {
+		if thing.Type == wire.InvTypeTx {
+			// new tx, OK it at 0 and request
+			s.mutex.Lock()
+			s.toDownload[thing.Hash] = 0
+			s.askForTx(p, thing.Hash)
+			s.mutex.Unlock()
+		}
+		if thing.Type == wire.InvTypeBlock { // new block what to do?
+			switch {
+			case s.blockchain.ChainState() == WAITING:
+				s.askForMerkleBlock(p, thing.Hash)
+			default:
+				// drop it as if its component particles had high thermal energies
+				log.Debug("Received inv block but ignoring; not synched\n")
+			}
+		}
+	}
+}
+
+func (s *SPVWallet) GetDataHandler(p *peer.Peer, m *wire.MsgGetData) {
+	log.Debugf("Received getdata request from peer%d\n", p.ID())
+	var sent int32
+	for _, thing := range m.InvList {
+		if thing.Type == wire.InvTypeTx {
+			tx, err := s.txstore.Txns().Get(thing.Hash)
+			if err != nil {
+				log.Errorf("Error getting tx %s: %s",
+					thing.Hash.String(), err.Error())
+			}
+			p.QueueMessage(tx, nil)
+			sent++
+			continue
+		}
+		// Didn't match, so it's not something we're responding to
+		log.Debugf("We only respond to tx requests, ignoring")
+
+	}
+	log.Debugf("Sent %d of %d requested items to peer%d", sent, len(m.InvList), p.ID())
 }
 
 // IngestHeaders takes in a bunch of headers and appends them to the
 // local header file, checking that they fit.  If there's no headers,
 // it assumes we're done and returns false.  If it worked it assumes there's
 // more to request and returns true.
-func (e *Eight333) IngestHeaders(p *peer.Peer, m *wire.MsgHeaders) (bool, error) {
+func (s *SPVWallet) IngestHeaders(p *peer.Peer, m *wire.MsgHeaders) (bool, error) {
 	gotNum := int64(len(m.Headers))
 	if gotNum > 0 {
 		log.Debugf("Received %d headers from peer%d, validating...", gotNum, p.ID())
 	} else {
 		log.Debugf("Received 0 headers from peer%d, we're probably synced up", p.ID())
-		if e.ChainState() == SYNCING {
+		if s.blockchain.ChainState() == SYNCING {
 			log.Info("Headers fully synced")
 		}
 		return false, nil
 	}
 	for _, resphdr := range m.Headers {
-		_, err := e.CommitHeader(*resphdr)
+		_, err := s.blockchain.CommitHeader(*resphdr)
 		if err != nil {
 			// probably should disconnect from spv node at this point,
 			// since they're giving us invalid headers.
 			return true, errors.New("Returned header didn't fit in chain")
 		}
 	}
-	height, _ := e.db.Height()
+	height, _ := s.blockchain.db.Height()
 	log.Debugf("Headers to height %d OK.", height)
 	return true, nil
 }
 
-func onRead(p *peer.Peer, bytesRead int, msg wire.Message, err error) {
-	log.Noticef("%t", msg)
+func (s *SPVWallet) fPositiveHandler() {
+	for {
+		peer := <-s.fPositives // blocks here
+
+		totalFP, _ := s.fpAccumulator[peer.ID()]
+		totalFP++
+		if totalFP > 7 {
+			s.UpdateFilterAndSend(peer)
+
+			log.Debugf("Reset %d false positives for peer%d\n", totalFP, peer.ID())
+			// reset accumulator
+			totalFP = 0
+		}
+		s.fpAccumulator[peer.ID()] = totalFP
+	}
 }
 
-func onWrite(p *peer.Peer, bytesWritten int, msg wire.Message, err error) {
-	log.Warningf("%t", msg)
+func (s *SPVWallet) UpdateFilterAndSend(p *peer.Peer) {
+	filt, err := s.txstore.GimmeFilter()
+	if err != nil {
+		log.Errorf("Filter creation error: %s\n", err.Error())
+		return
+	}
+	// send filter
+	p.QueueMessage(filt.MsgFilterLoad(), nil)
+	log.Debugf("Sent filter to peer%d\n", p.ID())
+}
+
+// Rebroadcast sends an inv message of all the unconfirmed txs the db is
+// aware of.  This is called after every sync.
+func (s *SPVWallet) rebroadcast() {
+	// get all unconfirmed txs
+	invMsg, err := s.txstore.GetPendingInv()
+	if err != nil {
+		log.Errorf("Rebroadcast error: %s", err.Error())
+	}
+	if len(invMsg.InvList) == 0 { // nothing to broadcast, so don't
+		return
+	}
+	for _, p := range s.PeerManager.ConnectedPeers() {
+		p.QueueMessage(invMsg, nil)
+	}
+	return
 }

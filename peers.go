@@ -6,19 +6,17 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/peer"
-	"net"
-	"time"
-	"strconv"
 	"github.com/btcsuite/btcd/wire"
-	"sync"
 	"github.com/btcsuite/btcutil/bloom"
+	"net"
+	"strconv"
+	"sync"
+	"time"
 )
-
-const PROTOCOL_VERSION = 70012
 
 var (
 	// Default number of outbound peers
-	defaultTargetOutbound = uint32(1)
+	defaultTargetOutbound = uint32(12)
 
 	// Default duration of time for retrying a connection
 	defaultRetryDuration = time.Second * 5
@@ -53,11 +51,16 @@ type Config struct {
 	TrustedPeer net.Addr
 
 	// Function to get bloom filter to give to peers
-	GetFilter func()(*bloom.Filter, error)
+	GetFilter func() (*bloom.Filter, error)
 
-	// Wrapper around the blockchain and tx databases. If this is nil the PeerManager
-	// will not attempt to request blocks and transactions.
-	Eight333 *Eight333
+	// Function to beging chain download
+	StartChainDownload func(*peer.Peer)
+
+	// Functon returns info about the last block in the chain
+	GetNewestBlock func() (hash *chainhash.Hash, height int32, err error)
+
+	// Listeners to handle messages from peers. If nil, no messages will be handled.
+	Listeners *peer.MessageListeners
 }
 
 type PeerManager struct {
@@ -73,9 +76,8 @@ type PeerManager struct {
 	trustedPeer  net.Addr
 	downloadPeer *peer.Peer
 
-	getFilter func()(*bloom.Filter, error)
-
-	eight333 *Eight333
+	getFilter          func() (*bloom.Filter, error)
+	startChainDownload func(*peer.Peer)
 }
 
 func NewPeerManager(config *Config) (*PeerManager, error) {
@@ -86,13 +88,13 @@ func NewPeerManager(config *Config) (*PeerManager, error) {
 	}
 
 	pm := &PeerManager{
-		addrManager: addrmgr.New(config.AddressCacheDir, nil),
-		peerMutex: new(sync.RWMutex),
-		connectedPeers: make(map[uint64]*peer.Peer),
-		sourceAddr: wire.NewNetAddressIPPort(net.ParseIP("0.0.0.0"), defaultPort, 0),
-		trustedPeer: config.TrustedPeer,
-		eight333: config.Eight333,
-		getFilter: config.GetFilter,
+		addrManager:        addrmgr.New(config.AddressCacheDir, nil),
+		peerMutex:          new(sync.RWMutex),
+		connectedPeers:     make(map[uint64]*peer.Peer),
+		sourceAddr:         wire.NewNetAddressIPPort(net.ParseIP("0.0.0.0"), defaultPort, 0),
+		trustedPeer:        config.TrustedPeer,
+		getFilter:          config.GetFilter,
+		startChainDownload: config.StartChainDownload,
 	}
 
 	targetOutbound := config.TargetOutbound
@@ -115,7 +117,7 @@ func NewPeerManager(config *Config) (*PeerManager, error) {
 		OnConnection:    pm.onConnection,
 		OnDisconnection: pm.onDisconnection,
 		GetNewAddress:   pm.getNewAddress,
-		Dial:            func(addr net.Addr)(net.Conn, error){
+		Dial: func(addr net.Addr) (net.Conn, error) {
 			return net.Dial("tcp", addr.String())
 		},
 	}
@@ -126,62 +128,66 @@ func NewPeerManager(config *Config) (*PeerManager, error) {
 	}
 	pm.connManager = connMgr
 
-	listeners := peer.MessageListeners{
-		OnVerAck: pm.onVerack,
-		OnAddr: pm.onAddr,
+	var listeners *peer.MessageListeners = config.Listeners
+	if listeners == nil {
+		listeners = &peer.MessageListeners{}
 	}
-	if pm.eight333 != nil {
-		listeners.OnMerkleBlock = pm.eight333.onMerkleBlock
-		listeners.OnHeaders = pm.eight333.onHeaders
-	}
+	listeners.OnVerAck = pm.onVerack
+	listeners.OnAddr = pm.onAddr
+
 	pm.peerConfig = &peer.Config{
-		NewestBlock:      pm.getNewestblock,
+		NewestBlock:      config.GetNewestBlock,
 		UserAgentName:    config.UserAgentName,
 		UserAgentVersion: config.UserAgentVersion,
 		ChainParams:      config.Params,
 		DisableRelayTx:   true,
-		Listeners:        listeners,
-		ProtocolVersion:  PROTOCOL_VERSION,
+		Listeners:        *listeners,
 	}
 	return pm, nil
 }
 
+func (pm *PeerManager) ConnectedPeers() []*peer.Peer {
+	var peers []*peer.Peer
+	pm.peerMutex.RLock()
+	defer pm.peerMutex.RUnlock()
+	for _, peer := range pm.connectedPeers {
+		peers = append(peers, peer)
+	}
+	return peers
+}
+
 func (pm *PeerManager) onConnection(req *connmgr.ConnReq, conn net.Conn) {
+	// Don't let the connection manager connect us to the same peer more than once
+	pm.peerMutex.Lock()
+	defer pm.peerMutex.Unlock()
+	for _, peer := range pm.connectedPeers {
+		if conn.RemoteAddr().String() == peer.Addr() {
+			pm.connManager.Disconnect(req.ID())
+			return
+		}
+	}
+
 	// Create a new peer for this connection
 	p, err := peer.NewOutboundPeer(pm.peerConfig, conn.RemoteAddr().String())
 	if err != nil {
 		pm.connManager.Disconnect(req.ID())
+		return
 	}
 
 	// Add to connected peers
-	pm.peerMutex.Lock()
 	pm.connectedPeers[req.ID()] = p
-	pm.peerMutex.Unlock()
 
 	// Associate the connection with the peer
 	p.AssociateConnection(conn)
 
 	// Tell the addr manager we made a connection
 	pm.addrManager.Connected(p.NA())
-
-	// If the other peer fails to complete the version handshake, dump them
-	select {
-	case <-time.After(time.Second*3):
-		if !p.VersionKnown() {
-			log.Warning("Failed to complete version handshake")
-			pm.peerMutex.Lock()
-			delete(pm.connectedPeers, req.ID())
-			pm.peerMutex.Unlock()
-			p.Disconnect()
-			pm.connManager.Disconnect(req.ID())
-		}
-	}
 }
 
 func (pm *PeerManager) onVerack(p *peer.Peer, msg *wire.MsgVerAck) {
 	// Check this peer offers bloom filtering services. If not dump them.
 	p.NA().Services = p.Services()
-	if !p.NA().HasService(wire.SFNodeBloom) {
+	if !(p.NA().HasService(wire.SFNodeBloom) && p.NA().HasService(wire.SFNodeNetwork)) {
 		pm.peerMutex.Lock()
 		for id, peer := range pm.connectedPeers {
 			if peer.ID() == p.ID() {
@@ -237,8 +243,8 @@ func (pm *PeerManager) onDisconnection(req *connmgr.ConnReq) {
 func (pm *PeerManager) setDownloadPeer(peer *peer.Peer) {
 	log.Infof("Setting peer%d as download peer\n", peer.ID())
 	pm.downloadPeer = peer
-	if pm.eight333 != nil {
-		pm.eight333.askForHeaders(pm.downloadPeer)
+	if pm.startChainDownload != nil {
+		pm.startChainDownload(pm.downloadPeer)
 	}
 }
 
@@ -256,18 +262,12 @@ func (pm *PeerManager) getNewAddress() (net.Addr, error) {
 	}
 }
 
-// FIXME: We need to serve the best block here. Which means we need database access
-func (pm *PeerManager) getNewestblock() (hash *chainhash.Hash, height int32, err error) {
-	h := testnet3Checkpoint.BlockHash()
-	return &h, TESTNET3_CHECKPOINT_HEIGHT, nil
-}
-
 // Query the DNS seeds and pass the addresses into the address manager.
 func (pm *PeerManager) queryDNSSeeds() {
 	wg := new(sync.WaitGroup)
 	for _, seed := range chaincfg.TestNet3Params.DNSSeeds {
 		wg.Add(1)
-		go func(host string){
+		go func(host string) {
 			returnedAddresses := 0
 			addrs, err := net.LookupHost(host)
 			if err != nil {
@@ -309,7 +309,7 @@ func (pm *PeerManager) onAddr(p *peer.Peer, msg *wire.MsgAddr) {
 func (pm *PeerManager) Start() {
 	pm.addrManager.Start()
 	log.Infof("Loaded %d peers from cache\n", pm.addrManager.NumAddresses())
-	if pm.addrManager.NeedMoreAddresses() {
+	if pm.trustedPeer == nil && pm.addrManager.NeedMoreAddresses() {
 		log.Info("Querying DNS seeds")
 		pm.queryDNSSeeds()
 	}

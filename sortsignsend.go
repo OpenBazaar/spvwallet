@@ -1,6 +1,5 @@
 package spvwallet
 
-/*
 import (
 	"encoding/hex"
 	"encoding/json"
@@ -10,7 +9,6 @@ import (
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
 	btc "github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcutil/bloom"
 	"github.com/btcsuite/btcutil/coinset"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/btcsuite/btcutil/txsort"
@@ -20,38 +18,16 @@ import (
 	"time"
 )
 
-
-func (p *Peer) PongBack(nonce uint64) {
-	mpong := wire.NewMsgPong(nonce)
-
-	p.outMsgQueue <- mpong
-	return
-}
-func (p *Peer) UpdateFilterAndSend() {
-	filt, err := p.TS.GimmeFilter()
-	if err != nil {
-		log.Errorf("Filter creation error: %s\n", err.Error())
-		return
-	}
-	// send filter
-	p.SendFilter(filt)
-	log.Debugf("Sent filter to %s\n", p.con.RemoteAddr().String())
-}
-
-func (p *Peer) SendFilter(f *bloom.Filter) {
-	p.outMsgQueue <- f.MsgFilterLoad()
-	return
-}
-
-func (p *Peer) NewOutgoingTx(tx *wire.MsgTx) error {
+func (s *SPVWallet) Broadcast(tx *wire.MsgTx) error {
 	txid := tx.TxHash()
 	// assign height of zero for txs we create
 
-	p.OKMutex.Lock()
-	p.OKTxids[txid] = 0
-	p.OKMutex.Unlock()
+	s.mutex.Lock()
+	s.toDownload[txid] = 0
+	s.mutex.Unlock()
 
-	_, err := p.TS.Ingest(tx, 0) // our own tx; don't keep track of false positives
+	// our own tx; don't keep track of false positives
+	_, err := s.txstore.Ingest(tx, 0)
 	if err != nil {
 		return err
 	}
@@ -62,25 +38,12 @@ func (p *Peer) NewOutgoingTx(tx *wire.MsgTx) error {
 	if err != nil {
 		return err
 	}
-	log.Debugf("Broadcasting tx %s to %s", tx.TxHash().String(), p.con.RemoteAddr().String())
-	p.outMsgQueue <- invMsg
-	return nil
-}
 
-// Rebroadcast sends an inv message of all the unconfirmed txs the db is
-// aware of.  This is called after every sync.  Only txids so hopefully not
-// too annoying for nodes.
-func (p *Peer) Rebroadcast() {
-	// get all unconfirmed txs
-	invMsg, err := p.TS.GetPendingInv()
-	if err != nil {
-		log.Errorf("Rebroadcast error: %s", err.Error())
+	log.Debugf("Broadcasting tx %s to peers", tx.TxHash().String())
+	for _, peer := range s.PeerManager.ConnectedPeers() {
+		peer.QueueMessage(invMsg, nil)
 	}
-	if len(invMsg.InvList) == 0 { // nothing to broadcast, so don't
-		return
-	}
-	p.outMsgQueue <- invMsg
-	return
+	return nil
 }
 
 type Coin struct {
@@ -133,12 +96,12 @@ func (w *SPVWallet) gatherCoins() map[coinset.Coin]*hd.ExtendedKey {
 }
 
 func (w *SPVWallet) Spend(amount int64, addr btc.Address, feeLevel FeeLevel) error {
-	_, err := w.buildTx(amount, addr, feeLevel)
+	tx, err := w.buildTx(amount, addr, feeLevel)
 	if err != nil {
 		return err
 	}
 	// broadcast
-	// TODO: broadcast tx to all peers
+	w.Broadcast(tx)
 	return nil
 }
 
@@ -249,7 +212,7 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 		input.SignatureScript = scriptSig
 	}
 	// broadcast
-	// TODO: broadcast tx to all peers
+	w.Broadcast(tx)
 	return nil
 }
 
@@ -328,7 +291,7 @@ func (w *SPVWallet) SweepMultisig(utxos []Utxo, key *hd.ExtendedKey, redeemScrip
 	}
 
 	// broadcast
-	// TODO: broadcast tx to all peers
+	w.Broadcast(tx)
 	return nil
 }
 
@@ -495,4 +458,3 @@ func (w *SPVWallet) GetFeePerByte(feeLevel FeeLevel) uint64 {
 		return w.normalFee
 	}
 }
-*/
