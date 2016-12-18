@@ -15,49 +15,44 @@ import (
 	"sync"
 )
 
-type ChainState int
-
-const (
-	SYNCING = 0
-	WAITING = 1
-	REORG   = 2
-)
-
 type TxStore struct {
 	Adrs           []btcutil.Address
-	WatchedScripts [][]byte
+	watchedScripts [][]byte
 	addrMutex      *sync.Mutex
-	db             Datastore
 
 	Param *chaincfg.Params
 
 	masterPrivKey *hd.ExtendedKey
 
-	chainState ChainState
-
 	listeners []func(TransactionCallback)
+
+	Datastore
 }
 
-func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey) *TxStore {
-	txs := new(TxStore)
-	txs.Param = p
-	txs.db = db
-	txs.masterPrivKey = masterPrivKey
-	txs.addrMutex = new(sync.Mutex)
-	txs.PopulateAdrs()
-	return txs
+func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey) (*TxStore, error) {
+	txs := &TxStore{
+		Param:         p,
+		masterPrivKey: masterPrivKey,
+		addrMutex:     new(sync.Mutex),
+		Datastore:     db,
+	}
+	err := txs.PopulateAdrs()
+	if err != nil {
+		return nil, err
+	}
+	return txs, nil
 }
 
 // SetDBSyncHeight sets sync height of the db, indicated the latest block
 // of which it has ingested all the transactions.
 func (ts *TxStore) SetDBSyncHeight(n int32) error {
-	return ts.db.State().Put("TipHeight", strconv.Itoa(int(n)))
+	return ts.State().Put("TipHeight", strconv.Itoa(int(n)))
 }
 
-// SyncHeight returns the chain height to which the db has synced
+// The the height at which all of our transactions are synced.
 func (ts *TxStore) GetDBSyncHeight() (int32, error) {
 	var n int32
-	h, err := ts.db.State().Get("TipHeight")
+	h, err := ts.State().Get("TipHeight")
 	if err != nil {
 		return n, nil
 	}
@@ -69,29 +64,29 @@ func (ts *TxStore) GetDBSyncHeight() (int32, error) {
 }
 
 // ... or I'm gonna fade away
-func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
-	t.PopulateAdrs()
+func (ts *TxStore) GimmeFilter() (*bloom.Filter, error) {
+	ts.PopulateAdrs()
 
 	// get all utxos to add outpoints to filter
-	allUtxos, err := t.db.Utxos().GetAll()
+	allUtxos, err := ts.Utxos().GetAll()
 	if err != nil {
 		return nil, err
 	}
 
-	allStxos, err := t.db.Stxos().GetAll()
+	allStxos, err := ts.Stxos().GetAll()
 	if err != nil {
 		return nil, err
 	}
-	t.addrMutex.Lock()
-	elem := uint32(len(t.Adrs) + len(allUtxos) + len(allStxos))
+	ts.addrMutex.Lock()
+	elem := uint32(len(ts.Adrs) + len(allUtxos) + len(allStxos))
 	f := bloom.NewFilter(elem, 0, 0.0001, wire.BloomUpdateAll)
 
 	// note there could be false positives since we're just looking
 	// for the 20 byte PKH without the opcodes.
-	for _, a := range t.Adrs { // add 20-byte pubkeyhash
+	for _, a := range ts.Adrs { // add 20-byte pubkeyhash
 		f.Add(a.ScriptAddress())
 	}
-	t.addrMutex.Unlock()
+	ts.addrMutex.Unlock()
 	for _, u := range allUtxos {
 		f.AddOutPoint(&u.Op)
 	}
@@ -99,8 +94,8 @@ func (t *TxStore) GimmeFilter() (*bloom.Filter, error) {
 	for _, s := range allStxos {
 		f.AddOutPoint(&s.Utxo.Op)
 	}
-	for _, w := range t.WatchedScripts {
-		_, addrs, _, err := txscript.ExtractPkScriptAddrs(w, t.Param)
+	for _, w := range ts.watchedScripts {
+		_, addrs, _, err := txscript.ExtractPkScriptAddrs(w, ts.Param)
 		if err != nil {
 			continue
 		}
@@ -147,11 +142,11 @@ func (ts *TxStore) GetPendingInv() (*wire.MsgInv, error) {
 	// use a map (really a set) do avoid dupes
 	txidMap := make(map[chainhash.Hash]struct{})
 
-	utxos, err := ts.db.Utxos().GetAll() // get utxos from db
+	utxos, err := ts.Utxos().GetAll() // get utxos from db
 	if err != nil {
 		return nil, err
 	}
-	stxos, err := ts.db.Stxos().GetAll() // get stxos from db
+	stxos, err := ts.Stxos().GetAll() // get stxos from db
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +192,7 @@ func (ts *TxStore) PopulateAdrs() error {
 		}
 		ts.Adrs = append(ts.Adrs, addr)
 	}
-	ts.WatchedScripts, _ = ts.db.WatchedScripts().GetAll()
+	ts.watchedScripts, _ = ts.WatchedScripts().GetAll()
 	ts.addrMutex.Unlock()
 	return nil
 }
@@ -237,7 +232,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		out := TransactionOutput{ScriptPubKey: txout.PkScript, Value: txout.Value, Index: uint32(i)}
 		for _, script := range PKscripts {
 			if bytes.Equal(txout.PkScript, script) { // new utxo found
-				ts.db.Keys().MarkKeyAsUsed(txout.PkScript)
+				ts.Keys().MarkKeyAsUsed(txout.PkScript)
 				var newu Utxo // create new utxo
 				newu.AtHeight = height
 				newu.Value = txout.Value
@@ -247,13 +242,13 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 				newop.Index = uint32(i)
 				newu.Op = newop
 				newu.Freeze = false
-				ts.db.Utxos().Put(newu)
+				ts.Utxos().Put(newu)
 				hits++
 				break // txos can match only 1 script
 			}
 		}
 		// Now check watched scripts
-		for _, script := range ts.WatchedScripts {
+		for _, script := range ts.watchedScripts {
 			if bytes.Equal(txout.PkScript, script) {
 				var newu Utxo // create new utxo
 				newu.AtHeight = height
@@ -264,13 +259,13 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 				newop.Index = uint32(i)
 				newu.Op = newop
 				newu.Freeze = true
-				ts.db.Utxos().Put(newu)
+				ts.Utxos().Put(newu)
 				hits++
 			}
 		}
 		cb.Outputs = append(cb.Outputs, out)
 	}
-	utxos, err := ts.db.Utxos().GetAll()
+	utxos, err := ts.Utxos().GetAll()
 	if err != nil {
 		return 0, err
 	}
@@ -282,8 +277,8 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 				st.Utxo = u              // assign outpoint
 				st.SpendHeight = height  // spent at height
 				st.SpendTxid = cachedSha // spent by txid
-				ts.db.Stxos().Put(st)
-				ts.db.Utxos().Delete(u)
+				ts.Stxos().Put(st)
+				ts.Utxos().Delete(u)
 				utxos = append(utxos[:i], utxos[i+1:]...)
 
 				in := TransactionInput{OutpointHash: u.Op.Hash.CloneBytes(), OutpointIndex: u.Op.Index, LinkedScriptPubKey: u.ScriptPubkey, Value: u.Value}
@@ -295,13 +290,13 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 
 	// if hits is nonzero it's a relevant tx and we should store it
 	if hits > 0 {
-		_, err := ts.db.Txns().Get(tx.TxHash())
+		_, err := ts.Txns().Get(tx.TxHash())
 		if err != nil {
 			// Callback on listeners
 			for _, listener := range ts.listeners {
 				listener(cb)
 			}
-			ts.db.Txns().Put(tx)
+			ts.Txns().Put(tx)
 			ts.PopulateAdrs()
 		}
 	}

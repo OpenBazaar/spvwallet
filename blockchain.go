@@ -23,14 +23,23 @@ const (
 	maxRetargetTimespan = int64(targetTimespan * maxDiffAdjust)
 )
 
+type ChainState int
+
+const (
+	SYNCING = 0
+	WAITING = 1
+	REORG   = 2
+)
+
 // Wrapper around Headers implementation that handles all blockchain operations
 type Blockchain struct {
 	lock   *sync.Mutex
 	params *chaincfg.Params
 	db     Headers
+	state  ChainState
 }
 
-func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
+func NewBlockchain(filePath string, params *chaincfg.Params) (*Blockchain, error) {
 	b := &Blockchain{
 		lock:   new(sync.Mutex),
 		params: params,
@@ -47,7 +56,10 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 				height:    MAINNET_CHECKPOINT_HEIGHT,
 				totalWork: big.NewInt(0),
 			}
-			b.db.Put(sh, true)
+			err := b.db.Put(sh, true)
+			if err != nil {
+				return nil, err
+			}
 		} else if b.params.Name == chaincfg.TestNet3Params.Name {
 			// Put the checkpoint to the db
 			sh := StoredHeader{
@@ -56,7 +68,10 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 				totalWork: big.NewInt(0),
 			}
 			// Put to db
-			b.db.Put(sh, true)
+			err := b.db.Put(sh, true)
+			if err != nil {
+				return nil, err
+			}
 		} else if b.params.Name == chaincfg.RegressionNetParams.Name {
 			// Put the checkpoint to the db
 			sh := StoredHeader{
@@ -65,10 +80,13 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 				totalWork: big.NewInt(0),
 			}
 			// Put to db
-			b.db.Put(sh, true)
+			err := b.db.Put(sh, true)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
-	return b
+	return b, nil
 }
 
 func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
@@ -286,6 +304,14 @@ func (b *Blockchain) GetBlockLocatorHashes() []*chainhash.Hash {
 		start += 1
 	}
 	return ret
+}
+
+func (b *Blockchain) ChainState() ChainState {
+	return b.state
+}
+
+func (b *Blockchain) SetChainState(state ChainState) {
+	b.state = state
 }
 
 func (b *Blockchain) Close() {

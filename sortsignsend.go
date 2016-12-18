@@ -1,5 +1,6 @@
 package spvwallet
 
+/*
 import (
 	"encoding/hex"
 	"encoding/json"
@@ -18,6 +19,7 @@ import (
 	"net/http"
 	"time"
 )
+
 
 func (p *Peer) PongBack(nonce uint64) {
 	mpong := wire.NewMsgPong(nonce)
@@ -109,8 +111,8 @@ func NewCoin(txid []byte, index uint32, value btc.Amount, numConfs int64, script
 }
 
 func (w *SPVWallet) gatherCoins() map[coinset.Coin]*hd.ExtendedKey {
-	height, _ := w.state.GetDBSyncHeight()
-	utxos, _ := w.db.Utxos().GetAll()
+	height, _ := w.txstore.GetDBSyncHeight()
+	utxos, _ := w.txstore.Utxos().GetAll()
 	m := make(map[coinset.Coin]*hd.ExtendedKey)
 	for _, u := range utxos {
 		if u.Freeze {
@@ -121,7 +123,7 @@ func (w *SPVWallet) gatherCoins() map[coinset.Coin]*hd.ExtendedKey {
 			confirmations = height - u.AtHeight
 		}
 		c := NewCoin(u.Op.Hash.CloneBytes(), u.Op.Index, btc.Amount(u.Value), int64(confirmations), u.ScriptPubkey)
-		key, err := w.state.GetKeyForScript(u.ScriptPubkey)
+		key, err := w.txstore.GetKeyForScript(u.ScriptPubkey)
 		if err != nil {
 			continue
 		}
@@ -131,14 +133,12 @@ func (w *SPVWallet) gatherCoins() map[coinset.Coin]*hd.ExtendedKey {
 }
 
 func (w *SPVWallet) Spend(amount int64, addr btc.Address, feeLevel FeeLevel) error {
-	tx, err := w.buildTx(amount, addr, feeLevel)
+	_, err := w.buildTx(amount, addr, feeLevel)
 	if err != nil {
 		return err
 	}
 	// broadcast
-	for _, peer := range w.peerGroup {
-		peer.NewOutgoingTx(tx)
-	}
+	// TODO: broadcast tx to all peers
 	return nil
 }
 
@@ -249,9 +249,7 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 		input.SignatureScript = scriptSig
 	}
 	// broadcast
-	for _, peer := range w.peerGroup {
-		peer.NewOutgoingTx(tx)
-	}
+	// TODO: broadcast tx to all peers
 	return nil
 }
 
@@ -330,9 +328,7 @@ func (w *SPVWallet) SweepMultisig(utxos []Utxo, key *hd.ExtendedKey, redeemScrip
 	}
 
 	// broadcast
-	for _, peer := range w.peerGroup {
-		peer.NewOutgoingTx(tx)
-	}
+	// TODO: broadcast tx to all peers
 	return nil
 }
 
@@ -499,3 +495,4 @@ func (w *SPVWallet) GetFeePerByte(feeLevel FeeLevel) uint64 {
 		return w.normalFee
 	}
 }
+*/
