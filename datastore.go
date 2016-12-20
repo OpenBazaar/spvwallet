@@ -10,7 +10,6 @@ type Datastore interface {
 	Stxos() Stxos
 	Txns() Txns
 	Keys() Keys
-	State() State
 	WatchedScripts() WatchedScripts
 }
 
@@ -78,14 +77,6 @@ type Keys interface {
 	// Get the number of unused keys following the last used key
 	// for each key purpose.
 	GetLookaheadWindows() map[KeyPurpose]int
-}
-
-type State interface {
-	// Put a key/value pair to the database
-	Put(key, value string) error
-
-	// Get a value given the key
-	Get(key string) (string, error)
 }
 
 type WatchedScripts interface {

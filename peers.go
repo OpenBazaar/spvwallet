@@ -21,6 +21,7 @@ var (
 	// Default duration of time for retrying a connection
 	defaultRetryDuration = time.Second * 5
 
+	// Default port per chain params
 	defaultPort uint16
 )
 
@@ -156,6 +157,10 @@ func (pm *PeerManager) ConnectedPeers() []*peer.Peer {
 	return peers
 }
 
+func (pm *PeerManager) DownloadPeer() *peer.Peer {
+	return pm.downloadPeer
+}
+
 func (pm *PeerManager) onConnection(req *connmgr.ConnReq, conn net.Conn) {
 	// Don't let the connection manager connect us to the same peer more than once
 	pm.peerMutex.Lock()
@@ -182,6 +187,12 @@ func (pm *PeerManager) onConnection(req *connmgr.ConnReq, conn net.Conn) {
 
 	// Tell the addr manager we made a connection
 	pm.addrManager.Connected(p.NA())
+
+	// Handle disconnect
+	go func(){
+		p.WaitForDisconnect()
+		pm.connManager.Disconnect(req.ID())
+	}()
 }
 
 func (pm *PeerManager) onVerack(p *peer.Peer, msg *wire.MsgVerAck) {
@@ -221,6 +232,7 @@ func (pm *PeerManager) onVerack(p *peer.Peer, msg *wire.MsgVerAck) {
 func (pm *PeerManager) onDisconnection(req *connmgr.ConnReq) {
 	// Remove from connected peers
 	pm.peerMutex.Lock()
+	defer pm.peerMutex.Unlock()
 	peer, ok := pm.connectedPeers[req.ID()]
 	if ok {
 		log.Debugf("Peer%d disconnected", peer.ID())
@@ -237,15 +249,31 @@ func (pm *PeerManager) onDisconnection(req *connmgr.ConnReq) {
 			}
 		}
 	}
-	pm.peerMutex.Unlock()
 }
 
 func (pm *PeerManager) setDownloadPeer(peer *peer.Peer) {
 	log.Infof("Setting peer%d as download peer\n", peer.ID())
 	pm.downloadPeer = peer
 	if pm.startChainDownload != nil {
-		pm.startChainDownload(pm.downloadPeer)
+		go pm.startChainDownload(pm.downloadPeer)
 	}
+}
+
+// Iterates over our peers and sees if any are reporting a height
+// greater than our height. If so switch them to the download peer
+// and start the chain download again.
+func (pm *PeerManager) CheckForMoreBlocks(height uint32) (moar bool) {
+	pm.peerMutex.RLock()
+	defer pm.peerMutex.RUnlock()
+
+	for _, peer := range pm.connectedPeers {
+		if uint32(peer.LastBlock()) > height {
+			pm.downloadPeer = peer
+			go pm.startChainDownload(peer)
+			return true
+		}
+	}
+	return false
 }
 
 // Called by connManager when it adds a new connection
@@ -265,7 +293,7 @@ func (pm *PeerManager) getNewAddress() (net.Addr, error) {
 // Query the DNS seeds and pass the addresses into the address manager.
 func (pm *PeerManager) queryDNSSeeds() {
 	wg := new(sync.WaitGroup)
-	for _, seed := range chaincfg.TestNet3Params.DNSSeeds {
+	for _, seed := range pm.peerConfig.ChainParams.DNSSeeds {
 		wg.Add(1)
 		go func(host string) {
 			returnedAddresses := 0

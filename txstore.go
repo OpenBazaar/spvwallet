@@ -11,7 +11,6 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/bloom"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
-	"strconv"
 	"sync"
 )
 
@@ -41,26 +40,6 @@ func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey)
 		return nil, err
 	}
 	return txs, nil
-}
-
-// SetDBSyncHeight sets sync height of the db, indicated the latest block
-// of which it has ingested all the transactions.
-func (ts *TxStore) SetDBSyncHeight(n int32) error {
-	return ts.State().Put("TipHeight", strconv.Itoa(int(n)))
-}
-
-// The the height at which all of our transactions are synced.
-func (ts *TxStore) GetDBSyncHeight() (int32, error) {
-	var n int32
-	h, err := ts.State().Get("TipHeight")
-	if err != nil {
-		return n, nil
-	}
-	height, err := strconv.Atoi(h)
-	if err != nil {
-		return n, nil
-	}
-	return int32(height), nil
 }
 
 // ... or I'm gonna fade away
@@ -202,23 +181,19 @@ func (ts *TxStore) PopulateAdrs() error {
 func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	var hits uint32
 	var err error
-	// tx has been OK'd by SPV; check tx sanity
+	// Tx has been OK'd by SPV; check tx sanity
 	utilTx := btcutil.NewTx(tx) // convert for validation
-	// checks basic stuff like there are inputs and ouputs
+	// Checks basic stuff like there are inputs and ouputs
 	err = blockchain.CheckTransactionSanity(utilTx)
 	if err != nil {
 		return hits, err
 	}
-	// note that you can't check signatures; this is SPV.
-	// 0 conf SPV means pretty much nothing.  Anyone can say anything.
 
-	// go through txouts, and then go through addresses to match
-
-	// generate PKscripts for all addresses
+	// Generate PKscripts for all addresses
 	ts.addrMutex.Lock()
 	PKscripts := make([][]byte, len(ts.Adrs))
 	for i, _ := range ts.Adrs {
-		// iterate through all our addresses
+		// Iterate through all our addresses
 		PKscripts[i], err = txscript.PayToAddrScript(ts.Adrs[i])
 		if err != nil {
 			return hits, err
@@ -226,39 +201,43 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	}
 	ts.addrMutex.Unlock()
 	cachedSha := tx.TxHash()
-	// iterate through all outputs of this tx, see if we gain
+	// Iterate through all outputs of this tx, see if we gain
 	cb := TransactionCallback{Txid: cachedSha.CloneBytes()}
 	for i, txout := range tx.TxOut {
 		out := TransactionOutput{ScriptPubKey: txout.PkScript, Value: txout.Value, Index: uint32(i)}
 		for _, script := range PKscripts {
 			if bytes.Equal(txout.PkScript, script) { // new utxo found
 				ts.Keys().MarkKeyAsUsed(txout.PkScript)
-				var newu Utxo // create new utxo
-				newu.AtHeight = height
-				newu.Value = txout.Value
-				newu.ScriptPubkey = txout.PkScript
-				var newop wire.OutPoint
-				newop.Hash = cachedSha
-				newop.Index = uint32(i)
-				newu.Op = newop
-				newu.Freeze = false
+				newop := wire.OutPoint{
+					Hash:  cachedSha,
+					Index: uint32(i),
+				}
+				newu := Utxo{
+					AtHeight:     height,
+					Value:        txout.Value,
+					ScriptPubkey: txout.PkScript,
+					Op:           newop,
+					Freeze:       false,
+				}
 				ts.Utxos().Put(newu)
 				hits++
-				break // txos can match only 1 script
+				break
 			}
 		}
 		// Now check watched scripts
 		for _, script := range ts.watchedScripts {
 			if bytes.Equal(txout.PkScript, script) {
-				var newu Utxo // create new utxo
-				newu.AtHeight = height
-				newu.Value = txout.Value
-				newu.ScriptPubkey = txout.PkScript
-				var newop wire.OutPoint
-				newop.Hash = cachedSha
-				newop.Index = uint32(i)
-				newu.Op = newop
-				newu.Freeze = true
+				newop := wire.OutPoint{
+					Hash:  cachedSha,
+					Index: uint32(i),
+				}
+				newu := Utxo{
+					AtHeight:     height,
+					Value:        txout.Value,
+					ScriptPubkey: txout.PkScript,
+					Op:           newop,
+					Freeze:       true,
+				}
 				ts.Utxos().Put(newu)
 				hits++
 			}
@@ -273,22 +252,28 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		for i, u := range utxos {
 			if outPointsEqual(txin.PreviousOutPoint, u.Op) {
 				hits++
-				var st Stxo              // generate spent txo
-				st.Utxo = u              // assign outpoint
-				st.SpendHeight = height  // spent at height
-				st.SpendTxid = cachedSha // spent by txid
+				st := Stxo{
+					Utxo:        u,
+					SpendHeight: height,
+					SpendTxid:   cachedSha,
+				}
 				ts.Stxos().Put(st)
 				ts.Utxos().Delete(u)
 				utxos = append(utxos[:i], utxos[i+1:]...)
 
-				in := TransactionInput{OutpointHash: u.Op.Hash.CloneBytes(), OutpointIndex: u.Op.Index, LinkedScriptPubKey: u.ScriptPubkey, Value: u.Value}
+				in := TransactionInput{
+					OutpointHash:       u.Op.Hash.CloneBytes(),
+					OutpointIndex:      u.Op.Index,
+					LinkedScriptPubKey: u.ScriptPubkey,
+					Value:              u.Value,
+				}
 				cb.Inputs = append(cb.Inputs, in)
 				break
 			}
 		}
 	}
 
-	// if hits is nonzero it's a relevant tx and we should store it
+	// If hits is nonzero it's a relevant tx and we should store it
 	if hits > 0 {
 		_, err := ts.Txns().Get(tx.TxHash())
 		if err != nil {

@@ -33,11 +33,9 @@ type SPVWallet struct {
 
 	fPositives    chan *peer.Peer
 	fpAccumulator map[int32]int32
-	blockQueue    chan HashAndHeight
+	blockQueue    chan chainhash.Hash
 	toDownload    map[chainhash.Hash]int32
-	mutex         *sync.Mutex
-
-	walletSyncHeight int32
+	mutex         *sync.RWMutex
 
 	config *Config
 }
@@ -63,6 +61,7 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 	}
 
 	w := &SPVWallet{
+		repoPath:         repoPath,
 		masterPrivateKey: mPrivKey,
 		masterPublicKey:  mPubKey,
 		params:           params,
@@ -73,9 +72,9 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 		feeAPI:           feeApi,
 		fPositives:       make(chan *peer.Peer),
 		fpAccumulator:    make(map[int32]int32),
-		blockQueue:       make(chan HashAndHeight, 32),
+		blockQueue:       make(chan chainhash.Hash, 32),
 		toDownload:       make(map[chainhash.Hash]int32),
-		mutex:            new(sync.Mutex),
+		mutex:            new(sync.RWMutex),
 	}
 
 	w.txstore, err = NewTxStore(w.params, db, w.masterPrivateKey)
@@ -88,10 +87,9 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 	}
 
 	listeners := &peer.MessageListeners{
-		OnHeaders:     w.onHeaders,
 		OnMerkleBlock: w.onMerkleBlock,
-		OnTx:          w.onTx,
 		OnInv:         w.onInv,
+		OnTx:          w.onTx,
 	}
 
 	getNewestBlock := func() (*chainhash.Hash, int32, error) {
@@ -113,7 +111,7 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 		Params:             w.params,
 		AddressCacheDir:    repoPath,
 		GetFilter:          w.txstore.GimmeFilter,
-		StartChainDownload: w.askForHeaders,
+		StartChainDownload: w.startChainDownload,
 		GetNewestBlock:     getNewestBlock,
 		Listeners:          listeners,
 	}
@@ -135,21 +133,9 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 }
 
 func (w *SPVWallet) Start() {
-	// If this is a new wallet or restoring from seed. Set the db height to the
-	// height of the checkpoint block.
-	tipHeight, _ := w.txstore.GetDBSyncHeight()
-	if tipHeight == 0 {
-		if w.params.Name == chaincfg.MainNetParams.Name {
-			tipHeight = MAINNET_CHECKPOINT_HEIGHT
-			w.txstore.SetDBSyncHeight(MAINNET_CHECKPOINT_HEIGHT)
-		} else if w.params.Name == chaincfg.TestNet3Params.Name {
-			tipHeight = TESTNET3_CHECKPOINT_HEIGHT
-			w.txstore.SetDBSyncHeight(TESTNET3_CHECKPOINT_HEIGHT)
-		}
-	}
-	w.walletSyncHeight = tipHeight
 	go w.PeerManager.Start()
 	go w.fPositiveHandler()
+	log.Info(w.CurrentAddress(EXTERNAL))
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -229,16 +215,17 @@ func (w *SPVWallet) AddTransactionListener(callback func(TransactionCallback)) {
 }
 
 func (w *SPVWallet) ChainTip() uint32 {
-	height, _ := w.txstore.GetDBSyncHeight()
+	height, _ := w.blockchain.db.Height()
 	return uint32(height)
 }
 
 func (w *SPVWallet) AddWatchedScript(script []byte) error {
 	err := w.txstore.WatchedScripts().Put(script)
 	w.txstore.PopulateAdrs()
-	for _, peer := range w.PeerManager.ConnectedPeers() {
-		w.UpdateFilterAndSend(peer)
-	}
+	/*
+		for _, peer := range w.PeerManager.ConnectedPeers() {
+			w.UpdateFilterAndSend(peer)
+		}*/
 	return err
 }
 
@@ -274,12 +261,6 @@ func (w *SPVWallet) Close() {
 
 func (w *SPVWallet) ReSyncBlockchain(fromHeight int32) {
 	w.Close()
-	if w.params.Name == chaincfg.MainNetParams.Name && fromHeight < MAINNET_CHECKPOINT_HEIGHT {
-		fromHeight = MAINNET_CHECKPOINT_HEIGHT
-	} else if w.params.Name == chaincfg.TestNet3Params.Name && fromHeight < TESTNET3_CHECKPOINT_HEIGHT {
-		fromHeight = TESTNET3_CHECKPOINT_HEIGHT
-	}
-	w.walletSyncHeight = fromHeight
-	w.txstore.SetDBSyncHeight(fromHeight)
+	// TODO delete the header db and create a new one
 	go w.Start()
 }

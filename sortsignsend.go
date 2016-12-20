@@ -74,7 +74,7 @@ func NewCoin(txid []byte, index uint32, value btc.Amount, numConfs int64, script
 }
 
 func (w *SPVWallet) gatherCoins() map[coinset.Coin]*hd.ExtendedKey {
-	height, _ := w.txstore.GetDBSyncHeight()
+	height, _ := w.blockchain.db.Height()
 	utxos, _ := w.txstore.Utxos().GetAll()
 	m := make(map[coinset.Coin]*hd.ExtendedKey)
 	for _, u := range utxos {
@@ -83,7 +83,7 @@ func (w *SPVWallet) gatherCoins() map[coinset.Coin]*hd.ExtendedKey {
 		}
 		var confirmations int32
 		if u.AtHeight > 0 {
-			confirmations = height - u.AtHeight
+			confirmations = int32(height) - u.AtHeight
 		}
 		c := NewCoin(u.Op.Hash.CloneBytes(), u.Op.Index, btc.Amount(u.Value), int64(confirmations), u.ScriptPubkey)
 		key, err := w.txstore.GetKeyForScript(u.ScriptPubkey)

@@ -1,7 +1,7 @@
 package spvwallet
 
 import (
-	"errors"
+	"fmt"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -89,14 +89,14 @@ func NewBlockchain(filePath string, params *chaincfg.Params) (*Blockchain, error
 	return b, nil
 }
 
-func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
+func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, uint32, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	newTip := false
 	// Fetch our current best header from the db
 	bestHeader, err := b.db.GetBestHeader()
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 	tipHash := bestHeader.header.BlockHash()
 	var parentHeader StoredHeader
@@ -108,18 +108,17 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 	} else {
 		parentHeader, err = b.db.GetPreviousHeader(header)
 		if err != nil {
-			log.Error(header.PrevBlock.String())
-			return false, errors.New("Header does not extend any known headers")
+			return false, 0, fmt.Errorf("Header %s does not extend any known headers", header.BlockHash().String())
 		}
 	}
 	valid := b.CheckHeader(header, parentHeader)
 	if !valid {
-		return false, nil
+		return false, 0, nil
 	}
 	// If this block is already the tip, return
 	headerHash := header.BlockHash()
 	if tipHash.IsEqual(&headerHash) {
-		return newTip, nil
+		return newTip, 0, nil
 	}
 	// Add the work of this header to the total work stored at the previous header
 	cumulativeWork := new(big.Int).Add(parentHeader.totalWork, blockchain.CalcWork(header.Bits))
@@ -134,21 +133,22 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 			log.Warning("REORG!!! REORG!!! REORG!!!")
 		}
 	}
+	newHeight := parentHeader.height + 1
 	// Put the header to the database
 	err = b.db.Put(StoredHeader{
 		header:    header,
-		height:    parentHeader.height + 1,
+		height:    newHeight,
 		totalWork: cumulativeWork,
 	}, newTip)
 	if err != nil {
-		return newTip, err
+		return newTip, 0, err
 	}
 	// FIXME: Prune any excess headers
 	/*err = b.Prune()
 	if err != nil {
 		return newTip, err
 	}*/
-	return newTip, nil
+	return newTip, newHeight, nil
 }
 
 func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeader) bool {
