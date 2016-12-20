@@ -10,6 +10,8 @@ import (
 	"github.com/op/go-logging"
 	b39 "github.com/tyler-smith/go-bip39"
 	"net"
+	"os"
+	"path"
 	"sync"
 )
 
@@ -32,6 +34,7 @@ type SPVWallet struct {
 	PeerManager *PeerManager
 
 	fPositives    chan *peer.Peer
+	stopChan      chan int
 	fpAccumulator map[int32]int32
 	blockQueue    chan chainhash.Hash
 	toDownload    map[chainhash.Hash]int32
@@ -71,6 +74,7 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 		economicFee:      lowFee,
 		feeAPI:           feeApi,
 		fPositives:       make(chan *peer.Peer),
+		stopChan:         make(chan int),
 		fpAccumulator:    make(map[int32]int32),
 		blockQueue:       make(chan chainhash.Hash, 32),
 		toDownload:       make(map[chainhash.Hash]int32),
@@ -134,7 +138,7 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 
 func (w *SPVWallet) Start() {
 	go w.PeerManager.Start()
-	go w.fPositiveHandler()
+	go w.fPositiveHandler(w.stopChan)
 	log.Info(w.CurrentAddress(EXTERNAL))
 }
 
@@ -257,10 +261,16 @@ func (w *SPVWallet) Close() {
 	log.Info("Disconnecting from peers and shutting down")
 	w.PeerManager.Stop()
 	w.blockchain.Close()
+	w.stopChan <- 1
 }
 
 func (w *SPVWallet) ReSyncBlockchain(fromHeight int32) {
 	w.Close()
-	// TODO delete the header db and create a new one
+	os.Remove(path.Join(w.repoPath, "headers.bin"))
+	blockchain, err := NewBlockchain(w.repoPath, w.params)
+	if err != nil {
+		return
+	}
+	w.blockchain = blockchain
 	go w.Start()
 }

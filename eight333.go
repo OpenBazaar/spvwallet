@@ -141,22 +141,26 @@ func (w *SPVWallet) GetDataHandler(p *peer.Peer, m *wire.MsgGetData) {
 	log.Debugf("Sent %d of %d requested items to Peer%d", sent, len(m.InvList), p.ID())
 }
 
-func (w *SPVWallet) fPositiveHandler() {
+func (w *SPVWallet) fPositiveHandler(quit chan int) {
 	for {
-		peer := <-w.fPositives
-		w.mutex.RLock()
-		falsePostives, _ := w.fpAccumulator[peer.ID()]
-		w.mutex.RUnlock()
-		falsePostives++
-		if falsePostives > 7 {
-			w.updateFilterAndSend(peer)
-			log.Debugf("Reset %d false positives for Peer%d\n", falsePostives, peer.ID())
-			// reset accumulator
-			falsePostives = 0
+		select {
+		case peer := <-w.fPositives:
+			w.mutex.RLock()
+			falsePostives, _ := w.fpAccumulator[peer.ID()]
+			w.mutex.RUnlock()
+			falsePostives++
+			if falsePostives > 7 {
+				w.updateFilterAndSend(peer)
+				log.Debugf("Reset %d false positives for Peer%d\n", falsePostives, peer.ID())
+				// reset accumulator
+				falsePostives = 0
+			}
+			w.mutex.Lock()
+			w.fpAccumulator[peer.ID()] = falsePostives
+			w.mutex.Unlock()
+		case <-quit:
+			break
 		}
-		w.mutex.Lock()
-		w.fpAccumulator[peer.ID()] = falsePostives
-		w.mutex.Unlock()
 	}
 }
 

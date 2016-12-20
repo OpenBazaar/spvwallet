@@ -97,9 +97,6 @@ func (h *HeaderDB) Put(sh StoredHeader, newBestHeader bool) error {
 		}
 		if newBestHeader {
 			tip := btx.Bucket(BKTChainTip)
-			if err != nil {
-				return err
-			}
 			err = tip.Put(KEYChainTip, ser)
 			if err != nil {
 				return err
@@ -115,14 +112,39 @@ func (h *HeaderDB) Prune() error {
 	return h.db.Update(func(btx *bolt.Tx) error {
 		hdrs := btx.Bucket(BKTHeaders)
 		numHeaders := hdrs.Stats().KeyN
+		tip := btx.Bucket(BKTChainTip)
+		b := tip.Get(KEYChainTip)
+		if b == nil {
+			return errors.New("ChainTip not set")
+		}
+		sh, err := deserializeHeader(b)
+		if err != nil {
+			return err
+		}
+		height := sh.height
 		if numHeaders > MAX_HEADERS {
-			for i := 0; i < numHeaders-MAX_HEADERS; i++ {
-				k, _ := hdrs.Cursor().First()
+			var toDelete [][]byte
+			pruneHeight := height - 2000
+			err := hdrs.ForEach(func(k, v []byte) error {
+				sh, err := deserializeHeader(v)
+				if err != nil {
+					return err
+				}
+				if sh.height <= pruneHeight {
+					toDelete = append(toDelete, k)
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+			for _, k := range toDelete {
 				err := hdrs.Delete(k)
 				if err != nil {
 					return err
 				}
 			}
+
 		}
 		return nil
 	})
