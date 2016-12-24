@@ -226,10 +226,10 @@ func (w *SPVWallet) ChainTip() uint32 {
 func (w *SPVWallet) AddWatchedScript(script []byte) error {
 	err := w.txstore.WatchedScripts().Put(script)
 	w.txstore.PopulateAdrs()
-	/*
-		for _, peer := range w.PeerManager.ConnectedPeers() {
-			w.UpdateFilterAndSend(peer)
-		}*/
+
+	for _, peer := range w.PeerManager.ConnectedPeers() {
+		w.updateFilterAndSend(peer)
+	}
 	return err
 }
 
