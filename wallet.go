@@ -40,6 +40,8 @@ type SPVWallet struct {
 	toDownload    map[chainhash.Hash]int32
 	mutex         *sync.RWMutex
 
+	running bool
+
 	config *Config
 }
 
@@ -140,6 +142,7 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 func (w *SPVWallet) Start() {
 	go w.PeerManager.Start()
 	go w.fPositiveHandler(w.stopChan)
+	w.running = true
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,10 +261,13 @@ func (w *SPVWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int)
 }
 
 func (w *SPVWallet) Close() {
-	log.Info("Disconnecting from peers and shutting down")
-	w.PeerManager.Stop()
-	w.blockchain.Close()
-	w.stopChan <- 1
+	if w.running {
+		log.Info("Disconnecting from peers and shutting down")
+		w.PeerManager.Stop()
+		w.blockchain.Close()
+		w.stopChan <- 1
+		w.running = false
+	}
 }
 
 func (w *SPVWallet) ReSyncBlockchain(fromHeight int32) {
