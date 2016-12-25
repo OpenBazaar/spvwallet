@@ -1,186 +1,136 @@
 package spvwallet
 
 import (
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
 )
 
-func (p *Peer) incomingMessageHandler() {
-	for {
-		n, xm, _, err := wire.ReadMessageN(p.con, p.localVersion, p.TS.Param.Net)
-		if err != nil {
-			p.disconnectChan <- p.remoteAddress
+var (
+	maxHash *chainhash.Hash
+)
+
+func init() {
+	h, err := chainhash.NewHashFromStr("0000000000000000000000000000000000000000000000000000000000000000")
+	if err != nil {
+		log.Fatal(err)
+	}
+	maxHash = h
+}
+
+func (w *SPVWallet) startChainDownload(p *peer.Peer) {
+	if w.blockchain.ChainState() == SYNCING {
+		height, _ := w.blockchain.db.Height()
+		if height >= uint32(p.LastBlock()) {
+			moar := w.PeerManager.CheckForMoreBlocks(height)
+			if !moar {
+				log.Info("Chain download complete")
+				w.blockchain.SetChainState(WAITING)
+				w.Rebroadcast()
+				close(w.blockQueue)
+			}
 			return
 		}
-		p.RBytes += uint64(n)
-		switch m := xm.(type) {
-		case *wire.MsgVersion:
-			log.Debugf("Got version message.  Agent %s, version %d, at height %d\n",
-				m.UserAgent, m.ProtocolVersion, m.LastBlock)
-			p.remoteVersion = uint32(m.ProtocolVersion) // weird cast! bug?
-		case *wire.MsgVerAck:
-			log.Debugf("Got verack from %s. Whatever.\n", p.con.RemoteAddr().String())
-		case *wire.MsgAddr:
-			log.Debugf("Received %d addresses from %s\n", len(m.AddrList), p.con.RemoteAddr().String())
-		case *wire.MsgPing:
-			// log.Debugf("Got a ping message.  We should pong back or they will kick us off.")
-			go p.PongBack(m.Nonce)
-		case *wire.MsgPong:
-			log.Debugf("Got a pong response. OK.\n")
-		case *wire.MsgMerkleBlock:
-			if p.TS.chainState == WAITING {
-				p.IngestBlockAndHeader(m)
-			} else {
-				p.IngestMerkleBlock(m)
-			}
-		case *wire.MsgHeaders: // concurrent because we keep asking for blocks
-			go p.HeaderHandler(m)
-		case *wire.MsgTx: // not concurrent! txs must be in order
-			p.TxHandler(m)
-		case *wire.MsgReject:
-			log.Warningf("Rejected! cmd: %s code: %s tx: %s reason: %s",
-				m.Cmd, m.Code.String(), m.Hash.String(), m.Reason)
-		case *wire.MsgInv:
-			p.InvHandler(m)
-		case *wire.MsgNotFound:
-			log.Warningf("Got not found response from %s:\n", p.con.RemoteAddr().String())
-			for i, thing := range m.InvList {
-				log.Warningf("\t$d) %s: %s", i, thing.Type, thing.Hash)
-			}
-		case *wire.MsgGetData:
-			p.GetDataHandler(m)
-
-		default:
-			log.Warningf("Received unknown message type %s from %s\n", m.Command(), p.con.RemoteAddr().String())
-		}
-	}
-	return
-}
-
-// this one seems kindof pointless?  could get ridf of it and let
-// functions call WriteMessageN themselves...
-func (p *Peer) outgoingMessageHandler() {
-	for {
-		msg := <-p.outMsgQueue
-		n, err := wire.WriteMessageN(p.con, msg, p.localVersion, p.TS.Param.Net)
-		if err != nil {
-			log.Errorf("Write message error: %s", err.Error())
-		}
-		p.WBytes += uint64(n)
-	}
-	return
-}
-
-// fPositiveHandler monitors false positives and when it gets enough of them,
-//
-func (p *Peer) fPositiveHandler() {
-	var fpAccumulator int32
-	for {
-		fpAccumulator += <-p.fPositives // blocks here
-		if fpAccumulator > 7 {
-			p.UpdateFilterAndSend()
-			// clear the channel
-		finClear:
-			for {
-				select {
-				case x := <-p.fPositives:
-					fpAccumulator += x
-				default:
-					break finClear
-				}
-			}
-
-			log.Debugf("Reset %d false positives for peer %s\n", fpAccumulator, p.con.RemoteAddr().String())
-			// reset accumulator
-			fpAccumulator = 0
-		}
+		gBlocks := wire.NewMsgGetBlocks(maxHash)
+		hashes := w.blockchain.GetBlockLocatorHashes()
+		gBlocks.BlockLocatorHashes = hashes
+		p.QueueMessage(gBlocks, nil)
 	}
 }
 
-func (p *Peer) HeaderHandler(m *wire.MsgHeaders) {
-	moar, err := p.IngestHeaders(m)
+func (w *SPVWallet) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
+	if w.blockchain.ChainState() == SYNCING && w.PeerManager.DownloadPeer().ID() == p.ID() {
+		queueHash := <-w.blockQueue
+		headerHash := m.Header.BlockHash()
+		if !headerHash.IsEqual(&queueHash) {
+			log.Errorf("Peer%d is sending us blocks out of order", p.ID())
+			p.Disconnect()
+			return
+		}
+	}
+	txids, err := checkMBlock(m)
 	if err != nil {
-		log.Errorf("Header error: %s\n", err.Error())
+		log.Errorf("Peer%d sent an invalid MerkleBlock", p.ID())
+		p.Disconnect()
 		return
 	}
-	// more to get? if so, ask for them and return
-	if moar {
-		err = p.AskForHeaders()
-		if err != nil {
-			log.Errorf("AskForHeaders error: %s", err.Error())
-		}
-		return
-	}
-
-	// no moar, done w/ headers, get blocks
-	err = p.AskForBlocks()
+	newBlock, height, err := w.blockchain.CommitHeader(m.Header)
 	if err != nil {
-		log.Errorf("AskForBlocks error: %s", err.Error())
+		log.Warning(err)
 		return
+	}
+	if !newBlock {
+		return
+	}
+	for _, txid := range txids {
+		w.mutex.Lock()
+		w.toDownload[*txid] = int32(height)
+		w.mutex.Unlock()
+	}
+	log.Debugf("Received Merkle Block %s at height %d\n", m.Header.BlockHash().String(), height)
+	if len(w.blockQueue) == 0 && w.blockchain.ChainState() == SYNCING {
+		go w.startChainDownload(p)
 	}
 }
 
-// TxHandler takes in transaction messages that come in from either a request
-// after an inv message or after a merkle block message.
-func (p *Peer) TxHandler(m *wire.MsgTx) {
-	p.OKMutex.Lock()
-	height, ok := p.OKTxids[m.TxHash()]
-	p.OKMutex.Unlock()
-	if !ok {
-		log.Warningf("Received unknown tx: %s", m.TxHash().String())
-		return
-	}
-
-	// check for double spends
-	//	allTxs, err := s.TS.GetAllTxs()
-	//	if err != nil {
-	//		log.Debugf("Can't get txs from db: %s", err.Error())
-	//		return
-	//	}
-	//	dubs, err := CheckDoubleSpends(m, allTxs)
-	//	if err != nil {
-	//		log.Debugf("CheckDoubleSpends error: %s", err.Error())
-	//		return
-	//	}
-	//	if len(dubs) > 0 {
-	//		for i, dub := range dubs {
-	//			fmt.Debugf("dub %d known tx %s and new tx %s are exclusive!!!\n",
-	//				i, dub.String(), m.TxSha().String())
-	//		}
-	//	}
-	hits, err := p.TS.Ingest(m, height)
+func (w *SPVWallet) onTx(p *peer.Peer, m *wire.MsgTx) {
+	w.mutex.RLock()
+	height := w.toDownload[m.TxHash()]
+	w.mutex.RUnlock()
+	hits, err := w.txstore.Ingest(m, height)
 	if err != nil {
-		log.Errorf("Incoming Tx error: %s\n", err.Error())
+		log.Errorf("Error ingesting tx: %s\n", err.Error())
 		return
 	}
 	if hits == 0 {
-		log.Debugf("Tx %s from %s had no hits, filter false positive.",
-			m.TxHash().String(), p.con.RemoteAddr().String())
-		p.fPositives <- 1 // add one false positive to chan
+		log.Debugf("Tx %s from Peer%d had no hits, filter false positive.", m.TxHash().String(), p.ID())
+		w.fPositives <- p
 		return
 	}
-	p.UpdateFilterAndSend()
-	log.Noticef("Tx %s ingested and matches %d utxo/adrs.",
-		m.TxHash().String(), hits)
-	//TODO: remove txid from map
+	w.updateFilterAndSend(p)
+	log.Infof("Tx %s from Peer%d ingested and matches %d utxo/adrs.", m.TxHash().String(), p.ID(), hits)
+
+	// FIXME: right now the hash stays in memory forever. We need to delete it but the way the code works,
+	// FIXME: doing so will cause the height to get reset to zero if a peer relays the tx to us again.
 }
 
-// GetDataHandler responds to requests for tx data, which happen after
-// advertising our txs via an inv message
-func (p *Peer) GetDataHandler(m *wire.MsgGetData) {
-	log.Debugf("Received getdata request from %s\n", p.con.RemoteAddr().String())
-	var sent int32
-	for i, thing := range m.InvList {
-		log.Debugf("\t%d)%s : %s",
-			i, thing.Type.String(), thing.Hash.String())
-
-		if thing.Type == wire.InvTypeTx {
-			tx, err := p.TS.db.Txns().Get(thing.Hash)
-			if err != nil {
-				log.Errorf("Error getting tx %s: %s",
-					thing.Hash.String(), err.Error())
+func (w *SPVWallet) onInv(p *peer.Peer, m *wire.MsgInv) {
+	go func() {
+		for _, inv := range m.InvList {
+			switch inv.Type {
+			case wire.InvTypeBlock:
+				// Kind of lame to send separate getData messages but this allows us
+				// to take advantage of the timeout on the upper layer. Otherwise we
+				// need separate timeout handling.
+				inv.Type = wire.InvTypeFilteredBlock
+				gData := wire.NewMsgGetData()
+				gData.AddInvVect(inv)
+				p.QueueMessage(gData, nil)
+				if w.blockchain.ChainState() == SYNCING && w.PeerManager.DownloadPeer().ID() == p.ID() {
+					w.blockQueue <- inv.Hash
+				}
+			case wire.InvTypeTx:
+				gData := wire.NewMsgGetData()
+				gData.AddInvVect(inv)
+				p.QueueMessage(gData, nil)
+			default:
+				continue
 			}
-			//tx.Flags = 0x00 // dewitnessify
-			p.outMsgQueue <- tx
+
+		}
+	}()
+}
+
+func (w *SPVWallet) onGetData(p *peer.Peer, m *wire.MsgGetData) {
+	log.Debugf("Received getdata request from Peer%d\n", p.ID())
+	var sent int32
+	for _, thing := range m.InvList {
+		if thing.Type == wire.InvTypeTx {
+			tx, err := w.txstore.Txns().Get(thing.Hash)
+			if err != nil {
+				log.Errorf("Error getting tx %s: %s", thing.Hash.String(), err.Error())
+			}
+			p.QueueMessage(tx, nil)
 			sent++
 			continue
 		}
@@ -188,28 +138,53 @@ func (p *Peer) GetDataHandler(m *wire.MsgGetData) {
 		log.Debugf("We only respond to tx requests, ignoring")
 
 	}
-	log.Debugf("Sent %d of %d requested items to %s", sent, len(m.InvList), p.con.RemoteAddr().String())
+	log.Debugf("Sent %d of %d requested items to Peer%d", sent, len(m.InvList), p.ID())
 }
 
-func (p *Peer) InvHandler(m *wire.MsgInv) {
-	log.Debugf("Received inv message from %s\n", p.con.RemoteAddr().String())
-	for _, thing := range m.InvList {
-		if thing.Type == wire.InvTypeTx {
-			// new tx, OK it at 0 and request
-			p.OKMutex.Lock()
-			p.OKTxids[thing.Hash] = 0
-			p.AskForTx(thing.Hash)
-			p.OKMutex.Unlock()
-		}
-		if thing.Type == wire.InvTypeBlock { // new block what to do?
-			switch {
-			case p.TS.chainState == WAITING:
-				// start getting headers
-				p.AskForMerkleBlock(thing.Hash)
-			default:
-				// drop it as if its component particles had high thermal energies
-				log.Debug("Received inv block but ignoring; not synched\n")
+func (w *SPVWallet) fPositiveHandler(quit chan int) {
+	for {
+		select {
+		case peer := <-w.fPositives:
+			w.mutex.RLock()
+			falsePostives, _ := w.fpAccumulator[peer.ID()]
+			w.mutex.RUnlock()
+			falsePostives++
+			if falsePostives > 7 {
+				w.updateFilterAndSend(peer)
+				log.Debugf("Reset %d false positives for Peer%d\n", falsePostives, peer.ID())
+				// reset accumulator
+				falsePostives = 0
 			}
+			w.mutex.Lock()
+			w.fpAccumulator[peer.ID()] = falsePostives
+			w.mutex.Unlock()
+		case <-quit:
+			break
 		}
+	}
+}
+
+func (w *SPVWallet) updateFilterAndSend(p *peer.Peer) {
+	filt, err := w.txstore.GimmeFilter()
+	if err != nil {
+		log.Errorf("Error creating filter: %s\n", err.Error())
+		return
+	}
+	// send filter
+	p.QueueMessage(filt.MsgFilterLoad(), nil)
+	log.Debugf("Sent filter to Peer%d\n", p.ID())
+}
+
+func (w *SPVWallet) Rebroadcast() {
+	// get all unconfirmed txs
+	invMsg, err := w.txstore.GetPendingInv()
+	if err != nil {
+		log.Errorf("Rebroadcast error: %s", err.Error())
+	}
+	if len(invMsg.InvList) == 0 { // nothing to broadcast, so don't
+		return
+	}
+	for _, peer := range w.PeerManager.connectedPeers {
+		peer.QueueMessage(invMsg, nil)
 	}
 }

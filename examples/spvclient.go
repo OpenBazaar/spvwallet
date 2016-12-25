@@ -34,7 +34,11 @@ func main() {
 	mnemonic := "salon around sketch ivory analyst vital erosion shift organ hub assault notice"
 
 	// Start up a new node
-	wallet := spvwallet.NewSPVWallet(mnemonic, &chaincfg.MainNetParams, 1000, 60, 40, 20, "", dirPath, database, "OpenBazaar", "", ml)
+	wallet, err := spvwallet.NewSPVWallet(mnemonic, &chaincfg.RegressionNetParams, 1000, 60, 40, 20, "", dirPath, database, "OpenBazaar", "127.0.0.1:18444", ml)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	go wallet.Start()
 	wg.Wait()
 }

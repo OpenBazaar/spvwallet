@@ -1,7 +1,7 @@
 package spvwallet
 
 import (
-	"errors"
+	"fmt"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -23,18 +23,27 @@ const (
 	maxRetargetTimespan = int64(targetTimespan * maxDiffAdjust)
 )
 
+type ChainState int
+
+const (
+	SYNCING = 0
+	WAITING = 1
+	REORG   = 2
+)
+
 // Wrapper around Headers implementation that handles all blockchain operations
 type Blockchain struct {
-	lock   *sync.Mutex
-	params *chaincfg.Params
-	db     Headers
+	lock        *sync.Mutex
+	params      *chaincfg.Params
+	db          Headers
+	state       ChainState
 }
 
-func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
+func NewBlockchain(filePath string, params *chaincfg.Params) (*Blockchain, error) {
 	b := &Blockchain{
-		lock:   new(sync.Mutex),
-		params: params,
-		db:     NewHeaderDB(filePath),
+		lock:        new(sync.Mutex),
+		params:      params,
+		db:          NewHeaderDB(filePath),
 	}
 
 	h, err := b.db.Height()
@@ -47,7 +56,10 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 				height:    MAINNET_CHECKPOINT_HEIGHT,
 				totalWork: big.NewInt(0),
 			}
-			b.db.Put(sh, true)
+			err := b.db.Put(sh, true)
+			if err != nil {
+				return nil, err
+			}
 		} else if b.params.Name == chaincfg.TestNet3Params.Name {
 			// Put the checkpoint to the db
 			sh := StoredHeader{
@@ -56,7 +68,10 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 				totalWork: big.NewInt(0),
 			}
 			// Put to db
-			b.db.Put(sh, true)
+			err := b.db.Put(sh, true)
+			if err != nil {
+				return nil, err
+			}
 		} else if b.params.Name == chaincfg.RegressionNetParams.Name {
 			// Put the checkpoint to the db
 			sh := StoredHeader{
@@ -65,20 +80,23 @@ func NewBlockchain(filePath string, params *chaincfg.Params) *Blockchain {
 				totalWork: big.NewInt(0),
 			}
 			// Put to db
-			b.db.Put(sh, true)
+			err := b.db.Put(sh, true)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
-	return b
+	return b, nil
 }
 
-func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
+func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, uint32, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 	newTip := false
 	// Fetch our current best header from the db
 	bestHeader, err := b.db.GetBestHeader()
 	if err != nil {
-		return false, err
+		return false, 0, err
 	}
 	tipHash := bestHeader.header.BlockHash()
 	var parentHeader StoredHeader
@@ -90,18 +108,17 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 	} else {
 		parentHeader, err = b.db.GetPreviousHeader(header)
 		if err != nil {
-			log.Error(header.PrevBlock.String())
-			return false, errors.New("Header does not extend any known headers")
+			return false, 0, fmt.Errorf("Header %s does not extend any known headers", header.BlockHash().String())
 		}
 	}
 	valid := b.CheckHeader(header, parentHeader)
 	if !valid {
-		return false, nil
+		return false, 0, nil
 	}
 	// If this block is already the tip, return
 	headerHash := header.BlockHash()
 	if tipHash.IsEqual(&headerHash) {
-		return newTip, nil
+		return newTip, 0, nil
 	}
 	// Add the work of this header to the total work stored at the previous header
 	cumulativeWork := new(big.Int).Add(parentHeader.totalWork, blockchain.CalcWork(header.Bits))
@@ -116,36 +133,32 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, error) {
 			log.Warning("REORG!!! REORG!!! REORG!!!")
 		}
 	}
+	newHeight := parentHeader.height + 1
 	// Put the header to the database
 	err = b.db.Put(StoredHeader{
 		header:    header,
-		height:    parentHeader.height + 1,
+		height:    newHeight,
 		totalWork: cumulativeWork,
 	}, newTip)
 	if err != nil {
-		return newTip, err
+		return newTip, 0, err
 	}
-	// FIXME: Prune any excess headers
-	/*err = b.Prune()
-	if err != nil {
-		return newTip, err
-	}*/
-	return newTip, nil
+	return newTip, newHeight, nil
 }
 
 func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeader) bool {
 
-	// get hash of n-1 header
+	// Get hash of n-1 header
 	prevHash := prevHeader.header.BlockHash()
 	height := prevHeader.height
 
-	// check if headers link together.  That whole 'blockchain' thing.
+	// Check if headers link together.  That whole 'blockchain' thing.
 	if prevHash.IsEqual(&header.PrevBlock) == false {
 		log.Errorf("Headers %d and %d don't link.\n", height, height+1)
 		return false
 	}
 
-	// check the header meets the difficulty requirement
+	// Check the header meets the difficulty requirement
 	diffTarget, err := b.calcRequiredWork(header, int32(height+1), prevHeader)
 	if err != nil {
 		log.Errorf("Error calclating difficulty", err)
@@ -157,22 +170,11 @@ func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeade
 		return false
 	}
 
-	// check if there's a valid proof of work.  That whole "Bitcoin" thing.
+	// Check if there's a valid proof of work.  That whole "Bitcoin" thing.
 	if !checkProofOfWork(header, b.params) {
-		log.Debugf("Block %d Bad proof of work.\n", height)
+		log.Debugf("Block %d bad proof of work.\n", height+1)
 		return false
 	}
-
-	// TODO: Check header timestamps: code from BitcoinCore
-	/*
-		 // Check timestamp against prev
-		 if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
-			return state.Invalid(false, REJECT_INVALID, "time-too-old", "block's timestamp is too early");
-
-		 // Check timestamp
-		 if (block.GetBlockTime() > nAdjustedTime + 2 * 60 * 60)
-			return state.Invalid(false, REJECT_INVALID, "time-too-new", "block timestamp too far in the future");
-	*/
 
 	return true // it must have worked if there's no errors and got to the end.
 }
@@ -288,6 +290,14 @@ func (b *Blockchain) GetBlockLocatorHashes() []*chainhash.Hash {
 	return ret
 }
 
+func (b *Blockchain) ChainState() ChainState {
+	return b.state
+}
+
+func (b *Blockchain) SetChainState(state ChainState) {
+	b.state = state
+}
+
 func (b *Blockchain) Close() {
 	b.lock.Lock()
 	b.db.Close()
@@ -299,12 +309,12 @@ func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
 
 	// The target must more than 0.  Why can you even encode negative...
 	if target.Sign() <= 0 {
-		log.Debugf("block target %064x is neagtive(??)\n", target.Bytes())
+		log.Debugf("Block target %064x is neagtive(??)\n", target.Bytes())
 		return false
 	}
 	// The target must be less than the maximum allowed (difficulty 1)
 	if target.Cmp(p.PowLimit) > 0 {
-		log.Debugf("block target %064x is "+
+		log.Debugf("Block target %064x is "+
 			"higher than max of %064x", target, p.PowLimit.Bytes())
 		return false
 	}
@@ -312,7 +322,7 @@ func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
 	blockHash := header.BlockHash()
 	hashNum := blockchain.HashToBig(&blockHash)
 	if hashNum.Cmp(target) > 0 {
-		log.Debugf("block hash %064x is higher than "+
+		log.Debugf("Block hash %064x is higher than "+
 			"required target of %064x", hashNum, target)
 		return false
 	}
@@ -325,7 +335,7 @@ func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
 func calcDiffAdjust(start, end wire.BlockHeader, p *chaincfg.Params) uint32 {
 	duration := end.Timestamp.UnixNano() - start.Timestamp.UnixNano()
 	if duration < minRetargetTimespan {
-		log.Debugf("whoa there, block %s off-scale high 4X diff adjustment!",
+		log.Debugf("Whoa there, block %s off-scale high 4X diff adjustment!",
 			end.BlockHash().String())
 		duration = minRetargetTimespan
 	} else if duration > maxRetargetTimespan {

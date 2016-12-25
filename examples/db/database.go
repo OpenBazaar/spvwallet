@@ -15,7 +15,6 @@ type SQLiteDatastore struct {
 	utxos          spvwallet.Utxos
 	stxos          spvwallet.Stxos
 	txns           spvwallet.Txns
-	state          spvwallet.State
 	watchedScripts spvwallet.WatchedScripts
 	db             *sql.DB
 	lock           *sync.Mutex
@@ -46,10 +45,6 @@ func Create(repoPath string) (*SQLiteDatastore, error) {
 			db:   conn,
 			lock: l,
 		},
-		state: &StateDB{
-			db:   conn,
-			lock: l,
-		},
 		watchedScripts: &WatchedScriptsDB{
 			db:   conn,
 			lock: l,
@@ -73,9 +68,6 @@ func (db *SQLiteDatastore) Stxos() spvwallet.Stxos {
 func (db *SQLiteDatastore) Txns() spvwallet.Txns {
 	return db.txns
 }
-func (db *SQLiteDatastore) State() spvwallet.State {
-	return db.state
-}
 func (db *SQLiteDatastore) WatchedScripts() spvwallet.WatchedScripts {
 	return db.watchedScripts
 }
@@ -87,7 +79,6 @@ func initDatabaseTables(db *sql.DB) error {
 	create table if not exists utxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, freeze integer);
 	create table if not exists stxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, spendHeight integer, spendTxid text);
 	create table if not exists txns (txid text primary key not null, tx blob);
-	create table if not exists state (key text primary key not null, value text);
 	create table if not exists watchedScripts (scriptPubKey text primary key not null);
 	`
 	_, err := db.Exec(sqlStmt)

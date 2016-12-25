@@ -1,15 +1,8 @@
 package spvwallet
 
 import (
-	"fmt"
-	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcd/wire"
-	"github.com/btcsuite/btcutil"
-	"github.com/btcsuite/btcutil/bloom"
-	hd "github.com/btcsuite/btcutil/hdkeychain"
-	"sync"
 )
 
 type Datastore interface {
@@ -17,7 +10,6 @@ type Datastore interface {
 	Stxos() Stxos
 	Txns() Txns
 	Keys() Keys
-	State() State
 	WatchedScripts() WatchedScripts
 }
 
@@ -85,14 +77,6 @@ type Keys interface {
 	// Get the number of unused keys following the last used key
 	// for each key purpose.
 	GetLookaheadWindows() map[KeyPurpose]int
-}
-
-type State interface {
-	// Put a key/value pair to the database
-	Put(key, value string) error
-
-	// Get a value given the key
-	Get(key string) (string, error)
 }
 
 type WatchedScripts interface {
