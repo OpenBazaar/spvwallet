@@ -33,17 +33,17 @@ const (
 
 // Wrapper around Headers implementation that handles all blockchain operations
 type Blockchain struct {
-	lock        *sync.Mutex
-	params      *chaincfg.Params
-	db          Headers
-	state       ChainState
+	lock   *sync.Mutex
+	params *chaincfg.Params
+	db     Headers
+	state  ChainState
 }
 
 func NewBlockchain(filePath string, params *chaincfg.Params) (*Blockchain, error) {
 	b := &Blockchain{
-		lock:        new(sync.Mutex),
-		params:      params,
-		db:          NewHeaderDB(filePath),
+		lock:   new(sync.Mutex),
+		params: params,
+		db:     NewHeaderDB(filePath),
 	}
 
 	h, err := b.db.Height()

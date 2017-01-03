@@ -189,7 +189,7 @@ func (pm *PeerManager) onConnection(req *connmgr.ConnReq, conn net.Conn) {
 	pm.addrManager.Connected(p.NA())
 
 	// Handle disconnect
-	go func(){
+	go func() {
 		p.WaitForDisconnect()
 		pm.connManager.Disconnect(req.ID())
 	}()
