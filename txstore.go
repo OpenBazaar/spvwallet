@@ -45,7 +45,7 @@ func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey)
 		return nil, err
 	}
 	pubkeyBytes := pubKey.SerializeCompressed()
-	f := []byte{0x02, FlagPrefix}
+	f := []byte{FlagPrefix}
 	f = append(f, pubkeyBytes[1:2]...)
 	txs := &TxStore{
 		Param:         p,
@@ -265,7 +265,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 			}
 		}
 		// Check stealth
-		if len(txout.PkScript) == 38 && txout.PkScript[0] == 0x6a && bytes.Equal(txout.PkScript[1:4], ts.stealthFlag){
+		if len(txout.PkScript) == 38 && txout.PkScript[0] == 0x6a && bytes.Equal(txout.PkScript[2:4], ts.stealthFlag){
 			outIndex, key, err := ts.checkStealth(tx, txout.PkScript)
 			if err == nil {
 				newop := wire.OutPoint{
@@ -333,7 +333,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 
 func (ts *TxStore) checkStealth(tx *wire.MsgTx, scriptPubkey []byte) (outIndex int, privkey *btcec.PrivateKey, err error) {
 	// Extract the ephemeral public key from the script
-	ephemPubkeyBytes := scriptPubkey[5:len(scriptPubkey)]
+	ephemPubkeyBytes := scriptPubkey[5:38]
 	ephemPubkey, err := btcec.ParsePubKey(ephemPubkeyBytes, btcec.S256())
 	if err != nil {
 		return 0, nil, err
@@ -366,8 +366,12 @@ func (ts *TxStore) checkStealth(tx *wire.MsgTx, scriptPubkey []byte) (outIndex i
 	}
 
 	// Check to see if the p2pkh script for our derived child key matches any output scripts in this transaction
+	script, err := txscript.PayToAddrScript(addr)
+	if err != nil {
+		return 0, nil, err
+	}
 	for i, out := range tx.TxOut {
-		if !bytes.Equal(addr.ScriptAddress(), out.PkScript) {
+		if bytes.Equal(script, out.PkScript) {
 			privkey, err := childKey.ECPrivKey()
 			if err != nil {
 				return 0, nil, err
