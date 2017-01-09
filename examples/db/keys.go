@@ -130,10 +130,7 @@ func (k *KeysDB) GetKeyForScript(scriptPubKey []byte) (*btcec.PrivateKey, error)
 	if err != nil {
 		return nil, err
 	}
-	key, err := btcec.PrivKeyFromBytes(btcec.S256(), keyBytes)
-	if err != nil {
-		return nil, err
-	}
+	key, _ := btcec.PrivKeyFromBytes(btcec.S256(), keyBytes)
 	return key, nil
 }
 
