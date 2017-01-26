@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil/bloom"
+	"golang.org/x/net/proxy"
 	"net"
 	"strconv"
 	"sync"
@@ -62,6 +63,9 @@ type Config struct {
 
 	// Listeners to handle messages from peers. If nil, no messages will be handled.
 	Listeners *peer.MessageListeners
+
+	// An optional proxy dialer. Will use net.Dial if nil.
+	Proxy proxy.Dialer
 }
 
 type PeerManager struct {
@@ -112,6 +116,11 @@ func NewPeerManager(config *Config) (*PeerManager, error) {
 		retryDuration = defaultRetryDuration
 	}
 
+	dial := net.Dial
+	if config.Proxy != nil {
+		dial = config.Proxy.Dial
+	}
+
 	connMgrConfig := &connmgr.Config{
 		TargetOutbound:  targetOutbound,
 		RetryDuration:   retryDuration,
@@ -119,7 +128,7 @@ func NewPeerManager(config *Config) (*PeerManager, error) {
 		OnDisconnection: pm.onDisconnection,
 		GetNewAddress:   pm.getNewAddress,
 		Dial: func(addr net.Addr) (net.Conn, error) {
-			return net.Dial("tcp", addr.String())
+			return dial("tcp", addr.String())
 		},
 	}
 
