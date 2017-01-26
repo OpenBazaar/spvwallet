@@ -7,7 +7,6 @@ package spvwallet
 import (
 	"encoding/binary"
 	"errors"
-	"golang.org/x/net/proxy"
 	"net"
 )
 
@@ -52,10 +51,13 @@ var (
 // TorLookupIP uses Tor to resolve DNS via the SOCKS extension they provide for
 // resolution over the Tor network. Tor itself doesn't support ipv6 so this
 // doesn't either.
-func TorLookupIP(host string, dialer proxy.Dialer) ([]net.IP, error) {
-	conn, err := dialer.Dial("tcp", host)
+func TorLookupIP(host string) ([]net.IP, error) {
+	conn, err := net.Dial("tcp", "127.0.0.1:9150")
 	if err != nil {
-		return nil, err
+		conn, err = net.Dial("tcp", "127.0.0.1:9050")
+		if err != nil {
+			return nil, err
+		}
 	}
 	defer conn.Close()
 

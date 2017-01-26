@@ -315,13 +315,15 @@ func (pm *PeerManager) queryDNSSeeds() {
 			var addrs []string
 			var err error
 			if pm.proxy != nil {
-				ips, err := TorLookupIP(host, pm.proxy)
-				if err != nil {
-					wg.Done()
-					return
-				}
-				for _, ip := range ips {
-					addrs = append(addrs, ip.String())
+				for i := 0; i < 5; i++ {
+					ips, err := TorLookupIP(host)
+					if err != nil {
+						wg.Done()
+						return
+					}
+					for _, ip := range ips {
+						addrs = append(addrs, ip.String())
+					}
 				}
 			} else {
 				addrs, err = net.LookupHost(host)
