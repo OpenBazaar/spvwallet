@@ -227,10 +227,6 @@ func (w *SPVWallet) Params() *chaincfg.Params {
 	return w.params
 }
 
-func (w *SPVWallet) AcceptStealth() bool {
-	return true
-}
-
 func (w *SPVWallet) AddTransactionListener(callback func(TransactionCallback)) {
 	w.txstore.listeners = append(w.txstore.listeners, callback)
 }
