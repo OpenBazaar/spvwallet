@@ -8,7 +8,8 @@ import (
 )
 
 var (
-	maxHash *chainhash.Hash
+	maxHash              *chainhash.Hash
+	MAX_UNCONFIRMED_TIME time.Duration = time.Hour * 24 * 7
 )
 
 func init() {
@@ -80,7 +81,7 @@ func (w *SPVWallet) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
 		}
 		now := time.Now()
 		for _, t := range txns {
-			if now.After(t.Timestamp.Add(time.Hour*24*7)) && t.Height == int32(0) {
+			if now.After(t.Timestamp.Add(MAX_UNCONFIRMED_TIME)) && t.Height == int32(0) {
 				log.Noticef("Marking tx as dead %s", t.Txid)
 				h, err := chainhash.NewHashFromStr(t.Txid)
 				if err != nil {
