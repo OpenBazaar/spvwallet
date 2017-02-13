@@ -21,6 +21,8 @@ func init() {
 }
 
 func (w *SPVWallet) startChainDownload(p *peer.Peer) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
 	if w.blockchain.ChainState() == SYNCING {
 		height, _ := w.blockchain.db.Height()
 		if height >= uint32(p.LastBlock()) {
