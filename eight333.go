@@ -4,6 +4,7 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
+	"time"
 )
 
 var (
@@ -71,6 +72,29 @@ func (w *SPVWallet) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
 	if len(w.blockQueue) == 0 && w.blockchain.ChainState() == SYNCING {
 		go w.startChainDownload(p)
 	}
+	if w.blockchain.ChainState() == WAITING {
+		txns, err := w.txstore.Txns().GetAll()
+		if err != nil {
+			log.Error(err)
+			return
+		}
+		now := time.Now()
+		for _, t := range txns {
+			if now.After(t.Timestamp.Add(time.Hour*24*7)) && t.Height == int32(0) {
+				log.Noticef("Marking tx as dead %s", t.Txid)
+				h, err := chainhash.NewHashFromStr(t.Txid)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				err = w.txstore.markAsDead(*h)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+			}
+		}
+	}
 }
 
 func (w *SPVWallet) onTx(p *peer.Peer, m *wire.MsgTx) {
@@ -131,7 +155,7 @@ func (w *SPVWallet) onGetData(p *peer.Peer, m *wire.MsgGetData) {
 	var sent int32
 	for _, thing := range m.InvList {
 		if thing.Type == wire.InvTypeTx {
-			tx, _, err := w.txstore.Txns().Get(thing.Hash)
+			tx, _, _, err := w.txstore.Txns().Get(thing.Hash)
 			if err != nil {
 				log.Errorf("Error getting tx %s: %s", thing.Hash.String(), err.Error())
 			}

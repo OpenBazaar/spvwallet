@@ -78,7 +78,7 @@ func initDatabaseTables(db *sql.DB) error {
 	create table if not exists keys (scriptPubKey text primary key not null, purpose integer, keyIndex integer, used integer, key text);
 	create table if not exists utxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, freeze integer);
 	create table if not exists stxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, spendHeight integer, spendTxid text);
-	create table if not exists txns (txid text primary key not null, value integer, height integer, tx blob);
+	create table if not exists txns (txid text primary key not null, value integer, height integer, timestamp integer, tx blob);
 	create table if not exists watchedScripts (scriptPubKey text primary key not null);
 	`
 	_, err := db.Exec(sqlStmt)
