@@ -170,7 +170,7 @@ func (w *SPVWallet) MasterPublicKey() *hd.ExtendedKey {
 }
 
 func (w *SPVWallet) CurrentAddress(purpose KeyPurpose) btc.Address {
-	key := w.txstore.GetCurrentKey(purpose)
+	key, _ := w.txstore.GetCurrentKey(purpose)
 	addr, _ := key.Address(w.params)
 	return btc.Address(addr)
 }

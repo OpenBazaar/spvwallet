@@ -24,7 +24,8 @@ type TxStore struct {
 
 	Param *chaincfg.Params
 
-	accountMasterKey *hd.ExtendedKey
+	internalKey *hd.ExtendedKey
+	externalKey *hd.ExtendedKey
 
 	listeners []func(TransactionCallback)
 
@@ -32,7 +33,7 @@ type TxStore struct {
 }
 
 func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey) (*TxStore, error) {
-	// Derive the "account" key using Bip44
+	// Derive keys using Bip44
 	fourtyFour, err := masterPrivKey.Child(hd.HardenedKeyStart + 44)
 	if err != nil {
 		return nil, err
@@ -45,11 +46,20 @@ func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey)
 	if err != nil {
 		return nil, err
 	}
+	external, err := account.Child(0)
+	if err != nil {
+		return nil, err
+	}
+	internal, err := account.Child(1)
+	if err != nil {
+		return nil, err
+	}
 	txs := &TxStore{
-		Param:            p,
-		accountMasterKey: account,
-		addrMutex:        new(sync.Mutex),
-		Datastore:        db,
+		Param:       p,
+		externalKey: external,
+		internalKey: internal,
+		addrMutex:   new(sync.Mutex),
+		Datastore:   db,
 	}
 	err = txs.PopulateAdrs()
 	if err != nil {
