@@ -66,9 +66,8 @@ func (ts *TxStore) GetKeyForScript(scriptPubKey []byte) (*hd.ExtendedKey, error)
 }
 
 func (ts *TxStore) generateChildKey(purpose KeyPurpose, index uint32) *hd.ExtendedKey {
-	accountMK, _ := ts.masterPrivKey.Child(hd.HardenedKeyStart + 0)
-	purposeMK, _ := accountMK.Child(uint32(purpose))
-	childKey, _ := purposeMK.Child(index)
+	keyPurpose, _ := ts.accountMasterKey.Child(uint32(purpose))
+	childKey, _ := keyPurpose.Child(index)
 	return childKey
 }
 
