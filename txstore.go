@@ -305,9 +305,9 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 
 	// If hits is nonzero it's a relevant tx and we should store it
 	if hits > 0 {
-		_, h, timestamp, err := ts.Txns().Get(tx.TxHash())
+		_, txn, err := ts.Txns().Get(tx.TxHash())
 		if err != nil {
-			timestamp = time.Now()
+			txn.Timestamp = time.Now()
 			// Callback on listeners
 			for _, listener := range ts.listeners {
 				listener(cb)
@@ -316,8 +316,8 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		}
 		// Let's check the height before committing so we don't allow rogue peers to send us a lose
 		// tx that resets our height to zero.
-		if h <= 0 {
-			ts.Txns().Put(tx, int(value), int(height), timestamp)
+		if txn.Height <= 0 {
+			ts.Txns().Put(tx, int(value), int(height), txn.Timestamp)
 		}
 	}
 	return hits, err

@@ -1,6 +1,7 @@
 package spvwallet
 
 import (
+	"fmt"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/peer"
@@ -14,6 +15,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 )
 
 type SPVWallet struct {
@@ -211,15 +213,15 @@ func (w *SPVWallet) Transactions() ([]Txn, error) {
 }
 
 func (w *SPVWallet) GetConfirmations(txid chainhash.Hash) (uint32, error) {
-	_, height, _, err := w.txstore.Txns().Get(txid)
+	_, txn, err := w.txstore.Txns().Get(txid)
 	if err != nil {
 		return 0, err
 	}
-	if height == 0 {
+	if txn.Height == 0 {
 		return 0, nil
 	}
 	chainTip := w.ChainTip()
-	return chainTip - uint32(height), nil
+	return chainTip - uint32(txn.Height), nil
 }
 
 func (w *SPVWallet) checkIfStxoIsConfirmed(utxo Utxo, stxos []Stxo) bool {

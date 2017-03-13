@@ -39,22 +39,30 @@ func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time) er
 	return nil
 }
 
-func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, int32, time.Time, error) {
+func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, spvwallet.Txn, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	stmt, err := t.db.Prepare("select tx, height, timestamp from txns where txid=?")
+	stmt, err := t.db.Prepare("select tx, value, height, timestamp from txns where txid=?")
 	defer stmt.Close()
 	var ret []byte
+	var txn spvwallet.Txn
+	var value int
 	var height int
 	var timestamp int
-	err = stmt.QueryRow(txid.String()).Scan(&ret, &height, &timestamp)
+	err = stmt.QueryRow(txid.String()).Scan(&ret, &value, &height, &timestamp)
 	if err != nil {
-		return nil, int32(0), time.Now(), err
+		return nil, txn, err
 	}
 	r := bytes.NewReader(ret)
 	msgTx := wire.NewMsgTx(1)
 	msgTx.BtcDecode(r, 1)
-	return msgTx, int32(height), time.Unix(int64(timestamp), 0), nil
+	txn = spvwallet.Txn{
+		Txid:      msgTx.TxHash().String(),
+		Value:     int64(value),
+		Height:    int32(height),
+		Timestamp: time.Unix(int64(timestamp), 0),
+	}
+	return msgTx, txn, nil
 }
 
 func (t *TxnsDB) GetAll() ([]spvwallet.Txn, error) {
