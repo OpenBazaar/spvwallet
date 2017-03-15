@@ -1,7 +1,6 @@
 package spvwallet
 
 import (
-	"fmt"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/peer"
@@ -15,7 +14,6 @@ import (
 	"os"
 	"path"
 	"sync"
-	"time"
 )
 
 type SPVWallet struct {
@@ -174,6 +172,16 @@ func (w *SPVWallet) MasterPublicKey() *hd.ExtendedKey {
 func (w *SPVWallet) CurrentAddress(purpose KeyPurpose) btc.Address {
 	key, _ := w.txstore.GetCurrentKey(purpose)
 	addr, _ := key.Address(w.params)
+	return btc.Address(addr)
+}
+
+func (w *SPVWallet) NewAddress(purpose KeyPurpose) btc.Address {
+	i, _ := w.txstore.Keys().GetUnused(EXTERNAL)
+	key, _ := w.txstore.generateChildKey(EXTERNAL, uint32(i[1]))
+	addr, _ := key.Address(w.params)
+	script, _ := txscript.PayToAddrScript(btc.Address(addr))
+	w.txstore.Keys().MarkKeyAsUsed(script)
+	w.txstore.PopulateAdrs()
 	return btc.Address(addr)
 }
 

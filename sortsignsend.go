@@ -120,9 +120,6 @@ func (w *SPVWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
 	if txn.Height > 0 {
 		return nil, errors.New("Transaction is confirmed, cannot bump fee")
 	}
-	if txn.Value < 0 {
-		return nil, errors.New("Cannot only bump incoming transactions")
-	}
 	utxos, err := w.txstore.Utxos().GetAll()
 	if err != nil {
 		return nil, errors.New("No unspent transactions")
