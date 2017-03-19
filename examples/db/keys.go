@@ -137,16 +137,22 @@ func (k *KeysDB) GetKeyForScript(scriptPubKey []byte) (*btcec.PrivateKey, error)
 func (k *KeysDB) GetUnused(purpose spvwallet.KeyPurpose) (int, error) {
 	k.lock.Lock()
 	defer k.lock.Unlock()
-
-	stm := "select keyIndex from keys where purpose=" + strconv.Itoa(int(purpose)) + " and used=0 order by rowid asc limit 1"
-	stmt, err := k.db.Prepare(stm)
-	defer stmt.Close()
-	var index int
-	err = stmt.QueryRow().Scan(&index)
+	var ret []int
+	stm := "select keyIndex from keys where purpose=" + strconv.Itoa(int(purpose)) + " and used=0 order by rowid asc"
+	rows, err := k.db.Query(stm)
 	if err != nil {
-		return 0, err
+		return ret, err
 	}
-	return index, nil
+	defer rows.Close()
+	for rows.Next() {
+		var index int
+		err = rows.Scan(&index)
+		if err != nil {
+			return ret, err
+		}
+		ret = append(ret, index)
+	}
+	return ret, nil
 }
 
 func (k *KeysDB) GetAll() ([]spvwallet.KeyPath, error) {
