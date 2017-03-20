@@ -15,14 +15,14 @@ type TxnsDB struct {
 	lock *sync.Mutex
 }
 
-func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time) error {
+func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, watchOnly bool) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	tx, err := t.db.Begin()
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("insert or replace into txns(txid, value, height, timestamp, tx) values(?,?,?,?,?)")
+	stmt, err := tx.Prepare("insert or replace into txns(txid, value, height, timestamp, watchOnly, tx) values(?,?,?,?,?,?)")
 	defer stmt.Close()
 	if err != nil {
 		tx.Rollback()
@@ -30,7 +30,11 @@ func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time) er
 	}
 	var buf bytes.Buffer
 	txn.Serialize(&buf)
-	_, err = stmt.Exec(txn.TxHash().String(), value, height, int(timestamp.Unix()), buf.Bytes())
+	watchOnlyInt := 0
+	if watchOnly {
+		watchOnlyInt = 1
+	}
+	_, err = stmt.Exec(txn.TxHash().String(), value, height, int(timestamp.Unix()), watchOnlyInt, buf.Bytes())
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -42,34 +46,40 @@ func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time) er
 func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, spvwallet.Txn, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
-	stmt, err := t.db.Prepare("select tx, value, height, timestamp from txns where txid=?")
+	stmt, err := t.db.Prepare("select tx, value, height, timestamp, watchOnly from txns where txid=?")
 	defer stmt.Close()
 	var ret []byte
 	var txn spvwallet.Txn
 	var value int
 	var height int
 	var timestamp int
-	err = stmt.QueryRow(txid.String()).Scan(&ret, &value, &height, &timestamp)
+	var watchOnlyInt int
+	err = stmt.QueryRow(txid.String()).Scan(&ret, &value, &height, &timestamp, &watchOnlyInt)
 	if err != nil {
 		return nil, txn, err
 	}
 	r := bytes.NewReader(ret)
 	msgTx := wire.NewMsgTx(1)
 	msgTx.BtcDecode(r, 1)
+	watchOnly := false
+	if watchOnlyInt > 0 {
+		watchOnly = true
+	}
 	txn = spvwallet.Txn{
 		Txid:      msgTx.TxHash().String(),
 		Value:     int64(value),
 		Height:    int32(height),
 		Timestamp: time.Unix(int64(timestamp), 0),
+		WatchOnly: watchOnly,
 	}
 	return msgTx, txn, nil
 }
 
-func (t *TxnsDB) GetAll() ([]spvwallet.Txn, error) {
+func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]spvwallet.Txn, error) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	var ret []spvwallet.Txn
-	stm := "select tx, value, height, timestamp from txns"
+	stm := "select tx, value, height, timestamp, watchOnly from txns"
 	rows, err := t.db.Query(stm)
 	defer rows.Close()
 	if err != nil {
@@ -80,14 +90,22 @@ func (t *TxnsDB) GetAll() ([]spvwallet.Txn, error) {
 		var value int
 		var height int
 		var timestamp int
-		if err := rows.Scan(&tx, &value, &height, &timestamp); err != nil {
+		var watchOnlyInt int
+		if err := rows.Scan(&tx, &value, &height, &timestamp, &watchOnlyInt); err != nil {
 			continue
 		}
 		r := bytes.NewReader(tx)
 		msgTx := wire.NewMsgTx(1)
 		msgTx.BtcDecode(r, 1)
+		watchOnly := false
+		if watchOnlyInt > 0 {
+			if !includeWatchOnly {
+				continue
+			}
+			watchOnly = true
+		}
 
-		txn := spvwallet.Txn{msgTx.TxHash().String(), int64(value), int32(height), time.Unix(int64(timestamp), 0)}
+		txn := spvwallet.Txn{msgTx.TxHash().String(), int64(value), int32(height), time.Unix(int64(timestamp), 0), watchOnly}
 		ret = append(ret, txn)
 	}
 	return ret, nil
