@@ -147,7 +147,6 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, uint32, error)
 }
 
 func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeader) bool {
-
 	// Get hash of n-1 header
 	prevHash := prevHeader.header.BlockHash()
 	height := prevHeader.height
