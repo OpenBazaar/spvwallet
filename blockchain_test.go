@@ -170,3 +170,38 @@ func Test_Reorg(t *testing.T) {
 	}
 	os.RemoveAll("headers.bin")
 }
+
+func TestBlockchain_GetReorgHeight(t *testing.T) {
+	bc, err := NewBlockchain("", &chaincfg.RegressionNetParams)
+	if err != nil {
+		t.Error(err)
+	}
+	var hdr wire.BlockHeader
+	for _, c := range chain {
+		b, err := hex.DecodeString(c)
+		if err != nil {
+			t.Error(err)
+		}
+		hdr.Deserialize(bytes.NewReader(b))
+		bc.CommitHeader(hdr)
+	}
+	prevBest := StoredHeader{header: hdr, height: 10}
+	for i := 0; i < len(fork)-1; i++ {
+		b, err := hex.DecodeString(fork[i])
+		if err != nil {
+			t.Error(err)
+		}
+		hdr.Deserialize(bytes.NewReader(b))
+		bc.CommitHeader(hdr)
+	}
+	currentBest := StoredHeader{header: hdr, height: 11}
+
+	height, err := bc.GetReorgHeight(currentBest, prevBest)
+	if err != nil {
+		t.Error(err)
+	}
+	if height != 5 {
+		t.Error("Incorrect reorg height")
+	}
+	os.RemoveAll("headers.bin")
+}

@@ -291,6 +291,30 @@ func (b *Blockchain) GetBlockLocatorHashes() []*chainhash.Hash {
 	return ret
 }
 
+func (b *Blockchain) GetReorgHeight(bestHeader, prevBestHeader StoredHeader) (uint32, error) {
+	majority, err := b.db.GetPreviousHeader(bestHeader.header)
+	if err != nil {
+		return 0, err
+	}
+	minority := prevBestHeader
+	for {
+		majorityHash := majority.header.BlockHash()
+		minorityHash := minority.header.BlockHash()
+		if majorityHash.IsEqual(&minorityHash) {
+			return majority.height, nil
+		}
+		majority, err = b.db.GetPreviousHeader(majority.header)
+		if err != nil {
+			return 0, err
+		}
+		minority, err = b.db.GetPreviousHeader(minority.header)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+}
+
 func (b *Blockchain) ChainState() ChainState {
 	return b.state
 }
