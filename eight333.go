@@ -43,7 +43,7 @@ func (w *SPVWallet) startChainDownload(p *peer.Peer) {
 }
 
 func (w *SPVWallet) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
-	if w.blockchain.ChainState() == SYNCING && w.PeerManager.DownloadPeer().ID() == p.ID() {
+	if w.blockchain.ChainState() == SYNCING && w.PeerManager.DownloadPeer() != nil && w.PeerManager.DownloadPeer().ID() == p.ID() {
 		queueHash := <-w.blockQueue
 		headerHash := m.Header.BlockHash()
 		if !headerHash.IsEqual(&queueHash) {
