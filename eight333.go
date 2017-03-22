@@ -70,7 +70,9 @@ func (w *SPVWallet) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
 	// We hit a reorg. Rollback the transactions and resync from the reorg point.
 	if reorg != nil {
 		err := w.txstore.processReorg(reorg.height)
-		log.Error(err)
+		if err != nil {
+			log.Error(err)
+		}
 		w.blockchain.SetChainState(SYNCING)
 		w.blockchain.db.Put(*reorg, true)
 		go w.startChainDownload(p)
