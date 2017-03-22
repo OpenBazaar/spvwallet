@@ -103,14 +103,26 @@ func TestBlockchain_CommitHeader(t *testing.T) {
 		t.Error(err)
 	}
 	var headers = []wire.BlockHeader{regtestCheckpoint}
-	for _, c := range chain {
+	for i, c := range chain {
 		b, err := hex.DecodeString(c)
 		if err != nil {
 			t.Error(err)
 		}
 		var hdr wire.BlockHeader
 		hdr.Deserialize(bytes.NewReader(b))
-		bc.CommitHeader(hdr)
+		newTip, reorg, height, err := bc.CommitHeader(hdr)
+		if err != nil {
+			t.Error()
+		}
+		if !newTip {
+			t.Error("Failed to set new tip when inserting header")
+		}
+		if reorg != nil {
+			t.Error("Incorrectly set reorg when inserting header")
+		}
+		if height != uint32(i+1) {
+			t.Error("Returned incorrect height when inserting header")
+		}
 		headers = append(headers, hdr)
 	}
 	best, err := bc.db.GetBestHeader()
@@ -141,19 +153,49 @@ func Test_Reorg(t *testing.T) {
 		}
 		var hdr wire.BlockHeader
 		hdr.Deserialize(bytes.NewReader(b))
-		bc.CommitHeader(hdr)
+		newTip, reorg, height, err := bc.CommitHeader(hdr)
+		if err != nil {
+			t.Error()
+		}
+		if !newTip {
+			t.Error("Failed to set new tip when inserting header")
+		}
+		if reorg != nil {
+			t.Error("Incorrectly set reorg when inserting header")
+		}
+		if height != uint32(i+1) {
+			t.Error("Returned incorrect height when inserting header")
+		}
 		if i < 5 {
 			headers = append(headers, hdr)
 		}
 	}
-	for _, c := range fork {
+	for i, c := range fork {
 		b, err := hex.DecodeString(c)
 		if err != nil {
 			t.Error(err)
 		}
 		var hdr wire.BlockHeader
 		hdr.Deserialize(bytes.NewReader(b))
-		bc.CommitHeader(hdr)
+		newTip, reorg, height, err := bc.CommitHeader(hdr)
+		if err != nil {
+			t.Error()
+		}
+		if newTip && i+6 < 11 {
+			t.Error("Incorrectly set new tip when inserting header")
+		}
+		if !newTip && i+6 >= 11 {
+			t.Error("Failed to set new tip when inserting header")
+		}
+		if reorg != nil && i+6 != 11 {
+			t.Error("Incorrectly set reorg when inserting header")
+		}
+		if reorg == nil && i+6 == 11 {
+			t.Error("Failed to return reorg when inserting a header that caused a reorg")
+		}
+		if height != uint32(i+6) {
+			t.Error("Returned incorrect height when inserting header")
+		}
 		headers = append(headers, hdr)
 	}
 	best, err := bc.db.GetBestHeader()
@@ -171,7 +213,7 @@ func Test_Reorg(t *testing.T) {
 	os.RemoveAll("headers.bin")
 }
 
-func TestBlockchain_GetReorgHeight(t *testing.T) {
+func TestBlockchain_GetLastGoodHeader(t *testing.T) {
 	bc, err := NewBlockchain("", &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
@@ -196,11 +238,11 @@ func TestBlockchain_GetReorgHeight(t *testing.T) {
 	}
 	currentBest := StoredHeader{header: hdr, height: 11}
 
-	height, err := bc.GetReorgHeight(currentBest, prevBest)
+	last, err := bc.GetLastGoodHeader(currentBest, prevBest)
 	if err != nil {
 		t.Error(err)
 	}
-	if height != 5 {
+	if last.height != 5 {
 		t.Error("Incorrect reorg height")
 	}
 	os.RemoveAll("headers.bin")

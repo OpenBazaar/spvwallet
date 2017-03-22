@@ -169,6 +169,11 @@ func TestHeaderDB_Put(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	// Test put duplicate
+	err = headers.Put(testSh2, true)
+	if err != nil {
+		t.Error(err)
+	}
 	os.RemoveAll("headers.bin")
 }
 

@@ -362,6 +362,28 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 	return nil
 }
 
+func (ts *TxStore) processReorg(lastGoodHeight uint32) error {
+	txns, err := ts.Txns().GetAll(true)
+	if err != nil {
+		return err
+	}
+	for _, tx := range txns {
+		if tx.Height > int32(lastGoodHeight) {
+			txid, err := chainhash.NewHashFromStr(tx.Txid)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+			err = ts.markAsDead(*txid)
+			if err != nil {
+				log.Error(err)
+				continue
+			}
+		}
+	}
+	return nil
+}
+
 func outPointsEqual(a, b wire.OutPoint) bool {
 	if !a.Hash.IsEqual(&b.Hash) {
 		return false
