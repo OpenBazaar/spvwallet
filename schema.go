@@ -34,6 +34,7 @@ type TransactionCallback struct {
 	Txid    []byte
 	Outputs []TransactionOutput
 	Inputs  []TransactionInput
+	Height  int32
 }
 
 type TransactionOutput struct {

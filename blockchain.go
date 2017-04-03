@@ -1,6 +1,7 @@
 package spvwallet
 
 import (
+	"errors"
 	"fmt"
 	"github.com/btcsuite/btcd/blockchain"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -318,7 +319,6 @@ func (b *Blockchain) GetLastGoodHeader(bestHeader, prevBestHeader StoredHeader) 
 			return nil, err
 		}
 	}
-
 }
 
 func (b *Blockchain) ChainState() ChainState {

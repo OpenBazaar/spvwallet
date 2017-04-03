@@ -229,7 +229,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	ts.addrMutex.Unlock()
 	cachedSha := tx.TxHash()
 	// Iterate through all outputs of this tx, see if we gain
-	cb := TransactionCallback{Txid: cachedSha.CloneBytes()}
+	cb := TransactionCallback{Txid: cachedSha.CloneBytes(), Height: height}
 	value := int64(0)
 	matchesWatchOnly := false
 	for i, txout := range tx.TxOut {
@@ -311,19 +311,24 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	// If hits is nonzero it's a relevant tx and we should store it
 	if hits > 0 || matchesWatchOnly {
 		_, txn, err := ts.Txns().Get(tx.TxHash())
+		shouldCallback := false
 		if err != nil {
 			txn.Timestamp = time.Now()
-			// Callback on listeners
-			for _, listener := range ts.listeners {
-				listener(cb)
-			}
-			ts.PopulateAdrs()
+			shouldCallback = true
 		}
 		// Let's check the height before committing so we don't allow rogue peers to send us a lose
 		// tx that resets our height to zero.
 		if txn.Height <= 0 {
 			ts.Txns().Put(tx, int(value), int(height), txn.Timestamp, hits == 0)
+			shouldCallback = true
 		}
+		if shouldCallback {
+			// Callback on listeners
+			for _, listener := range ts.listeners {
+				listener(cb)
+			}
+		}
+		ts.PopulateAdrs()
 	}
 	return hits, err
 }
