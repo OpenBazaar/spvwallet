@@ -134,7 +134,7 @@ func (k *KeysDB) GetKeyForScript(scriptPubKey []byte) (*btcec.PrivateKey, error)
 	return key, nil
 }
 
-func (k *KeysDB) GetUnused(purpose spvwallet.KeyPurpose) (int, error) {
+func (k *KeysDB) GetUnused(purpose spvwallet.KeyPurpose) ([]int, error) {
 	k.lock.Lock()
 	defer k.lock.Unlock()
 	var ret []int
