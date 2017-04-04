@@ -21,6 +21,7 @@ type TxStore struct {
 	Adrs           []btcutil.Address
 	watchedScripts [][]byte
 	addrMutex      *sync.Mutex
+	cbMutex        *sync.Mutex
 
 	Param *chaincfg.Params
 
@@ -59,6 +60,7 @@ func NewTxStore(p *chaincfg.Params, db Datastore, masterPrivKey *hd.ExtendedKey)
 		externalKey: external,
 		internalKey: internal,
 		addrMutex:   new(sync.Mutex),
+		cbMutex:     new(sync.Mutex),
 		Datastore:   db,
 	}
 	err = txs.PopulateAdrs()
@@ -310,6 +312,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 
 	// If hits is nonzero it's a relevant tx and we should store it
 	if hits > 0 || matchesWatchOnly {
+		ts.cbMutex.Lock()
 		_, txn, err := ts.Txns().Get(tx.TxHash())
 		shouldCallback := false
 		if err != nil {
@@ -320,7 +323,9 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		// tx that resets our height to zero.
 		if txn.Height <= 0 {
 			ts.Txns().Put(tx, int(value), int(height), txn.Timestamp, hits == 0)
-			shouldCallback = true
+			if height > 0 {
+				shouldCallback = true
+			}
 		}
 		if shouldCallback {
 			// Callback on listeners
@@ -328,6 +333,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 				listener(cb)
 			}
 		}
+		ts.cbMutex.Unlock()
 		ts.PopulateAdrs()
 	}
 	return hits, err
