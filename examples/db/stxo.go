@@ -20,14 +20,18 @@ func (s *StxoDB) Put(stxo spvwallet.Stxo) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	tx, _ := s.db.Begin()
-	stmt, err := tx.Prepare("insert or replace into stxos(outpoint, value, height, scriptPubKey, spendHeight, spendTxid) values(?,?,?,?,?,?)")
+	stmt, err := tx.Prepare("insert or replace into stxos(outpoint, value, height, scriptPubKey, watchOnly, spendHeight, spendTxid) values(?,?,?,?,?,?,?)")
 	defer stmt.Close()
 	if err != nil {
 		tx.Rollback()
 		return err
 	}
+	watchOnly := 0
+	if stxo.Utxo.WatchOnly {
+		watchOnly = 1
+	}
 	outpoint := stxo.Utxo.Op.Hash.String() + ":" + strconv.Itoa(int(stxo.Utxo.Op.Index))
-	_, err = stmt.Exec(outpoint, int(stxo.Utxo.Value), int(stxo.Utxo.AtHeight), hex.EncodeToString(stxo.Utxo.ScriptPubkey), int(stxo.SpendHeight), stxo.SpendTxid.String())
+	_, err = stmt.Exec(outpoint, int(stxo.Utxo.Value), int(stxo.Utxo.AtHeight), hex.EncodeToString(stxo.Utxo.ScriptPubkey), watchOnly, int(stxo.SpendHeight), stxo.SpendTxid.String())
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -40,7 +44,7 @@ func (s *StxoDB) GetAll() ([]spvwallet.Stxo, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 	var ret []spvwallet.Stxo
-	stm := "select outpoint, value, height, scriptPubKey, spendHeight, spendTxid from stxos"
+	stm := "select outpoint, value, height, scriptPubKey, watchOnly, spendHeight, spendTxid from stxos"
 	rows, err := s.db.Query(stm)
 	defer rows.Close()
 	if err != nil {
@@ -51,9 +55,10 @@ func (s *StxoDB) GetAll() ([]spvwallet.Stxo, error) {
 		var value int
 		var height int
 		var scriptPubKey string
+		var watchOnlyInt int
 		var spendHeight int
 		var spendTxid string
-		if err := rows.Scan(&outpoint, &value, &height, &scriptPubKey, &spendHeight, &spendTxid); err != nil {
+		if err := rows.Scan(&outpoint, &value, &height, &scriptPubKey, &watchOnlyInt, &spendHeight, &spendTxid); err != nil {
 			continue
 		}
 		s := strings.Split(outpoint, ":")
@@ -68,6 +73,10 @@ func (s *StxoDB) GetAll() ([]spvwallet.Stxo, error) {
 		if err != nil {
 			continue
 		}
+		watchOnly := false
+		if watchOnly > 0 {
+			watchOnly = true
+		}
 		scriptBytes, err := hex.DecodeString(scriptPubKey)
 		if err != nil {
 			continue
@@ -81,6 +90,7 @@ func (s *StxoDB) GetAll() ([]spvwallet.Stxo, error) {
 			AtHeight:     int32(height),
 			Value:        int64(value),
 			ScriptPubkey: scriptBytes,
+			WatchOnly:    watchOnly,
 		}
 		ret = append(ret, spvwallet.Stxo{
 			Utxo:        utxo,
