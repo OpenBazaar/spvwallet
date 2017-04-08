@@ -209,6 +209,10 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		return hits, err
 	}
 
+	// TODO check for double spends
+	// If doublespend && height==0 return // first seen rule
+	// If doublespend && height>0  mark double spend as dead
+
 	// Generate PKscripts for all addresses
 	ts.addrMutex.Lock()
 	PKscripts := make([][]byte, len(ts.Adrs))
