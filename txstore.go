@@ -217,7 +217,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 
 	// Check to see if this is a double spend
 	doubleSpends, err := ts.CheckDoubleSpends(tx)
-	if  err != nil {
+	if err != nil {
 		return hits, err
 	}
 	if len(doubleSpends) > 0 {
@@ -330,6 +330,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		_, txn, err := ts.Txns().Get(tx.TxHash())
 		shouldCallback := false
 		if err != nil {
+			cb.Value = value
 			txn.Timestamp = time.Now()
 			shouldCallback = true
 			ts.Txns().Put(tx, int(value), int(height), txn.Timestamp, hits == 0)
@@ -339,12 +340,12 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		if txn.Height <= 0 {
 			ts.Txns().UpdateHeight(tx.TxHash(), int(height))
 			if height > 0 {
+				cb.Value = txn.Value
 				shouldCallback = true
 			}
 		}
 		if shouldCallback {
 			// Callback on listeners
-			cb.Value = value
 			for _, listener := range ts.listeners {
 				listener(cb)
 			}
