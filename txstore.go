@@ -332,11 +332,12 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 		if err != nil {
 			txn.Timestamp = time.Now()
 			shouldCallback = true
+			ts.Txns().Put(tx, int(value), int(height), txn.Timestamp, hits == 0)
 		}
 		// Let's check the height before committing so we don't allow rogue peers to send us a lose
 		// tx that resets our height to zero.
 		if txn.Height <= 0 {
-			ts.Txns().Put(tx, int(value), int(height), txn.Timestamp, hits == 0)
+			ts.Txns().UpdateHeight(tx.TxHash(), int(height))
 			if height > 0 {
 				shouldCallback = true
 			}
@@ -364,7 +365,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 		if err != nil {
 			return err
 		}
-		err = ts.Txns().MarkAsDead(txid)
+		err = ts.Txns().UpdateHeight(txid, -1)
 		if err != nil {
 			return err
 		}
@@ -374,6 +375,9 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 		// If an stxo is marked dead, move it back into the utxo table
 		if txid.IsEqual(&s.SpendTxid) {
 			if err := markStxoAsDead(s); err != nil {
+				return err
+			}
+			if err := ts.Utxos().Put(s.Utxo); err != nil {
 				return err
 			}
 		}
@@ -398,7 +402,7 @@ func (ts *TxStore) markAsDead(txid chainhash.Hash) error {
 			if err != nil {
 				return err
 			}
-			ts.Txns().MarkAsDead(txid)
+			ts.Txns().UpdateHeight(txid, -1)
 		}
 	}
 	return nil
