@@ -231,7 +231,7 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 		return sigs, err
 	}
 
-	for i, _ := range tx.TxIn {
+	for i := range tx.TxIn {
 		sig, err := txscript.RawTxInSignature(tx, i, redeemScript, txscript.SigHashAll, signingKey)
 		if err != nil {
 			continue

@@ -260,7 +260,7 @@ func (pm *PeerManager) onDisconnection(req *connmgr.ConnReq) {
 	// If this was our download peer we lost, replace him
 	if pm.downloadPeer != nil && peer != nil {
 		if pm.downloadPeer.ID() == peer.ID() {
-			for id, _ := range pm.connectedPeers {
+			for id := range pm.connectedPeers {
 				pm.setDownloadPeer(pm.connectedPeers[id])
 				break
 			}

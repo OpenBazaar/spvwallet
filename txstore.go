@@ -235,7 +235,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	// Generate PKscripts for all addresses
 	ts.addrMutex.Lock()
 	PKscripts := make([][]byte, len(ts.Adrs))
-	for i, _ := range ts.Adrs {
+	for i := range ts.Adrs {
 		// Iterate through all our addresses
 		PKscripts[i], err = txscript.PayToAddrScript(ts.Adrs[i])
 		if err != nil {
