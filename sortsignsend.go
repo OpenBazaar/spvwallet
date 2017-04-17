@@ -1,7 +1,6 @@
 package spvwallet
 
 import (
-	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -121,7 +120,7 @@ func (w *SPVWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
 		return nil, errors.New("Transaction is confirmed, cannot bump fee")
 	}
 	// Check stxos for RBF opportunity
-	stxos, _ := w.txstore.Stxos().GetAll()
+	/*stxos, _ := w.txstore.Stxos().GetAll()
 	for _, s := range stxos {
 		if s.SpendTxid.IsEqual(&txid) {
 			r := bytes.NewReader(txn.Bytes)
@@ -154,6 +153,9 @@ func (w *SPVWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
 					if !optInRBF {
 						break
 					}
+
+					//TODO: Re-sign transaction
+
 					// Mark original tx as dead
 					if err = w.txstore.markAsDead(txid); err != nil {
 						return nil, err
@@ -168,7 +170,7 @@ func (w *SPVWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
 				}
 			}
 		}
-	}
+	}*/
 	// Check utxos for CPFP
 	utxos, _ := w.txstore.Utxos().GetAll()
 	for _, u := range utxos {

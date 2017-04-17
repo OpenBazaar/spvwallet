@@ -8,6 +8,7 @@ import (
 	"github.com/btcsuite/btcd/wire"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -24,10 +25,18 @@ var (
 		0x3a, 0x11, 0x0e, 0xe2, 0x38, 0x79, 0x74, 0x4b, 0x3e, 0x15, 0x38, 0xf5, 0x19, 0xa3, 0xf6, 0xf9,
 		0x09, 0x8d, 0xa2, 0xda, 0x02, 0xa9, 0xd4, 0x33, 0xaa, 0x09, 0x4d, 0x58, 0x85, 0x8b, 0x03, 0x18,
 		0xc6, 0xdd, 0xfe, 0x0e}
+	header3Bytes []byte = []byte{0x00, 0x00, 0x00, 0x20, 0x44, 0x88, 0xea, 0x55, 0x00, 0x77, 0xaa, 0x90,
+		0xbb, 0xba, 0x96, 0xa5, 0x52, 0x91, 0x27, 0xd4, 0xff, 0x99, 0x31, 0x1a, 0xad, 0xcc, 0x88, 0x8c,
+		0x22, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x84, 0x15, 0x97, 0x0b, 0xdc, 0xc8, 0x35, 0x29,
+		0x3a, 0x11, 0x0e, 0xe2, 0x38, 0x79, 0x74, 0x4b, 0x3e, 0x15, 0x38, 0xf5, 0x19, 0xa3, 0xf6, 0xf9,
+		0x09, 0x8d, 0xa2, 0xda, 0x02, 0xa9, 0xd4, 0x33, 0xaa, 0x09, 0x4d, 0x58, 0x85, 0x8b, 0x03, 0x18,
+		0xc6, 0xdd, 0xfe, 0x00}
 	testHdr1 wire.BlockHeader = wire.BlockHeader{}
 	testHdr2 wire.BlockHeader = wire.BlockHeader{}
+	testHdr3 wire.BlockHeader = wire.BlockHeader{}
 	testSh1  StoredHeader
 	testSh2  StoredHeader
+	testSh3  StoredHeader
 )
 
 func init() {
@@ -36,6 +45,8 @@ func init() {
 	testHdr1.Deserialize(&buf)
 	buf.Write(header2Bytes)
 	testHdr2.Deserialize(&buf)
+	buf.Write(header3Bytes)
+	testHdr3.Deserialize(&buf)
 	testSh1 = StoredHeader{
 		header:    testHdr1,
 		height:    100,
@@ -43,6 +54,11 @@ func init() {
 	}
 	testSh2 = StoredHeader{
 		header:    testHdr2,
+		height:    200,
+		totalWork: big.NewInt(1000),
+	}
+	testSh3 = StoredHeader{
+		header:    testHdr3,
 		height:    200,
 		totalWork: big.NewInt(1000),
 	}
@@ -296,6 +312,36 @@ func TestHeaderDB_Prune(t *testing.T) {
 	})
 	if err != nil {
 		t.Error(err)
+	}
+	os.RemoveAll("headers.bin")
+}
+
+func TestHeaderDB_Print(t *testing.T) {
+	headers := NewHeaderDB("")
+	// Test put with new tip
+	err := headers.Put(testSh1, true)
+	if err != nil {
+		t.Error(err)
+	}
+	err = headers.Put(testSh2, true)
+	if err != nil {
+		t.Error(err)
+	}
+	err = headers.Put(testSh3, true)
+	if err != nil {
+		t.Error(err)
+	}
+	var b bytes.Buffer
+	headers.Print(&b)
+	out := strings.Split(b.String(), "\n")
+	if out[0] != `Height: 100.0, Hash: 000000000000012a8ab8bccd1d3b09f3d1179850ad99ba7b978a870c59ef8141, Parent: 00000000000008471ccf356a18dd48aa12506ef0b6162cb8f98a8d8bb0465902` {
+		t.Error("Print function had incorrect return")
+	}
+	if out[1] != `Height: 200.0, Hash: 5f9e2cdf4dee12120f50f1b0e3086441a637fd09ff395dcf4e46735599633c4b, Parent: 00000000000011228c88ccad1a3199ffd4279152a596babb90aa770055ea8844` {
+		t.Error("Print function had incorrect return")
+	}
+	if out[2] != `Height: 200.1, Hash: abe7bc6da630b6e0be7167ce23a4cf42d614543206e3725d21ebe829618a94af, Parent: 000000000000012a8ab8bccd1d3b09f3d1179850ad99ba7b978a870c59ef8141` {
+		t.Error("Print function had incorrect return")
 	}
 	os.RemoveAll("headers.bin")
 }
