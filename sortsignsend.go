@@ -174,7 +174,7 @@ func (w *SPVWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
 	// Check utxos for CPFP
 	utxos, _ := w.txstore.Utxos().GetAll()
 	for _, u := range utxos {
-		if u.Op.Hash.IsEqual(&txid) {
+		if u.Op.Hash.IsEqual(&txid) && u.AtHeight == 0 {
 			key, err := w.txstore.GetKeyForScript(u.ScriptPubkey)
 			if err != nil {
 				return nil, err
