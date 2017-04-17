@@ -74,7 +74,7 @@ func (s *StxoDB) GetAll() ([]spvwallet.Stxo, error) {
 			continue
 		}
 		watchOnly := false
-		if watchOnly > 0 {
+		if watchOnlyInt > 0 {
 			watchOnly = true
 		}
 		scriptBytes, err := hex.DecodeString(scriptPubKey)
