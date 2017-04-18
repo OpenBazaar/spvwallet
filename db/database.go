@@ -80,10 +80,45 @@ func initDatabaseTables(db *sql.DB) error {
 	create table if not exists stxos (outpoint text primary key not null, value integer, height integer, scriptPubKey text, watchOnly integer, spendHeight integer, spendTxid text);
 	create table if not exists txns (txid text primary key not null, value integer, height integer, timestamp integer, watchOnly integer, tx blob);
 	create table if not exists watchedScripts (scriptPubKey text primary key not null);
+	create table if not exists config(key text primary key not null, value blob);
 	`
 	_, err := db.Exec(sqlStmt)
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+func (s *SQLiteDatastore) GetMnemonic() (string, error) {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	stmt, err := s.db.Prepare("select value from config where key=?")
+	defer stmt.Close()
+	var mnemonic string
+	err = stmt.QueryRow("mnemonic").Scan(&mnemonic)
+	if err != nil {
+		return "", err
+	}
+	return mnemonic, nil
+}
+
+func (s *SQLiteDatastore) SetMnemonic(mnemonic string) error {
+	s.lock.RLock()
+	defer s.lock.RUnlock()
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare("insert or replace into config(key, value) values(?,?)")
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	_, err = stmt.Exec("mnemonic", mnemonic)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	tx.Commit()
 	return nil
 }
