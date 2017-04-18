@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/OpenBazaar/spvwallet"
+	"github.com/OpenBazaar/spvwallet/api"
+	"github.com/OpenBazaar/spvwallet/cli"
 	"github.com/OpenBazaar/spvwallet/db"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/fatih/color"
@@ -16,7 +18,6 @@ import (
 	"os"
 	"os/signal"
 	"path"
-	"sync"
 )
 
 var parser = flags.NewParser(nil, flags.Default)
@@ -58,6 +59,7 @@ func main() {
 		"print the version number",
 		"Print the version number and exit",
 		&version)
+	cli.SetupCli(parser)
 	if _, err := parser.Parse(); err != nil {
 		os.Exit(1)
 	}
@@ -158,13 +160,11 @@ func (x *Start) Execute(args []string) error {
 		return err
 	}
 
-	// Start it!
-	go wallet.Start()
+	go api.ServeAPI(wallet)
 
+	// Start it!
 	printSplashScreen()
-	var wg sync.WaitGroup
-	wg.Add(1)
-	wg.Wait()
+	wallet.Start()
 	return nil
 }
 
@@ -187,4 +187,5 @@ func printSplashScreen() {
 	white.DisableColor()
 	fmt.Println("")
 	fmt.Println("SPVWallet v" + spvwallet.WALLET_VERSION + " starting...")
+	fmt.Println("[Press Ctrl+C to exit]")
 }

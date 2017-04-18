@@ -147,9 +147,9 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 }
 
 func (w *SPVWallet) Start() {
-	go w.PeerManager.Start()
-	go w.fPositiveHandler(w.stopChan)
 	w.running = true
+	go w.PeerManager.Start()
+	w.fPositiveHandler(w.stopChan)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////

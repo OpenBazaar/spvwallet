@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package pb;
+
+service API {
+  rpc Stop (Empty) returns (Empty) {}
+  rpc CurrentAddress (KeySelection) returns (Address) {}
+}
+
+message Empty {}
+
+enum KeyPurpose {
+    INTERNAL = 0;
+    EXTERNAL = 1;
+}
+
+message KeySelection {
+    KeyPurpose purpose = 1;
+}
+
+message Address {
+    string addr = 1;
+}

@@ -7,13 +7,9 @@ import (
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/op/go-logging"
 	"os"
-	"sync"
 )
 
 func main() {
-	var wg sync.WaitGroup
-	wg.Add(1)
-
 	// Create a new config
 	config := spvwallet.NewDefaultConfig()
 
@@ -38,6 +34,5 @@ func main() {
 	}
 
 	// Start it!
-	go wallet.Start()
-	wg.Wait()
+	wallet.Start()
 }

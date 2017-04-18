@@ -188,6 +188,7 @@ func (w *SPVWallet) onGetData(p *peer.Peer, m *wire.MsgGetData) {
 }
 
 func (w *SPVWallet) fPositiveHandler(quit chan int) {
+exit:
 	for {
 		select {
 		case peer := <-w.fPositives:
@@ -205,7 +206,7 @@ func (w *SPVWallet) fPositiveHandler(quit chan int) {
 			w.fpAccumulator[peer.ID()] = falsePostives
 			w.mutex.Unlock()
 		case <-quit:
-			break
+			break exit
 		}
 	}
 }
