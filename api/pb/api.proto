@@ -2,11 +2,20 @@ syntax = "proto3";
 
 package pb;
 
+import "google/protobuf/timestamp.proto";
+
 service API {
   rpc Stop (Empty) returns (Empty) {}
   rpc CurrentAddress (KeySelection) returns (Address) {}
+  rpc NewAddress (KeySelection) returns (Address) {}
   rpc ChainTip (Empty) returns (Height) {}
   rpc Balance (Empty) returns (Balances) {}
+  rpc MasterPrivateKey (Empty) returns (Key) {}
+  rpc MasterPublicKey (Empty) returns (Key) {}
+  rpc HasKey (Address) returns (BoolResponse) {}
+  rpc Params (Empty) returns (NetParams) {}
+  rpc Transactions (Empty) returns (TransactionList) {}
+  rpc GetTransaction (Txid) returns (Tx) {}
 }
 
 message Empty {}
@@ -31,4 +40,33 @@ message Height {
 message Balances {
     uint64 confirmed   = 1;
     uint64 unconfirmed = 2;
+}
+
+message Key {
+    string key = 1;
+}
+
+message BoolResponse {
+    bool bool = 1;
+}
+
+message NetParams {
+    string name = 1;
+}
+
+message TransactionList {
+    repeated Tx transactions = 1;
+}
+
+message Tx {
+    string txid                         = 1;
+    int64 value                         = 2;
+    int32 height                        = 3;
+    google.protobuf.Timestamp timestamp = 4;
+    bool watchOnly                      = 5;
+    bytes raw                           = 6;
+}
+
+message Txid {
+    string hash = 1;
 }

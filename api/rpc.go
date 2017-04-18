@@ -4,6 +4,10 @@ import (
 	"errors"
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api/pb"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcutil"
+	"github.com/golang/protobuf/ptypes"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -48,6 +52,19 @@ func (s *server) CurrentAddress(ctx context.Context, in *pb.KeySelection) (*pb.A
 	return &pb.Address{addr.String()}, nil
 }
 
+func (s *server) NewAddress(ctx context.Context, in *pb.KeySelection) (*pb.Address, error) {
+	var purpose spvwallet.KeyPurpose
+	if in.Purpose == pb.KeyPurpose_INTERNAL {
+		purpose = spvwallet.INTERNAL
+	} else if in.Purpose == pb.KeyPurpose_EXTERNAL {
+		purpose = spvwallet.EXTERNAL
+	} else {
+		return nil, errors.New("Unknown key purpose")
+	}
+	addr := s.w.NewAddress(purpose)
+	return &pb.Address{addr.String()}, nil
+}
+
 func (s *server) ChainTip(ctx context.Context, in *pb.Empty) (*pb.Height, error) {
 	return &pb.Height{s.w.ChainTip()}, nil
 }
@@ -55,4 +72,87 @@ func (s *server) ChainTip(ctx context.Context, in *pb.Empty) (*pb.Height, error)
 func (s *server) Balance(ctx context.Context, in *pb.Empty) (*pb.Balances, error) {
 	confirmed, unconfirmed := s.w.Balance()
 	return &pb.Balances{uint64(confirmed), uint64(unconfirmed)}, nil
+}
+
+func (s *server) MasterPrivateKey(ctx context.Context, in *pb.Empty) (*pb.Key, error) {
+	return &pb.Key{s.w.MasterPrivateKey().String()}, nil
+}
+
+func (s *server) MasterPublicKey(ctx context.Context, in *pb.Empty) (*pb.Key, error) {
+	return &pb.Key{s.w.MasterPublicKey().String()}, nil
+}
+
+func (s *server) Params(ctx context.Context, in *pb.Empty) (*pb.NetParams, error) {
+	return &pb.NetParams{s.w.Params().Name}, nil
+}
+
+func (s *server) HasKey(ctx context.Context, in *pb.Address) (*pb.BoolResponse, error) {
+	params, err := s.Params(ctx, &pb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	var p chaincfg.Params
+	switch params.Name {
+	case chaincfg.TestNet3Params.Name:
+		p = chaincfg.TestNet3Params
+	case chaincfg.MainNetParams.Name:
+		p = chaincfg.MainNetParams
+	case chaincfg.RegressionNetParams.Name:
+		p = chaincfg.RegressionNetParams
+	default:
+		return nil, errors.New("Unknown network parameters")
+	}
+	addr, err := btcutil.DecodeAddress(in.Addr, &p)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.BoolResponse{s.w.HasKey(addr)}, nil
+}
+
+func (s *server) Transactions(ctx context.Context, in *pb.Empty) (*pb.TransactionList, error) {
+	txs, err := s.w.Transactions()
+	if err != nil {
+		return nil, err
+	}
+	var list []*pb.Tx
+	for _, tx := range txs {
+		ts, err := ptypes.TimestampProto(tx.Timestamp)
+		if err != nil {
+			return nil, err
+		}
+		respTx := &pb.Tx{
+			Txid:      tx.Txid,
+			Value:     tx.Value,
+			Height:    tx.Height,
+			WatchOnly: tx.WatchOnly,
+			Timestamp: ts,
+			Raw:       tx.Bytes,
+		}
+		list = append(list, respTx)
+	}
+	return &pb.TransactionList{list}, nil
+}
+
+func (s *server) GetTransaction(ctx context.Context, in *pb.Txid) (*pb.Tx, error) {
+	ch, err := chainhash.NewHashFromStr(in.Hash)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := s.w.GetTransaction(*ch)
+	if err != nil {
+		return nil, err
+	}
+	ts, err := ptypes.TimestampProto(tx.Timestamp)
+	if err != nil {
+		return nil, err
+	}
+	respTx := &pb.Tx{
+		Txid:      tx.Txid,
+		Value:     tx.Value,
+		Height:    tx.Height,
+		WatchOnly: tx.WatchOnly,
+		Timestamp: ts,
+		Raw:       tx.Bytes,
+	}
+	return respTx, nil
 }
