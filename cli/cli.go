@@ -78,6 +78,17 @@ func SetupCli(parser *flags.Parser) {
 			"Examples:\n"+
 			"> spvwallet gettransaction 190bd83935740b88ebdfe724485f36ca4aa40125a21b93c410e0e191d4e9e0b5\n",
 		&getTransaction)
+	parser.AddCommand("getfeeperbyte",
+		"get the current bitcoin fee",
+		"Returns the current network fee per byte for the given fee level.\n\n"+
+			"Args:\n"+
+			"1. feeLevel       (string default=normal) The fee level: economic, normal, priority\n\n"+
+			"Examples:\n"+
+			"> spvwallet getfeeperbyte\n"+
+			"140\n"+
+			"> spvwallet getfeeperbyte priority\n"+
+			"160\n",
+		&getFeePerByte)
 }
 
 func newGRPCClient() (pb.APIClient, *grpc.ClientConn, error) {
@@ -401,5 +412,38 @@ func (x *GetTransaction) Execute(args []string) error {
 		return err
 	}
 	fmt.Println(string(formatted))
+	return nil
+}
+
+type GetFeePerByte struct{}
+
+var getFeePerByte GetFeePerByte
+
+func (x *GetFeePerByte) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	var feeLevel pb.FeeLevel
+	userSelection := ""
+	if len(args) > 0 {
+		userSelection = args[0]
+	}
+	switch strings.ToLower(userSelection) {
+	case "economic":
+		feeLevel = pb.FeeLevel_ECONOMIC
+	case "normal":
+		feeLevel = pb.FeeLevel_NORMAL
+	case "priority":
+		feeLevel = pb.FeeLevel_PRIORITY
+	default:
+		feeLevel = pb.FeeLevel_NORMAL
+	}
+	resp, err := client.GetFeePerByte(context.Background(), &pb.FeeLevelSelection{feeLevel})
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp.Fee)
 	return nil
 }

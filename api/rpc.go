@@ -156,3 +156,18 @@ func (s *server) GetTransaction(ctx context.Context, in *pb.Txid) (*pb.Tx, error
 	}
 	return respTx, nil
 }
+
+func (s *server) GetFeePerByte(ctx context.Context, in *pb.FeeLevelSelection) (*pb.FeePerByte, error) {
+	var feeLevel spvwallet.FeeLevel
+	switch in.FeeLevel {
+	case pb.FeeLevel_ECONOMIC:
+		feeLevel = spvwallet.ECONOMIC
+	case pb.FeeLevel_NORMAL:
+		feeLevel = spvwallet.NORMAL
+	case pb.FeeLevel_PRIORITY:
+		feeLevel = spvwallet.PRIOIRTY
+	default:
+		return nil, errors.New("Unknown fee level")
+	}
+	return &pb.FeePerByte{s.w.GetFeePerByte(feeLevel)}, nil
+}

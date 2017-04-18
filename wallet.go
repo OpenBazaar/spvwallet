@@ -73,7 +73,6 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	w := &SPVWallet{
 		repoPath:         config.RepoPath,
 		masterPrivateKey: mPrivKey,
@@ -83,7 +82,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		priorityFee:      config.HighFee,
 		normalFee:        config.MediumFee,
 		economicFee:      config.LowFee,
-		feeAPI:           config.FeeAPI.Path,
+		feeAPI:           config.FeeAPI.String(),
 		fPositives:       make(chan *peer.Peer),
 		stopChan:         make(chan int),
 		fpAccumulator:    make(map[int32]int32),

@@ -16,6 +16,7 @@ service API {
   rpc Params (Empty) returns (NetParams) {}
   rpc Transactions (Empty) returns (TransactionList) {}
   rpc GetTransaction (Txid) returns (Tx) {}
+  rpc GetFeePerByte (FeeLevelSelection) returns (FeePerByte) {}
 }
 
 message Empty {}
@@ -69,4 +70,18 @@ message Tx {
 
 message Txid {
     string hash = 1;
+}
+
+enum FeeLevel {
+    ECONOMIC = 0;
+    NORMAL   = 1;
+    PRIORITY = 2;
+}
+
+message FeeLevelSelection {
+    FeeLevel feeLevel = 1;
+}
+
+message FeePerByte {
+    uint64 fee = 1;
 }
