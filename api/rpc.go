@@ -171,3 +171,77 @@ func (s *server) GetFeePerByte(ctx context.Context, in *pb.FeeLevelSelection) (*
 	}
 	return &pb.FeePerByte{s.w.GetFeePerByte(feeLevel)}, nil
 }
+
+func (s *server) Spend(ctx context.Context, in *pb.SpendInfo) (*pb.Txid, error) {
+	params, err := s.Params(ctx, &pb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	var p chaincfg.Params
+	switch params.Name {
+	case chaincfg.TestNet3Params.Name:
+		p = chaincfg.TestNet3Params
+	case chaincfg.MainNetParams.Name:
+		p = chaincfg.MainNetParams
+	case chaincfg.RegressionNetParams.Name:
+		p = chaincfg.RegressionNetParams
+	default:
+		return nil, errors.New("Unknown network parameters")
+	}
+	var feeLevel spvwallet.FeeLevel
+	switch in.FeeLevel {
+	case pb.FeeLevel_ECONOMIC:
+		feeLevel = spvwallet.ECONOMIC
+	case pb.FeeLevel_NORMAL:
+		feeLevel = spvwallet.NORMAL
+	case pb.FeeLevel_PRIORITY:
+		feeLevel = spvwallet.PRIOIRTY
+	default:
+		return nil, errors.New("Unknown fee level")
+	}
+	addr, err := btcutil.DecodeAddress(in.Address, &p)
+	if err != nil {
+		return nil, err
+	}
+	txid, err := s.w.Spend(int64(in.Amount), addr, feeLevel)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.Txid{txid.String()}, nil
+}
+
+func (s *server) BumpFee(ctx context.Context, in *pb.Txid) (*pb.Txid, error) {
+	ch, err := chainhash.NewHashFromStr(in.Hash)
+	if err != nil {
+		return nil, err
+	}
+	txid, err := s.w.BumpFee(*ch)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.Txid{txid.String()}, nil
+}
+
+func (s *server) Peers(ctx context.Context, in *pb.Empty) (*pb.PeerList, error) {
+	var peers []*pb.Peer
+	for _, peer := range s.w.PeerManager.ConnectedPeers() {
+		ts, err := ptypes.TimestampProto(peer.TimeConnected())
+		if err != nil {
+			return nil, err
+		}
+		p := &pb.Peer{
+			Address:         peer.Addr(),
+			BytesSent:       peer.BytesSent(),
+			BytesReceived:   peer.BytesReceived(),
+			Connected:       peer.Connected(),
+			ID:              peer.ID(),
+			LastBlock:       peer.LastBlock(),
+			ProtocolVersion: peer.ProtocolVersion(),
+			Services:        peer.Services().String(),
+			UserAgent:       peer.UserAgent(),
+			TimeConnected:   ts,
+		}
+		peers = append(peers, p)
+	}
+	return &pb.PeerList{peers}, nil
+}

@@ -9,6 +9,7 @@ import (
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -82,13 +83,39 @@ func SetupCli(parser *flags.Parser) {
 		"get the current bitcoin fee",
 		"Returns the current network fee per byte for the given fee level.\n\n"+
 			"Args:\n"+
-			"1. feeLevel       (string default=normal) The fee level: economic, normal, priority\n\n"+
+			"1. feelevel       (string default=normal) The fee level: economic, normal, priority\n\n"+
 			"Examples:\n"+
 			"> spvwallet getfeeperbyte\n"+
 			"140\n"+
 			"> spvwallet getfeeperbyte priority\n"+
 			"160\n",
 		&getFeePerByte)
+	parser.AddCommand("spend",
+		"send bitcoins",
+		"Send bitcoins to the given address\n\n"+
+			"Args:\n"+
+			"1. address       (string) The recipient's bitcoin address\n"+
+			"2. amount        (integer) The amount to send in satoshi"+
+			"3. feelevel      (string default=normal) The fee level: economic, normal, priority\n\n"+
+			"Examples:\n"+
+			"> spvwallet spend 1DxGWC22a46VPEjq8YKoeVXSLzB7BA8sJS 1000000\n"+
+			"82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c"+
+			"> spvwallet spend 1DxGWC22a46VPEjq8YKoeVXSLzB7BA8sJS 3000000000 priority\n"+
+			"82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c",
+		&spend)
+	parser.AddCommand("bumpfee",
+		"bump the tx fee",
+		"Bumps the fee on an unconfirmed transaction\n\n"+
+			"Args:\n"+
+			"1. txid       (string) The transaction ID of the transaction to bump.\n\n"+
+			"Examples:\n"+
+			"> spvwallet bumpfee 190bd83935740b88ebdfe724485f36ca4aa40125a21b93c410e0e191d4e9e0b5\n"+
+			"82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c",
+		&bumpFee)
+	parser.AddCommand("peers",
+		"get info about peers",
+		"Returns a list of json data on each connected peer",
+		&peers)
 }
 
 func newGRPCClient() (pb.APIClient, *grpc.ClientConn, error) {
@@ -445,5 +472,110 @@ func (x *GetFeePerByte) Execute(args []string) error {
 		return err
 	}
 	fmt.Println(resp.Fee)
+	return nil
+}
+
+type Spend struct{}
+
+var spend Spend
+
+func (x *Spend) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	var feeLevel pb.FeeLevel
+	userSelection := ""
+	if len(args) > 2 {
+		userSelection = args[2]
+	}
+	switch strings.ToLower(userSelection) {
+	case "economic":
+		feeLevel = pb.FeeLevel_ECONOMIC
+	case "normal":
+		feeLevel = pb.FeeLevel_NORMAL
+	case "priority":
+		feeLevel = pb.FeeLevel_PRIORITY
+	default:
+		feeLevel = pb.FeeLevel_NORMAL
+	}
+	amt, err := strconv.Atoi(args[1])
+	if err != nil {
+		return err
+	}
+	resp, err := client.Spend(context.Background(), &pb.SpendInfo{args[0], uint64(amt), feeLevel})
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp.Hash)
+	return nil
+}
+
+type BumpFee struct{}
+
+var bumpFee BumpFee
+
+func (x *BumpFee) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if len(args) <= 0 {
+		return errors.New("Txid is required")
+	}
+	resp, err := client.BumpFee(context.Background(), &pb.Txid{args[0]})
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp.Hash)
+	return nil
+}
+
+type Peers struct{}
+
+var peers Peers
+
+func (x *Peers) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	resp, err := client.Peers(context.Background(), &pb.Empty{})
+	if err != nil {
+		return err
+	}
+	type peer struct {
+		Address         string    `json:"address"`
+		BytesSent       uint64    `json:"bytesSent"`
+		BytesReceived   uint64    `json:"bytesReceived"`
+		Connected       bool      `json:"connected"`
+		ID              int32     `json:"id"`
+		LastBlock       int32     `json:"lastBlock"`
+		ProtocolVersion uint32    `json:"protocolVersion"`
+		Services        string    `json:"services"`
+		UserAgent       string    `json:"userAgent"`
+		TimeConnected   time.Time `json:"timeConnected"`
+	}
+	var peers []peer
+	for _, p := range resp.Peers {
+		pi := peer{
+			Address:         p.Address,
+			BytesSent:       p.BytesSent,
+			BytesReceived:   p.BytesReceived,
+			Connected:       p.Connected,
+			ID:              p.ID,
+			LastBlock:       p.LastBlock,
+			ProtocolVersion: p.ProtocolVersion,
+			Services:        p.Services,
+			UserAgent:       p.UserAgent,
+			TimeConnected:   time.Unix(int64(p.TimeConnected.Seconds), int64(p.TimeConnected.Nanos)),
+		}
+		peers = append(peers, pi)
+	}
+	out, err := json.MarshalIndent(peers, "", "    ")
+	fmt.Println(string(out))
 	return nil
 }

@@ -17,6 +17,10 @@ service API {
   rpc Transactions (Empty) returns (TransactionList) {}
   rpc GetTransaction (Txid) returns (Tx) {}
   rpc GetFeePerByte (FeeLevelSelection) returns (FeePerByte) {}
+  rpc Spend (SpendInfo) returns (Txid) {}
+  rpc BumpFee (Txid) returns (Txid) {}
+  rpc Peers (Empty) returns (PeerList) {}
+
 }
 
 message Empty {}
@@ -84,4 +88,27 @@ message FeeLevelSelection {
 
 message FeePerByte {
     uint64 fee = 1;
+}
+
+message SpendInfo {
+    string address    = 1;
+    uint64 amount     = 2;
+    FeeLevel feeLevel = 3;
+}
+
+message PeerList {
+    repeated Peer peers = 1;
+}
+
+message Peer {
+    string address                          = 1;
+    uint64 bytesSent                        = 2;
+    uint64 bytesReceived                    = 3;
+    bool   connected                        = 4;
+    int32  ID                               = 5;
+    int32  lastBlock                        = 6;
+    uint32 protocolVersion                  = 7;
+    string services                         = 8;
+    string userAgent                        = 9;
+    google.protobuf.Timestamp timeConnected = 10;
 }
