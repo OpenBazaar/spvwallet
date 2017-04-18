@@ -17,17 +17,17 @@ type SQLiteDatastore struct {
 	txns           spvwallet.Txns
 	watchedScripts spvwallet.WatchedScripts
 	db             *sql.DB
-	lock           *sync.Mutex
+	lock           *sync.RWMutex
 }
 
 func Create(repoPath string) (*SQLiteDatastore, error) {
-	dbPath := path.Join(repoPath, "state.db")
+	dbPath := path.Join(repoPath, "wallet.db")
 	conn, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
 		return nil, err
 	}
 
-	l := new(sync.Mutex)
+	l := new(sync.RWMutex)
 	sqliteDB := &SQLiteDatastore{
 		keys: &KeysDB{
 			db:   conn,

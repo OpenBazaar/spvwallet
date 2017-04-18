@@ -12,7 +12,7 @@ import (
 
 type TxnsDB struct {
 	db   *sql.DB
-	lock *sync.Mutex
+	lock *sync.RWMutex
 }
 
 func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, watchOnly bool) error {
@@ -44,8 +44,8 @@ func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, wa
 }
 
 func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, spvwallet.Txn, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 	stmt, err := t.db.Prepare("select tx, value, height, timestamp, watchOnly from txns where txid=?")
 	defer stmt.Close()
 	var ret []byte
@@ -76,8 +76,8 @@ func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, spvwallet.Txn, error) {
 }
 
 func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]spvwallet.Txn, error) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	t.lock.RLock()
+	defer t.lock.RUnlock()
 	var ret []spvwallet.Txn
 	stm := "select tx, value, height, timestamp, watchOnly from txns"
 	rows, err := t.db.Query(stm)

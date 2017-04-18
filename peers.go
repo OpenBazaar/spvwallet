@@ -26,7 +26,7 @@ var (
 	defaultPort uint16
 )
 
-type Config struct {
+type PeerManagerConfig struct {
 
 	// The network parameters to use
 	Params *chaincfg.Params
@@ -87,7 +87,7 @@ type PeerManager struct {
 	proxy proxy.Dialer
 }
 
-func NewPeerManager(config *Config) (*PeerManager, error) {
+func NewPeerManager(config *PeerManagerConfig) (*PeerManager, error) {
 	port, err := strconv.Atoi(config.Params.DefaultPort)
 	defaultPort = uint16(port)
 	if err != nil {

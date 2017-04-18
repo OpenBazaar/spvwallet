@@ -9,8 +9,6 @@ import (
 	hd "github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/op/go-logging"
 	b39 "github.com/tyler-smith/go-bip39"
-	"golang.org/x/net/proxy"
-	"net"
 	"os"
 	"path"
 	"sync"
@@ -43,21 +41,31 @@ type SPVWallet struct {
 
 	running bool
 
-	config *Config
+	config *PeerManagerConfig
 }
 
 var log = logging.MustGetLogger("bitcoin")
 
 const WALLET_VERSION = "0.1.0"
 
-func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFee uint64, mediumFee uint64, highFee uint64, feeApi,
-	repoPath string, db Datastore, userAgent string, trustedPeer string, proxy proxy.Dialer, logger logging.LeveledBackend) (*SPVWallet, error) {
+func NewSPVWallet(config *Config) (*SPVWallet, error) {
 
-	log.SetBackend(logger)
+	log.SetBackend(logging.AddModuleLevel(config.Logger))
 
-	seed := b39.NewSeed(mnemonic, "")
+	if config.Mnemonic == "" {
+		ent, err := b39.NewEntropy(128)
+		if err != nil {
+			return nil, err
+		}
+		mnemonic, err := b39.NewMnemonic(ent)
+		if err != nil {
+			return nil, err
+		}
+		config.Mnemonic = mnemonic
+	}
+	seed := b39.NewSeed(config.Mnemonic, "")
 
-	mPrivKey, err := hd.NewMaster(seed, params)
+	mPrivKey, err := hd.NewMaster(seed, config.Params)
 	if err != nil {
 		return nil, err
 	}
@@ -67,15 +75,15 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 	}
 
 	w := &SPVWallet{
-		repoPath:         repoPath,
+		repoPath:         config.RepoPath,
 		masterPrivateKey: mPrivKey,
 		masterPublicKey:  mPubKey,
-		params:           params,
-		maxFee:           maxFee,
-		priorityFee:      highFee,
-		normalFee:        mediumFee,
-		economicFee:      lowFee,
-		feeAPI:           feeApi,
+		params:           config.Params,
+		maxFee:           config.MaxFee,
+		priorityFee:      config.HighFee,
+		normalFee:        config.MediumFee,
+		economicFee:      config.LowFee,
+		feeAPI:           config.FeeAPI.Path,
 		fPositives:       make(chan *peer.Peer),
 		stopChan:         make(chan int),
 		fpAccumulator:    make(map[int32]int32),
@@ -84,7 +92,7 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 		mutex:            new(sync.RWMutex),
 	}
 
-	w.txstore, err = NewTxStore(w.params, db, w.masterPrivateKey)
+	w.txstore, err = NewTxStore(w.params, config.DB, w.masterPrivateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -114,24 +122,20 @@ func NewSPVWallet(mnemonic string, params *chaincfg.Params, maxFee uint64, lowFe
 		return &hash, int32(height), nil
 	}
 
-	w.config = &Config{
-		UserAgentName:      userAgent,
+	w.config = &PeerManagerConfig{
+		UserAgentName:      config.UserAgent,
 		UserAgentVersion:   WALLET_VERSION,
 		Params:             w.params,
-		AddressCacheDir:    repoPath,
+		AddressCacheDir:    config.RepoPath,
 		GetFilter:          w.txstore.GimmeFilter,
 		StartChainDownload: w.startChainDownload,
 		GetNewestBlock:     getNewestBlock,
 		Listeners:          listeners,
-		Proxy:              proxy,
+		Proxy:              config.Proxy,
 	}
 
-	if trustedPeer != "" {
-		addr, err := net.ResolveTCPAddr("tcp", trustedPeer)
-		if err != nil {
-			return nil, err
-		}
-		w.config.TrustedPeer = addr
+	if config.TrustedPeer != nil {
+		w.config.TrustedPeer = config.TrustedPeer
 	}
 
 	w.PeerManager, err = NewPeerManager(w.config)
