@@ -27,11 +27,19 @@ func SetupCli(parser *flags.Parser) {
 			"> spvwallet currentaddress internal\n"+
 			"18zAxgfKx4NuTUGUEuB8p7FKgCYPM15DfS\n",
 		&currentAddress)
+	parser.AddCommand("chaintip",
+		"return the height of the chain",
+		"Returns the height of the best chain of headers",
+		&chainTip)
+	parser.AddCommand("balance",
+		"get the wallet balance",
+		"Returns both the confirmed and unconfirmed balances",
+		&balance)
 }
 
 func newGRPCClient() (pb.APIClient, *grpc.ClientConn, error) {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(api.Port, grpc.WithInsecure())
+	conn, err := grpc.Dial(api.Addr, grpc.WithInsecure())
 	if err != nil {
 		return nil, nil, err
 	}
@@ -81,5 +89,41 @@ func (x *CurrentAddress) Execute(args []string) error {
 		return err
 	}
 	fmt.Println(resp.Addr)
+	return nil
+}
+
+type ChainTip struct{}
+
+var chainTip ChainTip
+
+func (x *ChainTip) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	resp, err := client.ChainTip(context.Background(), &pb.Empty{})
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp.Height)
+	return nil
+}
+
+type Balance struct{}
+
+var balance Balance
+
+func (x *Balance) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	resp, err := client.Balance(context.Background(), &pb.Empty{})
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Confirmed: %d, Unconfirmed: %d\n", resp.Confirmed, resp.Unconfirmed)
 	return nil
 }

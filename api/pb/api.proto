@@ -5,6 +5,8 @@ package pb;
 service API {
   rpc Stop (Empty) returns (Empty) {}
   rpc CurrentAddress (KeySelection) returns (Address) {}
+  rpc ChainTip (Empty) returns (Height) {}
+  rpc Balance (Empty) returns (Balances) {}
 }
 
 message Empty {}
@@ -20,4 +22,13 @@ message KeySelection {
 
 message Address {
     string addr = 1;
+}
+
+message Height {
+    uint32 height = 1;
+}
+
+message Balances {
+    uint64 confirmed   = 1;
+    uint64 unconfirmed = 2;
 }

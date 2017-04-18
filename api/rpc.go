@@ -10,14 +10,14 @@ import (
 	"net"
 )
 
-const Port = ":8234"
+const Addr = "127.0.0.1:8234"
 
 type server struct {
 	w *spvwallet.SPVWallet
 }
 
 func ServeAPI(w *spvwallet.SPVWallet) error {
-	lis, err := net.Listen("tcp", Port)
+	lis, err := net.Listen("tcp", Addr)
 	if err != nil {
 		return err
 	}
@@ -46,4 +46,13 @@ func (s *server) CurrentAddress(ctx context.Context, in *pb.KeySelection) (*pb.A
 	}
 	addr := s.w.CurrentAddress(purpose)
 	return &pb.Address{addr.String()}, nil
+}
+
+func (s *server) ChainTip(ctx context.Context, in *pb.Empty) (*pb.Height, error) {
+	return &pb.Height{s.w.ChainTip()}, nil
+}
+
+func (s *server) Balance(ctx context.Context, in *pb.Empty) (*pb.Balances, error) {
+	confirmed, unconfirmed := s.w.Balance()
+	return &pb.Balances{uint64(confirmed), uint64(unconfirmed)}, nil
 }
