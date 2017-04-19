@@ -181,7 +181,7 @@ func printSplashScreen() {
 	blue.Println(` \        /  / __ \|  |_|  |_\  ___/|  |`)
 	white.Printf(`/_______  / |____|      \___/ `)
 	blue.Println(`   \__/\  /  (____  /____/____/\___  >__|`)
-	white.Printf(`	    \/ `)
+	white.Printf(`	\/ `)
 	blue.Println(`                           \/        \/               \/`)
 	blue.DisableColor()
 	white.DisableColor()

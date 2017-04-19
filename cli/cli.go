@@ -643,6 +643,9 @@ func (x *Spend) Execute(args []string) error {
 	if len(args) > 2 {
 		userSelection = args[2]
 	}
+	if len(args) < 2 {
+		return errors.New("Address and amount are required")
+	}
 	switch strings.ToLower(userSelection) {
 	case "economic":
 		feeLevel = pb.FeeLevel_ECONOMIC
