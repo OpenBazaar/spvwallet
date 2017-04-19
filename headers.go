@@ -5,13 +5,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/boltdb/bolt"
-	"github.com/btcsuite/btcd/wire"
 	"io"
 	"math/big"
 	"path"
 	"sort"
 	"sync"
+
+	"github.com/boltdb/bolt"
+	"github.com/btcsuite/btcd/wire"
 )
 
 const MAX_HEADERS = 2000

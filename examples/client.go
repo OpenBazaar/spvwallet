@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/db"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/op/go-logging"
-	"os"
 )
 
 func main() {
