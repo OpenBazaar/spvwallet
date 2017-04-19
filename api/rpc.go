@@ -1,12 +1,16 @@
 package api
 
 import (
+	"encoding/hex"
 	"errors"
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api/pb"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/btcsuite/btcutil"
+	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/golang/protobuf/ptypes"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -244,4 +248,293 @@ func (s *server) Peers(ctx context.Context, in *pb.Empty) (*pb.PeerList, error) 
 		peers = append(peers, p)
 	}
 	return &pb.PeerList{peers}, nil
+}
+
+func (s *server) AddWatchedScript(ctx context.Context, in *pb.Address) (*pb.Empty, error) {
+	script, err := hex.DecodeString(in.Addr)
+	if err == nil {
+		return nil, s.w.AddWatchedScript(script)
+	} else {
+		params, err := s.Params(ctx, &pb.Empty{})
+		if err != nil {
+			return nil, err
+		}
+		var p chaincfg.Params
+		switch params.Name {
+		case chaincfg.TestNet3Params.Name:
+			p = chaincfg.TestNet3Params
+		case chaincfg.MainNetParams.Name:
+			p = chaincfg.MainNetParams
+		case chaincfg.RegressionNetParams.Name:
+			p = chaincfg.RegressionNetParams
+		default:
+			return nil, errors.New("Unknown network parameters")
+		}
+		addr, err := btcutil.DecodeAddress(in.Addr, &p)
+		if err != nil {
+			return nil, err
+		}
+		script, err := txscript.PayToAddrScript(addr)
+		if err != nil {
+			return nil, err
+		}
+		return nil, s.w.AddWatchedScript(script)
+	}
+	return nil, nil
+}
+
+func (s *server) GetConfirmations(ctx context.Context, in *pb.Txid) (*pb.Confirmations, error) {
+	ch, err := chainhash.NewHashFromStr(in.Hash)
+	if err != nil {
+		return nil, err
+	}
+	confirms, err := s.w.GetConfirmations(*ch)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.Confirmations{confirms}, nil
+}
+
+func (s *server) SweepAddress(ctx context.Context, in *pb.SweepInfo) (*pb.Txid, error) {
+	var utxos []spvwallet.Utxo
+	for _, u := range in.Utxos {
+		h, err := chainhash.NewHashFromStr(u.Txid)
+		if err != nil {
+			return nil, err
+		}
+		op := wire.NewOutPoint(h, u.Index)
+		utxo := spvwallet.Utxo{
+			Op:    *op,
+			Value: int64(u.Value),
+		}
+		utxos = append(utxos, utxo)
+	}
+	params, err := s.Params(ctx, &pb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	var p chaincfg.Params
+	switch params.Name {
+	case chaincfg.TestNet3Params.Name:
+		p = chaincfg.TestNet3Params
+	case chaincfg.MainNetParams.Name:
+		p = chaincfg.MainNetParams
+	case chaincfg.RegressionNetParams.Name:
+		p = chaincfg.RegressionNetParams
+	default:
+		return nil, errors.New("Unknown network parameters")
+	}
+	var addr *btcutil.Address
+	if in.Address != "" {
+		a, err := btcutil.DecodeAddress(in.Address, &p)
+		if err != nil {
+			return nil, err
+		}
+		addr = &a
+	} else {
+		addr = nil
+	}
+	var key *hdkeychain.ExtendedKey
+	wif, err := btcutil.DecodeWIF(in.Key)
+	if err == nil {
+		key = hdkeychain.NewExtendedKey(
+			p.HDPrivateKeyID[:],
+			wif.PrivKey.Serialize(),
+			make([]byte, 32),
+			make([]byte, 4),
+			0,
+			0,
+			true)
+	} else {
+		keyBytes, err := hex.DecodeString(in.Key)
+		if err == nil {
+			key = hdkeychain.NewExtendedKey(
+				p.HDPrivateKeyID[:],
+				keyBytes,
+				make([]byte, 32),
+				make([]byte, 4),
+				0,
+				0,
+				true)
+		} else {
+			key, err = hdkeychain.NewKeyFromString(in.Key)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	var rs *[]byte
+	if len(in.RedeemScript) > 0 {
+		rs = &in.RedeemScript
+	}
+	var feeLevel spvwallet.FeeLevel
+	switch in.FeeLevel {
+	case pb.FeeLevel_ECONOMIC:
+		feeLevel = spvwallet.ECONOMIC
+	case pb.FeeLevel_NORMAL:
+		feeLevel = spvwallet.NORMAL
+	case pb.FeeLevel_PRIORITY:
+		feeLevel = spvwallet.PRIOIRTY
+	default:
+		return nil, errors.New("Unknown fee level")
+	}
+	newTxid, err := s.w.SweepAddress(utxos, addr, key, rs, feeLevel)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.Txid{newTxid.String()}, nil
+}
+
+func (s *server) ReSyncBlockchain(ctx context.Context, in *pb.Height) (*pb.Empty, error) {
+	s.w.ReSyncBlockchain(int32(in.Height))
+	return nil, nil
+}
+
+func (s *server) CreateMultisigSignature(ctx context.Context, in *pb.CreateMultisigInfo) (*pb.SignatureList, error) {
+	var ins []spvwallet.TransactionInput
+	for _, input := range in.Inputs {
+		h, err := hex.DecodeString(input.Txid)
+		if err != nil {
+			return nil, err
+		}
+		i := spvwallet.TransactionInput{
+			OutpointHash:  h,
+			OutpointIndex: input.Index,
+		}
+		ins = append(ins, i)
+	}
+	var outs []spvwallet.TransactionOutput
+	for _, output := range in.Outputs {
+		o := spvwallet.TransactionOutput{
+			ScriptPubKey: output.ScriptPubKey,
+			Value:        int64(output.Value),
+		}
+		outs = append(outs, o)
+	}
+	params, err := s.Params(ctx, &pb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	var p chaincfg.Params
+	switch params.Name {
+	case chaincfg.TestNet3Params.Name:
+		p = chaincfg.TestNet3Params
+	case chaincfg.MainNetParams.Name:
+		p = chaincfg.MainNetParams
+	case chaincfg.RegressionNetParams.Name:
+		p = chaincfg.RegressionNetParams
+	default:
+		return nil, errors.New("Unknown network parameters")
+	}
+	var key *hdkeychain.ExtendedKey
+	wif, err := btcutil.DecodeWIF(in.Key)
+	if err == nil {
+		key = hdkeychain.NewExtendedKey(
+			p.HDPrivateKeyID[:],
+			wif.PrivKey.Serialize(),
+			make([]byte, 32),
+			make([]byte, 4),
+			0,
+			0,
+			true)
+	} else {
+		keyBytes, err := hex.DecodeString(in.Key)
+		if err == nil {
+			key = hdkeychain.NewExtendedKey(
+				p.HDPrivateKeyID[:],
+				keyBytes,
+				make([]byte, 32),
+				make([]byte, 4),
+				0,
+				0,
+				true)
+		} else {
+			key, err = hdkeychain.NewKeyFromString(in.Key)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	sigs, err := s.w.CreateMultisigSignature(ins, outs, key, in.RedeemScript, in.FeePerByte)
+	if err != nil {
+		return nil, err
+	}
+	var retSigs []*pb.Signature
+	for _, s := range sigs {
+		sig := &pb.Signature{
+			Index:     s.InputIndex,
+			Signature: s.Signature,
+		}
+		retSigs = append(retSigs, sig)
+	}
+	return &pb.SignatureList{retSigs}, nil
+}
+
+func (s *server) Multisign(ctx context.Context, in *pb.MultisignInfo) (*pb.RawTx, error) {
+	var ins []spvwallet.TransactionInput
+	for _, input := range in.Inputs {
+		h, err := hex.DecodeString(input.Txid)
+		if err != nil {
+			return nil, err
+		}
+		i := spvwallet.TransactionInput{
+			OutpointHash:  h,
+			OutpointIndex: input.Index,
+		}
+		ins = append(ins, i)
+	}
+	var outs []spvwallet.TransactionOutput
+	for _, output := range in.Outputs {
+		o := spvwallet.TransactionOutput{
+			ScriptPubKey: output.ScriptPubKey,
+			Value:        int64(output.Value),
+		}
+		outs = append(outs, o)
+	}
+	var sig1 []spvwallet.Signature
+	for _, s := range in.Sig1 {
+		sig := spvwallet.Signature{
+			InputIndex: s.Index,
+			Signature: s.Signature,
+		}
+		sig1 = append(sig1, sig)
+	}
+	var sig2 []spvwallet.Signature
+	for _, s := range in.Sig2 {
+		sig := spvwallet.Signature{
+			InputIndex: s.Index,
+			Signature: s.Signature,
+		}
+		sig2 = append(sig2, sig)
+	}
+	tx, err := s.w.Multisign(ins, outs, sig1, sig2, in.RedeemScript, in.FeePerByte, in.Broadcast)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.RawTx{tx}, nil
+}
+
+func (s *server) EstimateFee(ctx context.Context, in *pb.EstimateFeeData) (*pb.Fee, error) {
+	var ins []spvwallet.TransactionInput
+	for _, input := range in.Inputs {
+		h, err := hex.DecodeString(input.Txid)
+		if err != nil {
+			return nil, err
+		}
+		i := spvwallet.TransactionInput{
+			OutpointHash:  h,
+			OutpointIndex: input.Index,
+		}
+		ins = append(ins, i)
+	}
+	var outs []spvwallet.TransactionOutput
+	for _, output := range in.Outputs {
+		o := spvwallet.TransactionOutput{
+			ScriptPubKey: output.ScriptPubKey,
+			Value:        int64(output.Value),
+		}
+		outs = append(outs, o)
+	}
+	fee := s.w.EstimateFee(ins, outs, in.FeePerByte)
+	return &pb.Fee{fee}, nil
 }

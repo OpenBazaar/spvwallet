@@ -20,7 +20,13 @@ service API {
   rpc Spend (SpendInfo) returns (Txid) {}
   rpc BumpFee (Txid) returns (Txid) {}
   rpc Peers (Empty) returns (PeerList) {}
-
+  rpc AddWatchedScript (Address) returns (Empty) {}
+  rpc GetConfirmations (Txid) returns (Confirmations) {}
+  rpc SweepAddress (SweepInfo) returns (Txid) {}
+  rpc ReSyncBlockchain (Height) returns (Empty) {}
+  rpc CreateMultisigSignature (CreateMultisigInfo) returns (SignatureList) {}
+  rpc Multisign (MultisignInfo) returns (RawTx) {}
+  rpc EstimateFee (EstimateFeeData) returns (Fee) {}
 }
 
 message Empty {}
@@ -90,6 +96,10 @@ message FeePerByte {
     uint64 fee = 1;
 }
 
+message Fee {
+    uint64 fee = 1;
+}
+
 message SpendInfo {
     string address    = 1;
     uint64 amount     = 2;
@@ -111,4 +121,69 @@ message Peer {
     string services                         = 8;
     string userAgent                        = 9;
     google.protobuf.Timestamp timeConnected = 10;
+}
+
+message Confirmations {
+    uint32 confirmations = 1;
+}
+
+message Utxo {
+    string txid  = 1;
+    uint32 index = 2;
+    uint64 value = 3;
+}
+
+message SweepInfo {
+    repeated Utxo utxos = 1;
+    string address      = 2;
+    string key          = 3;
+    bytes redeemScript  = 4;
+    FeeLevel feeLevel   = 5;
+}
+
+message Input {
+    string txid  = 1;
+    uint32 index = 2;
+}
+
+message Output {
+    bytes scriptPubKey = 1;
+    uint64 value       = 2;
+}
+
+message Signature {
+    uint32 index    = 1;
+    bytes signature = 2;
+}
+
+message CreateMultisigInfo {
+    repeated Input inputs   = 1;
+    repeated Output outputs = 2;
+    string key              = 3;
+    bytes redeemScript      = 4;
+    uint64 feePerByte       = 5;
+}
+
+message SignatureList {
+    repeated Signature sigs = 1;
+}
+
+message MultisignInfo {
+    repeated Input inputs   = 1;
+    repeated Output outputs = 2;
+    repeated Signature sig1 = 3;
+    repeated Signature sig2 = 4;
+    bytes redeemScript      = 5;
+    uint64 feePerByte       = 6;
+    bool broadcast          = 7;
+}
+
+message RawTx {
+    bytes tx = 1;
+}
+
+message EstimateFeeData {
+    repeated Input inputs   = 1;
+    repeated Output outputs = 2;
+    uint64 feePerByte       = 3;
 }

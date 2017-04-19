@@ -1,6 +1,7 @@
 package spvwallet
 
 import (
+	"bytes"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -244,12 +245,12 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 	return sigs, nil
 }
 
-func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte uint64) error {
+func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error) {
 	tx := new(wire.MsgTx)
 	for _, in := range ins {
 		ch, err := chainhash.NewHashFromStr(hex.EncodeToString(in.OutpointHash))
 		if err != nil {
-			return err
+			return nil, err
 		}
 		outpoint := wire.NewOutPoint(ch, in.OutpointIndex)
 		input := wire.NewTxIn(outpoint, []byte{})
@@ -291,13 +292,17 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 		builder.AddData(redeemScript)
 		scriptSig, err := builder.Script()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		input.SignatureScript = scriptSig
 	}
 	// broadcast
-	w.Broadcast(tx)
-	return nil
+	if broadcast {
+		w.Broadcast(tx)
+	}
+	var buf bytes.Buffer
+	tx.BtcEncode(&buf, 1)
+	return buf.Bytes(), nil
 }
 
 func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel FeeLevel) (*chainhash.Hash, error) {

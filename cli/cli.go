@@ -1,11 +1,15 @@
 package cli
 
 import (
+	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/OpenBazaar/jsonpb"
 	"github.com/OpenBazaar/spvwallet/api"
 	"github.com/OpenBazaar/spvwallet/api/pb"
+	"github.com/btcsuite/btcd/wire"
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -116,6 +120,155 @@ func SetupCli(parser *flags.Parser) {
 		"get info about peers",
 		"Returns a list of json data on each connected peer",
 		&peers)
+	parser.AddCommand("addwatchedscript",
+		"add a script to watch",
+		"Add a script of bitcoin address to watch\n\n"+
+			"Args:\n"+
+			"1. script       (string) A hex encoded output script or bitcoin address.\n\n"+
+			"Examples:\n"+
+			"> spvwallet addwatchedscript 1DxGWC22a46VPEjq8YKoeVXSLzB7BA8sJS\n"+
+			"> spvwallet addwatchedscript 76a914f318374559bf8296228e9c7480578a357081d59988ac\n",
+		&addWatchedScript)
+	parser.AddCommand("getconfirmations",
+		"get the number of confirmations for a tx",
+		"Returns the number of confirmations for the given transaction\n\n"+
+			"Args:\n"+
+			"1. txid       (string) The transaction ID\n\n"+
+			"Examples:\n"+
+			"> spvwallet getconfirmations 190bd83935740b88ebdfe724485f36ca4aa40125a21b93c410e0e191d4e9e0b5\n"+
+			"6\n",
+		&getConfirmations)
+	parser.AddCommand("sweepaddress",
+		"sweep all coins from an address",
+		"Completely empty an address into a different one\n\n"+
+			"Args:\n"+
+			"1. sweepinfo       (jsonobject) A json obeject containing the required data\n"+
+			"{\n"+
+			`    "utxos": [`+"\n"+
+			"                  {\n"+
+			`                      "txid": "id"    (string, required) The transaction id`+"\n"+
+			`                      "index": n      (integer, required) The output index`+"\n"+
+			`                      "value": n      (integer, required) The output amount in satoshi`+"\n"+
+			"                  }\n"+
+			"             ],\n"+
+			`    "address": "addr",        (string, optional) The address to send the coins to. If omitted a change address from this wallet will be used.`+"\n"+
+			`    "key": "key",             (string, required) The private key used to sign. Can be in WIF, Hex, or xPriv format`+"\n"+
+			`    "redeemScript": "script", (string, optional) Redeem script if p2sh. Only single key scripts supported a present.`+"\n"+
+			`    "feeLevel": "level",      (string, optional default=normal ) The fee level: economic, normal, or priority`+"\n"+
+			"}\n\n"+
+			"Examples:\n"+
+			`> spvwallet sweepaddress "{"utxos":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0, "value": 1000000], "address": "1DxGWC22a46VPEjq8YKoeVXSLzB7BA8sJS", "key": "KzSg35HS67h4e7NLEywc3gNydjbRjzsyrPH5D7G8rpgv9qQCnb3S", "redeemScript": "1f6eb0660aab25ffe35978e7cb6e31bf40e1cceaf29c7f4f118cd2d76c2088237cb33c75510b8be669d90c01b0c394477690ff9c8388bcec4d71c3855fa50beb", "feeLevel":"priority"}"`+"\n"+
+			"12c56cfcdc0249002c2a4b1f7fd957c7149fc45d0e9920594c7c78c17dcc34bd\n\n"+
+			`> spvwallet sweepaddress "{"utxos":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0, "value": 1000000], "address": "1DxGWC22a46VPEjq8YKoeVXSLzB7BA8sJS", "key": "xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j", "feeLevel":"priority"}"`+"\n"+
+			"12c56cfcdc0249002c2a4b1f7fd957c7149fc45d0e9920594c7c78c17dcc34bd\n\n"+
+			`> spvwallet sweepaddress "{"utxos":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0, "value": 1000000], "address": "1DxGWC22a46VPEjq8YKoeVXSLzB7BA8sJS", "key": "be93c7096dc03bd495894140ff7fee894fbf6c944980d26f8f1cb12cc54316c7"}"`+"\n"+
+			"12c56cfcdc0249002c2a4b1f7fd957c7149fc45d0e9920594c7c78c17dcc34bd\n\n"+
+			`> spvwallet sweepaddress "{"utxos":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0, "value": 1000000], "key": "be93c7096dc03bd495894140ff7fee894fbf6c944980d26f8f1cb12cc54316c7"}"`+"\n"+
+			"12c56cfcdc0249002c2a4b1f7fd957c7149fc45d0e9920594c7c78c17dcc34bd",
+		&sweepAddress)
+	parser.AddCommand("resyncblockchain",
+		"re-download the chain of headers",
+		"Will download all headers from the given height. Try this to uncover missing transasctions\n\n"+
+			"Args:\n"+
+			"1. height       (integer default=0) The starting height for the resync.\n\n"+
+			"Examples:\n"+
+			"> spvwallet resyncblockchain 400000\n"+
+			"> spvwallet resyncblockchain",
+		&reSyncBlockchain)
+	parser.AddCommand("createmultisigsignature",
+		"Create a p2sh multisig signature",
+		"Create a signature for a p2sh multisig transaction\n\n"+
+			"Args:\n"+
+			"1. txinfo       (jsonobject) A json obeject containing the required data\n"+
+			"{\n"+
+			`    "inputs": [`+"\n"+
+			"                  {\n"+
+			`                      "txid": "id"    (string, required) The transaction id`+"\n"+
+			`                      "index": n      (integer, required) The output index`+"\n"+
+			"                  }\n"+
+			"             ],\n"+
+			`    "outputs": [`+"\n"+
+			"                  {\n"+
+			`                      "scriptPubKey": "script"    (string, required) The output script in hex`+"\n"+
+			`                      "value": n                  (integer, required) The value to send to this output in satoshi`+"\n"+
+			"                  }\n"+
+			"             ],\n"+
+			`    "key": "key",             (string, required) The private key used to sign. Can be in WIF, Hex, or xPriv format`+"\n"+
+			`    "redeemScript": "script", (string, required) Redeem script if p2sh.`+"\n"+
+			`    "feePerByte": n,          (integer, required) The fee per byte in satoshis to use.`+"\n"+
+			"}\n\n"+
+			"Examples:\n"+
+			`> spvwallet createmultisigsignature "{"inputs":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0], "outputs":["scriptPubKey": "76a914f318374559bf8296228e9c7480578a357081d59988ac", "value": 1000000], "key": "KzSg35HS67h4e7NLEywc3gNydjbRjzsyrPH5D7G8rpgv9qQCnb3S", "redeemScript": "1f6eb0660aab25ffe35978e7cb6e31bf40e1cceaf29c7f4f118cd2d76c2088237cb33c75510b8be669d90c01b0c394477690ff9c8388bcec4d71c3855fa50beb", "feePerByte": 140}"`+"\n"+
+			`[{"inputIndex": 0, "signature": "d76206ff0df8ab2c4121bae90c71d9b3a432e8f9c0cc90f66f61dec782bc82983a08c93cd9c660f412ba082f95b11f561276782dfbf4376ff4ca6b2f4ab7b3b0d8ba8b724b0237933a"}]`+"\n\n"+
+			`> spvwallet createmultisigsignature "{"inputs":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0], "outputs":["scriptPubKey": "76a914f318374559bf8296228e9c7480578a357081d59988ac", "value": 1000000], "key": "be93c7096dc03bd495894140ff7fee894fbf6c944980d26f8f1cb12cc54316c7", "redeemScript": "1f6eb0660aab25ffe35978e7cb6e31bf40e1cceaf29c7f4f118cd2d76c2088237cb33c75510b8be669d90c01b0c394477690ff9c8388bcec4d71c3855fa50beb", "feePerByte": 140}"`+"\n"+
+			`[{"inputIndex": 0, "signature": "d76206ff0df8ab2c4121bae90c71d9b3a432e8f9c0cc90f66f61dec782bc82983a08c93cd9c660f412ba082f95b11f561276782dfbf4376ff4ca6b2f4ab7b3b0d8ba8b724b0237933a"}]`+"\n\n"+
+			`> spvwallet createmultisigsignature "{"inputs":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0], "outputs":["scriptPubKey": "76a914f318374559bf8296228e9c7480578a357081d59988ac", "value": 1000000], "key": "xprvA2nrNbFZABcdryreWet9Ea4LvTJcGsqrMzxHx98MMrotbir7yrKCEXw7nadnHM8Dq38EGfSh6dqA9QWTyefMLEcBYJUuekgW4BYPJcr9E7j", "redeemScript": "1f6eb0660aab25ffe35978e7cb6e31bf40e1cceaf29c7f4f118cd2d76c2088237cb33c75510b8be669d90c01b0c394477690ff9c8388bcec4d71c3855fa50beb", "feePerByte": 140}"`+"\n"+
+			`[{"inputIndex": 0, "signature": "d76206ff0df8ab2c4121bae90c71d9b3a432e8f9c0cc90f66f61dec782bc82983a08c93cd9c660f412ba082f95b11f561276782dfbf4376ff4ca6b2f4ab7b3b0d8ba8b724b0237933a"}]`+"\n\n",
+		&createMultisigSignature)
+	parser.AddCommand("multisign",
+		"Combine multisig signatures",
+		"Create a signed 2 of 3 p2sh transaction from two signatures and optionally broadcast\n\n"+
+			"Args:\n"+
+			"1. txinfo       (jsonobject) A json obeject containing the required data\n"+
+			"{\n"+
+			`    "inputs": [`+"\n"+
+			"                  {\n"+
+			`                      "txid": "id"    (string, required) The transaction id`+"\n"+
+			`                      "index": n      (integer, required) The output index`+"\n"+
+			"                  }\n"+
+			"             ],\n"+
+			`    "outputs": [`+"\n"+
+			"                  {\n"+
+			`                      "scriptPubKey": "script"    (string, required) The output script in hex`+"\n"+
+			`                      "value": n                  (integer, required) The value to send to this output in satoshi`+"\n"+
+			"                  }\n"+
+			"             ],\n"+
+			`    "sig1": [`+"\n"+
+			"                  {\n"+
+			`                      "index": n          (integer, required) The input index for signature 1`+"\n"+
+			`                      "signature": "sig"  (string, required) The hex encoded signature`+"\n"+
+			"                  },\n"+
+			"             ],\n"+
+			`    "sig2": [`+"\n"+
+			"                  {\n"+
+			`                      "index": n          (integer, required) The input index for signature 2`+"\n"+
+			`                      "signature": "sig"  (string, required) The hex encoded signature`+"\n"+
+			"                  },\n"+
+			"             ],\n"+
+			`    "redeemScript": "script", (string, required) Redeem script if p2sh.`+"\n"+
+			`    "feePerByte": n,          (integer, required) The fee per byte in satoshis to use.`+"\n"+
+			`    "broadcast": b,           (bool, optional default=false) Broadcast the resulting tx to the network.`+"\n"+
+			"}\n\n"+
+			"Examples:\n"+
+			`> spvwallet multisign "{"inputs":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0], "outputs":["scriptPubKey": "76a914f318374559bf8296228e9c7480578a357081d59988ac", "value": 1000000], "sig1": [{"inputIndex": 0, "signature": "d76206ff0df8ab2c4121bae90c71d9b3a432e8f9c0cc90f66f61dec782bc82983a08c93cd9c660f412ba082f95b11f561276782dfbf4376ff4ca6b2f4ab7b3b0d8ba8b724b0237933a"}], "sig2": [{"inputIndex": 0, "signature": "766c36dea732e9640868155b79703545b6ef129bb0446f9b86ac7cad775229ef41ac95543bf488ed42c5b82ffc14d7248136e988b1d4c0ea6d56712de139f83815e8974306d267a900"}], redeemScript": "1f6eb0660aab25ffe35978e7cb6e31bf40e1cceaf29c7f4f118cd2d76c2088237cb33c75510b8be669d90c01b0c394477690ff9c8388bcec4d71c3855fa50beb", "feePerByte": 140, "broadcast": true}"`+"\n"+
+			`1393c31443b83c47de7def5a9edaf5f88c050e99f166353ed37404937be3099b`+"\n\n"+
+			`> spvwallet multisign "{"inputs":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0], "outputs":["scriptPubKey": "76a914f318374559bf8296228e9c7480578a357081d59988ac", "value": 1000000], "sig1": [{"inputIndex": 0, "signature": "d76206ff0df8ab2c4121bae90c71d9b3a432e8f9c0cc90f66f61dec782bc82983a08c93cd9c660f412ba082f95b11f561276782dfbf4376ff4ca6b2f4ab7b3b0d8ba8b724b0237933a"}], "sig2": [{"inputIndex": 0, "signature": "766c36dea732e9640868155b79703545b6ef129bb0446f9b86ac7cad775229ef41ac95543bf488ed42c5b82ffc14d7248136e988b1d4c0ea6d56712de139f83815e8974306d267a900"}], "redeemScript": "1f6eb0660aab25ffe35978e7cb6e31bf40e1cceaf29c7f4f118cd2d76c2088237cb33c75510b8be669d90c01b0c394477690ff9c8388bcec4d71c3855fa50beb", "feePerByte": 140, "broadcast": false}"`+"\n"+
+			`010000000100357d084478aa6beba8ca59de331e9bd725d23c3eaf7de0e5167801582a585f040000006b483045022100897aba7833d46a519c1f46694e053be8fdeae32125acd764c54c97ac6856d6f802201ff0e693055e39b16151b4da2a61f8dbb3948c08107b68a4b484dc7359de5b350121026a9dc92c93988750560fb46885fe549251c664e63545889367f5db183637f966ffffffff02a4857902000000001976a9143f2fe0d76898ef6c23b2b2a2892d763e0602bc4288acbd8b7349000000001976a914cc61ffeae5c6673caaaff5c0b06af395c8edc9ad88ac00000000`+"\n\n",
+		&multisign)
+	parser.AddCommand("estimatefee",
+		"Estimate the fee for a tx",
+		"Given a transaction estimate what fee it will cost in satoshis\n\n"+
+			"Args:\n"+
+			"1. txinfo       (jsonobject) A json obeject containing the required data\n"+
+			"{\n"+
+			`    "inputs": [`+"\n"+
+			"                  {\n"+
+			`                      "txid": "id"    (string, required) The transaction id`+"\n"+
+			`                      "index": n      (integer, required) The output index`+"\n"+
+			"                  }\n"+
+			"             ],\n"+
+			`    "outputs": [`+"\n"+
+			"                  {\n"+
+			`                      "scriptPubKey": "script"    (string, required) The output script in hex`+"\n"+
+			`                      "value": n                  (integer, required) The value to send to this output in satoshi`+"\n"+
+			"                  }\n"+
+			"             ],\n"+
+			`    "feePerByte": n,          (integer, required) The fee per byte in satoshis to use.`+"\n"+
+			"}\n\n"+
+			"Examples:\n"+
+			`> spvwallet estimatefee "{"inputs":["txid": "82bfd45f3564e0b5166ab9ca072200a237f78499576e9658b20b0ccd10ff325c", "index": 0], "outputs":["scriptPubKey": "76a914f318374559bf8296228e9c7480578a357081d59988ac", "value": 1000000], "feePerByte": 140}"`+"\n"+
+			"18500\n",
+		&estimateFee)
 }
 
 func newGRPCClient() (pb.APIClient, *grpc.ClientConn, error) {
@@ -579,3 +732,189 @@ func (x *Peers) Execute(args []string) error {
 	fmt.Println(string(out))
 	return nil
 }
+
+type AddWatchedScript struct{}
+
+var addWatchedScript AddWatchedScript
+
+func (x *AddWatchedScript) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if len(args) <= 0 {
+		return errors.New("Address or script required")
+	}
+	_, err = client.AddWatchedScript(context.Background(), &pb.Address{args[0]})
+	return err
+}
+
+type GetConfirmations struct{}
+
+var getConfirmations GetConfirmations
+
+func (x *GetConfirmations) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if len(args) <= 0 {
+		return errors.New("Txid is required")
+	}
+	resp, err := client.GetConfirmations(context.Background(), &pb.Txid{args[0]})
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp.Confirmations)
+	return nil
+}
+
+type SweepAddress struct{}
+
+var sweepAddress SweepAddress
+
+func (x *SweepAddress) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if len(args) <= 0 {
+		return errors.New("Sweep data is required")
+	}
+	sweepInfo := new(pb.SweepInfo)
+	if err := jsonpb.UnmarshalString(args[0], sweepInfo); err != nil {
+		return err
+	}
+	resp, err := client.SweepAddress(context.Background(), sweepInfo)
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp.Hash)
+	return nil
+}
+
+type ReSyncBlockchain struct{}
+
+var reSyncBlockchain ReSyncBlockchain
+
+func (x *ReSyncBlockchain) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	var height uint32
+	if len(args) <= 0 {
+		return errors.New("Txid is required")
+	} else {
+		i, err := strconv.Atoi(args[0])
+		if err != nil {
+			return err
+		}
+		height = uint32(i)
+	}
+	_, err = client.ReSyncBlockchain(context.Background(), &pb.Height{height})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type CreateMultisigSignature struct{}
+
+var createMultisigSignature CreateMultisigSignature
+
+func (x *CreateMultisigSignature) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if len(args) <= 0 {
+		return errors.New("Multisig data is required")
+	}
+	multsigInfo := new(pb.CreateMultisigInfo)
+	if err := jsonpb.UnmarshalString(args[0], multsigInfo); err != nil {
+		return err
+	}
+	resp, err := client.CreateMultisigSignature(context.Background(), multsigInfo)
+	if err != nil {
+		return err
+	}
+	type sig struct {
+		InputIndex uint32 `json:"inputIndex"`
+		Signature  string `json:"signature"`
+	}
+	var sigs []sig
+	for _, s := range resp.Sigs {
+		retSig := sig{
+			InputIndex: s.Index,
+			Signature:  hex.EncodeToString(s.Signature),
+		}
+		sigs = append(sigs, retSig)
+	}
+	out, err := json.MarshalIndent(sigs, "", "    ")
+	fmt.Println(string(out))
+	return nil
+}
+
+type Multisign struct{}
+
+var multisign Multisign
+
+func (x *Multisign) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if len(args) <= 0 {
+		return errors.New("Multisig data is required")
+	}
+	multsignInfo := new(pb.MultisignInfo)
+	if err := jsonpb.UnmarshalString(args[0], multsignInfo); err != nil {
+		return err
+	}
+	resp, err := client.Multisign(context.Background(), multsignInfo)
+	if err != nil {
+		return err
+	}
+	if multsignInfo.Broadcast {
+		r := bytes.NewReader(resp.Tx)
+		msgTx := wire.NewMsgTx(1)
+		msgTx.BtcDecode(r, 1)
+		fmt.Println(msgTx.TxHash().String())
+	} else {
+		fmt.Println(hex.EncodeToString(resp.Tx))
+	}
+	return nil
+}
+
+type EstimateFee struct{}
+
+var estimateFee EstimateFee
+
+func (x *EstimateFee) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	if len(args) <= 0 {
+		return errors.New("Tx data is required")
+	}
+	estimateFeeData := new(pb.EstimateFeeData)
+	if err := jsonpb.UnmarshalString(args[0], estimateFeeData); err != nil {
+		return err
+	}
+	resp, err := client.EstimateFee(context.Background(), estimateFeeData)
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp.Fee)
+	return nil
+}
+
