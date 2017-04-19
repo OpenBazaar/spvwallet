@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
+	"sync"
 )
 
 const Addr = "127.0.0.1:8234"
@@ -537,4 +538,29 @@ func (s *server) EstimateFee(ctx context.Context, in *pb.EstimateFeeData) (*pb.F
 	}
 	fee := s.w.EstimateFee(ins, outs, in.FeePerByte)
 	return &pb.Fee{fee}, nil
+}
+
+func (s *server) WalletNotify(in *pb.Empty, stream pb.API_WalletNotifyServer) error {
+	cb := func(tx spvwallet.TransactionCallback) {
+		ts, err := ptypes.TimestampProto(tx.Timestamp)
+		if err != nil {
+			return
+		}
+		resp := &pb.Tx{
+			Txid: tx.Txid,
+			Value: tx.Value,
+			Height: tx.Height,
+			Timestamp: ts,
+			WatchOnly: tx.WatchOnly,
+		}
+		if err := stream.Send(resp); err != nil {
+			return err
+		}
+	}
+	s.w.AddTransactionListener(cb)
+	// Keep the connection open to continue streaming
+	var wg sync.WaitGroup
+	wg.Add(1)
+	wg.Wait()
+	return nil
 }

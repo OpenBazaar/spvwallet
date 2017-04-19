@@ -27,6 +27,7 @@ service API {
   rpc CreateMultisigSignature (CreateMultisigInfo) returns (SignatureList) {}
   rpc Multisign (MultisignInfo) returns (RawTx) {}
   rpc EstimateFee (EstimateFeeData) returns (Fee) {}
+  rpc WalletNotify (Empty) returns (stream Tx) {}
 }
 
 message Empty {}
