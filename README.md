@@ -128,16 +128,16 @@ Available commands:
   balance                  get the wallet balance
   bumpfee                  bump the tx fee
   chaintip                 return the height of the chain
-  createmultisigsignature  Create a p2sh multisig signature
+  createmultisigsignature  create a p2sh multisig signature
   currentaddress           get the current bitcoin address
-  estimatefee              Estimate the fee for a tx
+  estimatefee              estimate the fee for a tx
   getconfirmations         get the number of confirmations for a tx
   getfeeperbyte            get the current bitcoin fee
   gettransaction           get a specific transaction
   haskey                   does key exist
   masterprivatekey         get the wallet's master private key
   masterpublickey          get the wallet's master public key
-  multisign                Combine multisig signatures
+  multisign                combine multisig signatures
   newaddress               get a new bitcoin address
   peers                    get info about peers
   resyncblockchain         re-download the chain of headers
