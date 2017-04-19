@@ -4,11 +4,11 @@
 
 # spvwallet
 
-Lightweight p2p SPV wallet in Go. It connects directly to the bitcoin p2p network to fetch headers, merkle blocks, and transactions.
+Lightweight p2p SPV wallet and library in Go. It connects directly to the bitcoin p2p network to fetch headers, merkle blocks, and transactions.
 
 It uses a number of utilities from btcsuite but natively handles blockchain and wallet.
 
-Usage:
+Library Usage:
 ```go
 // Create a new config
 config := spvwallet.NewDefaultConfig()
@@ -109,3 +109,44 @@ type BitcoinWallet interface {
 	Close()
 }
 ```
+
+To create a wallet binary:
+```
+make install
+```
+
+Usage:
+```
+Usage:
+  spvwallet [OPTIONS] <command>
+
+Help Options:
+  -h, --help  Show this help message
+
+Available commands:
+  addwatchedscript         add a script to watch
+  balance                  get the wallet balance
+  bumpfee                  bump the tx fee
+  chaintip                 return the height of the chain
+  createmultisigsignature  Create a p2sh multisig signature
+  currentaddress           get the current bitcoin address
+  estimatefee              Estimate the fee for a tx
+  getconfirmations         get the number of confirmations for a tx
+  getfeeperbyte            get the current bitcoin fee
+  gettransaction           get a specific transaction
+  haskey                   does key exist
+  masterprivatekey         get the wallet's master private key
+  masterpublickey          get the wallet's master public key
+  multisign                Combine multisig signatures
+  newaddress               get a new bitcoin address
+  peers                    get info about peers
+  resyncblockchain         re-download the chain of headers
+  spend                    send bitcoins
+  start                    start the wallet
+  stop                     stop the wallet
+  sweepaddress             sweep all coins from an address
+  transactions             get a list of transactions
+  version                  print the version number
+```
+
+Finally a gRPC API is available on port 8234. The same interface is exposed via the API plus a streaming wallet notifier which fires when a new transaction (either incoming or outgoing) is recorded then again when it gains its first confirmation.
