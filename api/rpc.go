@@ -229,7 +229,7 @@ func (s *server) BumpFee(ctx context.Context, in *pb.Txid) (*pb.Txid, error) {
 
 func (s *server) Peers(ctx context.Context, in *pb.Empty) (*pb.PeerList, error) {
 	var peers []*pb.Peer
-	for _, peer := range s.w.PeerManager.ConnectedPeers() {
+	for _, peer := range s.w.ConnectedPeers() {
 		ts, err := ptypes.TimestampProto(peer.TimeConnected())
 		if err != nil {
 			return nil, err

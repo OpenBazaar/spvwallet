@@ -26,7 +26,7 @@ func (w *SPVWallet) startChainDownload(p *peer.Peer) {
 	if w.blockchain.ChainState() == SYNCING {
 		height, _ := w.blockchain.db.Height()
 		if height >= uint32(p.LastBlock()) {
-			moar := w.PeerManager.CheckForMoreBlocks(height)
+			moar := w.peerManager.CheckForMoreBlocks(height)
 			if !moar {
 				log.Info("Chain download complete")
 				w.blockchain.SetChainState(WAITING)
@@ -43,7 +43,7 @@ func (w *SPVWallet) startChainDownload(p *peer.Peer) {
 }
 
 func (w *SPVWallet) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
-	if w.blockchain.ChainState() == SYNCING && w.PeerManager.DownloadPeer() != nil && w.PeerManager.DownloadPeer().ID() == p.ID() {
+	if w.blockchain.ChainState() == SYNCING && w.peerManager.DownloadPeer() != nil && w.peerManager.DownloadPeer().ID() == p.ID() {
 		queueHash := <-w.blockQueue
 		headerHash := m.Header.BlockHash()
 		if !headerHash.IsEqual(&queueHash) {
@@ -151,7 +151,7 @@ func (w *SPVWallet) onInv(p *peer.Peer, m *wire.MsgInv) {
 				gData := wire.NewMsgGetData()
 				gData.AddInvVect(inv)
 				p.QueueMessage(gData, nil)
-				if w.blockchain.ChainState() == SYNCING && w.PeerManager.DownloadPeer() != nil && w.PeerManager.DownloadPeer().ID() == p.ID() {
+				if w.blockchain.ChainState() == SYNCING && w.peerManager.DownloadPeer() != nil && w.peerManager.DownloadPeer().ID() == p.ID() {
 					w.blockQueue <- inv.Hash
 				}
 			case wire.InvTypeTx:
@@ -231,7 +231,7 @@ func (w *SPVWallet) Rebroadcast() {
 	if len(invMsg.InvList) == 0 { // nothing to broadcast, so don't
 		return
 	}
-	for _, peer := range w.PeerManager.connectedPeers {
+	for _, peer := range w.peerManager.connectedPeers {
 		peer.QueueMessage(invMsg, nil)
 	}
 }

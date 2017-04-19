@@ -42,7 +42,7 @@ func (s *SPVWallet) Broadcast(tx *wire.MsgTx) error {
 	}
 
 	log.Debugf("Broadcasting tx %s to peers", tx.TxHash().String())
-	for _, peer := range s.PeerManager.ConnectedPeers() {
+	for _, peer := range s.peerManager.ConnectedPeers() {
 		peer.QueueMessage(invMsg, nil)
 		s.updateFilterAndSend(peer)
 	}
@@ -89,7 +89,7 @@ func (w *SPVWallet) gatherCoins() map[coinset.Coin]*hd.ExtendedKey {
 			confirmations = int32(height) - u.AtHeight
 		}
 		c := NewCoin(u.Op.Hash.CloneBytes(), u.Op.Index, btc.Amount(u.Value), int64(confirmations), u.ScriptPubkey)
-		key, err := w.txstore.GetKeyForScript(u.ScriptPubkey)
+		key, err := w.keyManager.GetKeyForScript(u.ScriptPubkey)
 		if err != nil {
 			continue
 		}
@@ -183,7 +183,7 @@ func (w *SPVWallet) BumpFee(txid chainhash.Hash) (*chainhash.Hash, error) {
 	utxos, _ := w.txstore.Utxos().GetAll()
 	for _, u := range utxos {
 		if u.Op.Hash.IsEqual(&txid) && u.AtHeight == 0 {
-			key, err := w.txstore.GetKeyForScript(u.ScriptPubkey)
+			key, err := w.keyManager.GetKeyForScript(u.ScriptPubkey)
 			if err != nil {
 				return nil, err
 			}

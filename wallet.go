@@ -30,7 +30,8 @@ type SPVWallet struct {
 
 	blockchain  *Blockchain
 	txstore     *TxStore
-	PeerManager *PeerManager
+	peerManager *PeerManager
+	keyManager  *KeyManager
 
 	fPositives    chan *peer.Peer
 	stopChan      chan int
@@ -91,7 +92,9 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		mutex:            new(sync.RWMutex),
 	}
 
-	w.txstore, err = NewTxStore(w.params, config.DB, w.masterPrivateKey)
+	w.keyManager, err = NewKeyManager(config.DB.Keys(), w.params, w.masterPrivateKey)
+
+	w.txstore, err = NewTxStore(w.params, config.DB, w.keyManager)
 	if err != nil {
 		return nil, err
 	}
@@ -137,7 +140,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		w.config.TrustedPeer = config.TrustedPeer
 	}
 
-	w.PeerManager, err = NewPeerManager(w.config)
+	w.peerManager, err = NewPeerManager(w.config)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +150,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 
 func (w *SPVWallet) Start() {
 	w.running = true
-	go w.PeerManager.Start()
+	go w.peerManager.Start()
 	w.fPositiveHandler(w.stopChan)
 }
 
@@ -173,15 +176,19 @@ func (w *SPVWallet) MasterPublicKey() *hd.ExtendedKey {
 	return w.masterPublicKey
 }
 
+func (w *SPVWallet) ConnectedPeers() []*peer.Peer {
+	return w.peerManager.ConnectedPeers()
+}
+
 func (w *SPVWallet) CurrentAddress(purpose KeyPurpose) btc.Address {
-	key, _ := w.txstore.GetCurrentKey(purpose)
+	key, _ := w.keyManager.GetCurrentKey(purpose)
 	addr, _ := key.Address(w.params)
 	return btc.Address(addr)
 }
 
 func (w *SPVWallet) NewAddress(purpose KeyPurpose) btc.Address {
 	i, _ := w.txstore.Keys().GetUnused(purpose)
-	key, _ := w.txstore.generateChildKey(purpose, uint32(i[1]))
+	key, _ := w.keyManager.generateChildKey(purpose, uint32(i[1]))
 	addr, _ := key.Address(w.params)
 	script, _ := txscript.PayToAddrScript(btc.Address(addr))
 	w.txstore.Keys().MarkKeyAsUsed(script)
@@ -194,7 +201,7 @@ func (w *SPVWallet) HasKey(addr btc.Address) bool {
 	if err != nil {
 		return false
 	}
-	_, err = w.txstore.GetKeyForScript(script)
+	_, err = w.keyManager.GetKeyForScript(script)
 	if err != nil {
 		return false
 	}
@@ -271,7 +278,7 @@ func (w *SPVWallet) AddWatchedScript(script []byte) error {
 	err := w.txstore.WatchedScripts().Put(script)
 	w.txstore.PopulateAdrs()
 
-	for _, peer := range w.PeerManager.ConnectedPeers() {
+	for _, peer := range w.peerManager.ConnectedPeers() {
 		w.updateFilterAndSend(peer)
 	}
 	return err
@@ -304,7 +311,7 @@ func (w *SPVWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int)
 func (w *SPVWallet) Close() {
 	if w.running {
 		log.Info("Disconnecting from peers and shutting down")
-		w.PeerManager.Stop()
+		w.peerManager.Stop()
 		w.blockchain.Close()
 		w.stopChan <- 1
 		w.running = false
@@ -319,7 +326,7 @@ func (w *SPVWallet) ReSyncBlockchain(fromHeight int32) {
 		return
 	}
 	w.blockchain = blockchain
-	w.PeerManager, err = NewPeerManager(w.config)
+	w.peerManager, err = NewPeerManager(w.config)
 	if err != nil {
 		return
 	}
