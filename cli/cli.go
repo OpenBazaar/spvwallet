@@ -176,7 +176,7 @@ func SetupCli(parser *flags.Parser) {
 			"> spvwallet resyncblockchain",
 		&reSyncBlockchain)
 	parser.AddCommand("createmultisigsignature",
-		"Create a p2sh multisig signature",
+		"create a p2sh multisig signature",
 		"Create a signature for a p2sh multisig transaction\n\n"+
 			"Args:\n"+
 			"1. txinfo       (jsonobject) A json obeject containing the required data\n"+
@@ -206,7 +206,7 @@ func SetupCli(parser *flags.Parser) {
 			`[{"inputIndex": 0, "signature": "d76206ff0df8ab2c4121bae90c71d9b3a432e8f9c0cc90f66f61dec782bc82983a08c93cd9c660f412ba082f95b11f561276782dfbf4376ff4ca6b2f4ab7b3b0d8ba8b724b0237933a"}]`+"\n\n",
 		&createMultisigSignature)
 	parser.AddCommand("multisign",
-		"Combine multisig signatures",
+		"combine multisig signatures",
 		"Create a signed 2 of 3 p2sh transaction from two signatures and optionally broadcast\n\n"+
 			"Args:\n"+
 			"1. txinfo       (jsonobject) A json obeject containing the required data\n"+
@@ -246,7 +246,7 @@ func SetupCli(parser *flags.Parser) {
 			`010000000100357d084478aa6beba8ca59de331e9bd725d23c3eaf7de0e5167801582a585f040000006b483045022100897aba7833d46a519c1f46694e053be8fdeae32125acd764c54c97ac6856d6f802201ff0e693055e39b16151b4da2a61f8dbb3948c08107b68a4b484dc7359de5b350121026a9dc92c93988750560fb46885fe549251c664e63545889367f5db183637f966ffffffff02a4857902000000001976a9143f2fe0d76898ef6c23b2b2a2892d763e0602bc4288acbd8b7349000000001976a914cc61ffeae5c6673caaaff5c0b06af395c8edc9ad88ac00000000`+"\n\n",
 		&multisign)
 	parser.AddCommand("estimatefee",
-		"Estimate the fee for a tx",
+		"estimate the fee for a tx",
 		"Given a transaction estimate what fee it will cost in satoshis\n\n"+
 			"Args:\n"+
 			"1. txinfo       (jsonobject) A json obeject containing the required data\n"+

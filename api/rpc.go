@@ -547,14 +547,14 @@ func (s *server) WalletNotify(in *pb.Empty, stream pb.API_WalletNotifyServer) er
 			return
 		}
 		resp := &pb.Tx{
-			Txid:      tx.Txid,
+			Txid:      hex.EncodeToString(tx.Txid),
 			Value:     tx.Value,
 			Height:    tx.Height,
 			Timestamp: ts,
 			WatchOnly: tx.WatchOnly,
 		}
 		if err := stream.Send(resp); err != nil {
-			return err
+			return
 		}
 	}
 	s.w.AddTransactionListener(cb)
