@@ -496,7 +496,7 @@ func (s *server) Multisign(ctx context.Context, in *pb.MultisignInfo) (*pb.RawTx
 	for _, s := range in.Sig1 {
 		sig := spvwallet.Signature{
 			InputIndex: s.Index,
-			Signature: s.Signature,
+			Signature:  s.Signature,
 		}
 		sig1 = append(sig1, sig)
 	}
@@ -504,7 +504,7 @@ func (s *server) Multisign(ctx context.Context, in *pb.MultisignInfo) (*pb.RawTx
 	for _, s := range in.Sig2 {
 		sig := spvwallet.Signature{
 			InputIndex: s.Index,
-			Signature: s.Signature,
+			Signature:  s.Signature,
 		}
 		sig2 = append(sig2, sig)
 	}
@@ -547,9 +547,9 @@ func (s *server) WalletNotify(in *pb.Empty, stream pb.API_WalletNotifyServer) er
 			return
 		}
 		resp := &pb.Tx{
-			Txid: tx.Txid,
-			Value: tx.Value,
-			Height: tx.Height,
+			Txid:      tx.Txid,
+			Value:     tx.Value,
+			Height:    tx.Height,
 			Timestamp: ts,
 			WatchOnly: tx.WatchOnly,
 		}

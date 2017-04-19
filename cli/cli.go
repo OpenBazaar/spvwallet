@@ -917,4 +917,3 @@ func (x *EstimateFee) Execute(args []string) error {
 	fmt.Println(resp.Fee)
 	return nil
 }
-
