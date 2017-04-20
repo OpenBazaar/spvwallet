@@ -3,124 +3,13 @@ package spvwallet
 import (
 	"bytes"
 	"encoding/hex"
-	"errors"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
-	"sort"
 	"testing"
 )
-
-type keyStoreEntry struct {
-	scriptPubKey []byte
-	path         KeyPath
-	used         bool
-	key          *btcec.PrivateKey
-}
-
-type mockKeyStore struct {
-	keys map[string]*keyStoreEntry
-}
-
-func (m *mockKeyStore) Put(scriptPubKey []byte, keyPath KeyPath) error {
-	m.keys[hex.EncodeToString(scriptPubKey)] = &keyStoreEntry{scriptPubKey, keyPath, false, nil}
-	return nil
-}
-
-func (m *mockKeyStore) ImportKey(scriptPubKey []byte, key *btcec.PrivateKey) error {
-	kp := KeyPath{Purpose: EXTERNAL, Index: -1}
-	m.keys[hex.EncodeToString(scriptPubKey)] = &keyStoreEntry{scriptPubKey, kp, false, key}
-	return nil
-}
-
-func (m *mockKeyStore) MarkKeyAsUsed(scriptPubKey []byte) error {
-	key, ok := m.keys[hex.EncodeToString(scriptPubKey)]
-	if !ok {
-		return errors.New("key does not exist")
-	}
-	key.used = true
-	return nil
-}
-
-func (m *mockKeyStore) GetLastKeyIndex(purpose KeyPurpose) (int, bool, error) {
-	i := -1
-	used := false
-	for _, key := range m.keys {
-		if key.path.Purpose == purpose && key.path.Index > i {
-			i = key.path.Index
-			used = key.used
-		}
-	}
-	if i == -1 {
-		return i, used, errors.New("No saved keys")
-	}
-	return i, used, nil
-}
-
-func (m *mockKeyStore) GetPathForScript(scriptPubKey []byte) (KeyPath, error) {
-	key, ok := m.keys[hex.EncodeToString(scriptPubKey)]
-	if !ok || key.path.Index == -1 {
-		return KeyPath{}, errors.New("key does not exist")
-	}
-	return key.path, nil
-}
-
-func (m *mockKeyStore) GetKeyForScript(scriptPubKey []byte) (*btcec.PrivateKey, error) {
-	for _, k := range m.keys {
-		if k.path.Index == -1 && bytes.Equal(scriptPubKey, k.scriptPubKey) {
-			return k.key, nil
-		}
-	}
-	return nil, errors.New("Not found")
-}
-
-func (m *mockKeyStore) GetUnused(purpose KeyPurpose) ([]int, error) {
-	var i []int
-	for _, key := range m.keys {
-		if !key.used && key.path.Purpose == purpose {
-			i = append(i, key.path.Index)
-		}
-	}
-	sort.Ints(i)
-	return i, nil
-}
-
-func (m *mockKeyStore) GetAll() ([]KeyPath, error) {
-	var kp []KeyPath
-	for _, key := range m.keys {
-		kp = append(kp, key.path)
-	}
-	return kp, nil
-}
-
-func (m *mockKeyStore) GetLookaheadWindows() map[KeyPurpose]int {
-	internalLastUsed := -1
-	externalLastUsed := -1
-	for _, key := range m.keys {
-		if key.path.Purpose == INTERNAL && key.used && key.path.Index > internalLastUsed {
-			internalLastUsed = key.path.Index
-		}
-		if key.path.Purpose == EXTERNAL && key.used && key.path.Index > externalLastUsed {
-			externalLastUsed = key.path.Index
-		}
-	}
-	internalUnused := 0
-	externalUnused := 0
-	for _, key := range m.keys {
-		if key.path.Purpose == INTERNAL && !key.used && key.path.Index > internalLastUsed {
-			internalUnused++
-		}
-		if key.path.Purpose == EXTERNAL && !key.used && key.path.Index > externalLastUsed {
-			externalUnused++
-		}
-	}
-	mp := make(map[KeyPurpose]int)
-	mp[INTERNAL] = internalUnused
-	mp[EXTERNAL] = externalUnused
-	return mp
-}
 
 func createKeyManager() (*KeyManager, error) {
 	masterPrivKey, err := hdkeychain.NewKeyFromString("xprv9s21ZrQH143K25QhxbucbDDuQ4naNntJRi4KUfWT7xo4EKsHt2QJDu7KXp1A3u7Bi1j8ph3EGsZ9Xvz9dGuVrtHHs7pXeTzjuxBrCmmhgC6")

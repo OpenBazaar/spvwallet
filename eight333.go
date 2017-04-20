@@ -231,7 +231,7 @@ func (w *SPVWallet) Rebroadcast() {
 	if len(invMsg.InvList) == 0 { // nothing to broadcast, so don't
 		return
 	}
-	for _, peer := range w.peerManager.connectedPeers {
+	for _, peer := range w.peerManager.ConnectedPeers() {
 		peer.QueueMessage(invMsg, nil)
 	}
 }
