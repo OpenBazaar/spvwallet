@@ -173,7 +173,7 @@ func (stxo *Stxo) IsEqual(alt *Stxo) bool {
 		return false
 	}
 
-	if stxo.SpendTxid.IsEqual(&alt.SpendTxid) {
+	if !stxo.SpendTxid.IsEqual(&alt.SpendTxid) {
 		return false
 	}
 
