@@ -58,7 +58,7 @@ func (ts *TxStore) GimmeFilter() (*bloom.Filter, error) {
 		return nil, err
 	}
 	ts.addrMutex.Lock()
-	elem := uint32(len(ts.adrs) + len(allUtxos) + len(allStxos))
+	elem := uint32(len(ts.adrs) + len(allUtxos) + len(allStxos)) + uint32(len(ts.watchedScripts))
 	f := bloom.NewFilter(elem, 0, 0.0001, wire.BloomUpdateAll)
 
 	// note there could be false positives since we're just looking
