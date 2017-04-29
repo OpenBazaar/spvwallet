@@ -79,7 +79,7 @@ func SetupCli(parser *flags.Parser) {
 		"get a specific transaction",
 		"Returns json data of a specific transaction\n\n"+
 			"Args:\n"+
-			"1. txid       (string) A transaction ID to seach for.\n\n"+
+			"1. txid       (string) A transaction ID to search for.\n\n"+
 			"Examples:\n"+
 			"> spvwallet gettransaction 190bd83935740b88ebdfe724485f36ca4aa40125a21b93c410e0e191d4e9e0b5\n",
 		&getTransaction)

@@ -85,7 +85,7 @@ func TestMBolck_nextPowerOfTwo(t *testing.T) {
 func TestMBlock_inDeadZone(t *testing.T) {
 	// Test greater than root
 	if !inDeadZone(127, 57) {
-		t.Error("Failed to detect postion greater than root")
+		t.Error("Failed to detect position greater than root")
 	}
 	// Test not in dead zone
 	if inDeadZone(126, 57) {
