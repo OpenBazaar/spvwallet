@@ -1,6 +1,7 @@
 package spvwallet
 
 import (
+	"fmt"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
@@ -21,6 +22,11 @@ func init() {
 }
 
 func (w *SPVWallet) startChainDownload(p *peer.Peer) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("Unhandled error in startChainDownload", r)
+		}
+	}()
 	w.mutex.Lock()
 	defer w.mutex.Unlock()
 	if w.blockchain.ChainState() == SYNCING {
