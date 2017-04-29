@@ -8,8 +8,38 @@ import (
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
 	"sort"
+	"strconv"
 	"testing"
+	"time"
 )
+
+type MockDatastore struct {
+	keys           Keys
+	utxos          Utxos
+	stxos          Stxos
+	txns           Txns
+	watchedScripts WatchedScripts
+}
+
+func (m *MockDatastore) Keys() Keys {
+	return m.keys
+}
+
+func (m *MockDatastore) Utxos() Utxos {
+	return m.utxos
+}
+
+func (m *MockDatastore) Stxos() Stxos {
+	return m.stxos
+}
+
+func (m *MockDatastore) Txns() Txns {
+	return m.txns
+}
+
+func (m *MockDatastore) WatchedScripts() WatchedScripts {
+	return m.watchedScripts
+}
 
 type keyStoreEntry struct {
 	scriptPubKey []byte
@@ -118,6 +148,159 @@ func (m *mockKeyStore) GetLookaheadWindows() map[KeyPurpose]int {
 	mp[INTERNAL] = internalUnused
 	mp[EXTERNAL] = externalUnused
 	return mp
+}
+
+type mockUtxoStore struct {
+	utxos map[string]*Utxo
+}
+
+func (m *mockUtxoStore) Put(utxo Utxo) error {
+	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	m.utxos[key] = &utxo
+	return nil
+}
+
+func (m *mockUtxoStore) GetAll() ([]Utxo, error) {
+	var utxos []Utxo
+	for _, v := range m.utxos {
+		utxos = append(utxos, *v)
+	}
+	return utxos, nil
+}
+
+func (m *mockUtxoStore) SetWatchOnly(utxo Utxo) error {
+	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	u, ok := m.utxos[key]
+	if !ok {
+		return errors.New("Not found")
+	}
+	u.WatchOnly = true
+	return nil
+}
+
+func (m *mockUtxoStore) Delete(utxo Utxo) error {
+	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
+	_, ok := m.utxos[key]
+	if !ok {
+		return errors.New("Not found")
+	}
+	delete(m.utxos, key)
+	return nil
+}
+
+type mockStxoStore struct {
+	stxos map[string]*Stxo
+}
+
+func (m *mockStxoStore) Put(stxo Stxo) error {
+	m.stxos[stxo.SpendTxid.String()] = &stxo
+	return nil
+}
+
+func (m *mockStxoStore) GetAll() ([]Stxo, error) {
+	var stxos []Stxo
+	for _, v := range m.stxos {
+		stxos = append(stxos, *v)
+	}
+	return stxos, nil
+}
+
+func (m *mockStxoStore) Delete(stxo Stxo) error {
+	_, ok := m.stxos[stxo.SpendTxid.String()]
+	if !ok {
+		return errors.New("Not found")
+	}
+	delete(m.stxos, stxo.SpendTxid.String())
+	return nil
+}
+
+type txnStoreEntry struct {
+	txn       *wire.MsgTx
+	value     int
+	height    int
+	timestamp time.Time
+	watchOnly bool
+}
+
+type mockTxnStore struct {
+	txns map[string]*txnStoreEntry
+}
+
+func (m *mockTxnStore) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, watchOnly bool) error {
+	m.txns[txn.TxHash().String()] = &txnStoreEntry{
+		txn:       txn,
+		value:     value,
+		height:    height,
+		timestamp: timestamp,
+		watchOnly: watchOnly,
+	}
+	return nil
+}
+
+func (m *mockTxnStore) Get(txid chainhash.Hash) (*wire.MsgTx, Txn, error) {
+	t, ok := m.txns[txid.String()]
+	if !ok {
+		return nil, Txn{}, errors.New("Not found")
+	}
+	var buf bytes.Buffer
+	t.txn.Serialize(&buf)
+	return t.txn, Txn{txid.String(), int64(t.value), int32(t.height), t.timestamp, t.watchOnly, buf.Bytes()}, nil
+}
+
+func (m *mockTxnStore) GetAll(includeWatchOnly bool) ([]Txn, error) {
+	var txns []Txn
+	for _, t := range m.txns {
+		var buf bytes.Buffer
+		t.txn.Serialize(&buf)
+		txn := Txn{t.txn.TxHash().String(), int64(t.value), int32(t.height), t.timestamp, t.watchOnly, buf.Bytes()}
+		txns = append(txns, txn)
+	}
+	return txns, nil
+}
+
+func (m *mockTxnStore) UpdateHeight(txid chainhash.Hash, height int) error {
+	txn, ok := m.txns[txid.String()]
+	if !ok {
+		return errors.New("Not found")
+	}
+	txn.height = height
+	return nil
+}
+
+func (m *mockTxnStore) Delete(txid *chainhash.Hash) error {
+	_, ok := m.txns[txid.String()]
+	if !ok {
+		return errors.New("Not found")
+	}
+	delete(m.txns, txid.String())
+	return nil
+}
+
+type mockWatchedScriptsStore struct {
+	scripts map[string][]byte
+}
+
+func (m *mockWatchedScriptsStore) Put(scriptPubKey []byte) error {
+	m.scripts[hex.EncodeToString(scriptPubKey)] = scriptPubKey
+	return nil
+}
+
+func (m *mockWatchedScriptsStore) GetAll() ([][]byte, error) {
+	var ret [][]byte
+	for _, b := range m.scripts {
+		ret = append(ret, b)
+	}
+	return ret, nil
+}
+
+func (m *mockWatchedScriptsStore) Delete(scriptPubKey []byte) error {
+	enc := hex.EncodeToString(scriptPubKey)
+	_, ok := m.scripts[enc]
+	if !ok {
+		return errors.New("Not found")
+	}
+	delete(m.scripts, enc)
+	return nil
 }
 
 func TestUtxo_IsEqual(t *testing.T) {

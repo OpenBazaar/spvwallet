@@ -148,9 +148,7 @@ func (ts *TxStore) GetPendingInv() (*wire.MsgInv, error) {
 		item := wire.NewInvVect(wire.InvTypeTx, &txid)
 		err = invMsg.AddInvVect(item)
 		if err != nil {
-			if err != nil {
-				return nil, err
-			}
+			return nil, err
 		}
 	}
 
