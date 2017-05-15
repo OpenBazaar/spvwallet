@@ -65,6 +65,20 @@ func TestTxStore_PopulateAdrs(t *testing.T) {
 	if len(txStore.watchedScripts) != 1 {
 		t.Error("Failed to load watched scripts into memory")
 	}
+	tx1Hex := "0100000001f0c1a0d39f0f1357fcead5897f1eed424d9835d30d2543f3d804138ba825939b010000006b483045022100ed5c193377e4fb7d8df067c18e4982f55f2443cd9b41548347f646448cc5ad9f02202ad6ad5041246a23868bc52675c4c1a4018e1cfd180dcd63897fb9040df14d85012102e2606d87535c7b15855a854c09225ba025230f8b79332a6d1d06b39cd711f821ffffffff0264f3cc03000000001976a9148f83a59ebdf80b8cc965a28da3a825c126a4cefb88ac204e0000000000001976a9140706d0505002aa3ef07a822b9c143b0047b07bdf88ac00000000"
+	tx1Bytes, err := hex.DecodeString(tx1Hex)
+	r := bytes.NewReader(tx1Bytes)
+	tx := wire.NewMsgTx(1)
+	tx.BtcDecode(r, 1)
+
+	err = txStore.Txns().Put(tx, 100000, 0, time.Now(), false)
+	err = txStore.PopulateAdrs()
+	if err != nil {
+		t.Error(err)
+	}
+	if len(txStore.txids) != 1 {
+		t.Error("Failed to load txids into memory")
+	}
 
 }
 
