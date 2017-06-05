@@ -21,11 +21,7 @@ type SPVWallet struct {
 	masterPrivateKey *hd.ExtendedKey
 	masterPublicKey  *hd.ExtendedKey
 
-	maxFee      uint64
-	priorityFee uint64
-	normalFee   uint64
-	economicFee uint64
-	feeAPI      string
+	feeProvider *FeeProvider
 
 	repoPath string
 
@@ -79,16 +75,19 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		masterPrivateKey: mPrivKey,
 		masterPublicKey:  mPubKey,
 		params:           config.Params,
-		maxFee:           config.MaxFee,
-		priorityFee:      config.HighFee,
-		normalFee:        config.MediumFee,
-		economicFee:      config.LowFee,
-		feeAPI:           config.FeeAPI.String(),
-		fPositives:       make(chan *peer.Peer),
-		stopChan:         make(chan int),
-		fpAccumulator:    make(map[int32]int32),
-		blockQueue:       make(chan chainhash.Hash, 32),
-		mutex:            new(sync.RWMutex),
+		feeProvider: NewFeeProvider(
+			config.MaxFee,
+			config.HighFee,
+			config.MediumFee,
+			config.LowFee,
+			config.FeeAPI.String(),
+			config.Proxy,
+		),
+		fPositives:    make(chan *peer.Peer),
+		stopChan:      make(chan int),
+		fpAccumulator: make(map[int32]int32),
+		blockQueue:    make(chan chainhash.Hash, 32),
+		mutex:         new(sync.RWMutex),
 	}
 
 	w.keyManager, err = NewKeyManager(config.DB.Keys(), w.params, w.masterPrivateKey)
