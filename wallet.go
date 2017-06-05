@@ -253,16 +253,16 @@ func (w *SPVWallet) GetTransaction(txid chainhash.Hash) (Txn, error) {
 	return txn, err
 }
 
-func (w *SPVWallet) GetConfirmations(txid chainhash.Hash) (uint32, error) {
+func (w *SPVWallet) GetConfirmations(txid chainhash.Hash) (uint32, uint32, error) {
 	_, txn, err := w.txstore.Txns().Get(txid)
 	if err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	if txn.Height == 0 {
-		return 0, nil
+		return 0, 0, nil
 	}
 	chainTip := w.ChainTip()
-	return chainTip - uint32(txn.Height), nil
+	return chainTip - uint32(txn.Height), uint32(txn.Height), nil
 }
 
 func (w *SPVWallet) checkIfStxoIsConfirmed(utxo Utxo, stxos []Stxo) bool {
