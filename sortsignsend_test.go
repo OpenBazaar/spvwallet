@@ -63,7 +63,7 @@ func Test_gatherCoins(t *testing.T) {
 		if coin.Value() != 10000 {
 			t.Error("Returned incorrect coin value")
 		}
-		addr2, err := key.Address(&chaincfg.TestNet3Params)
+		addr2, err := Address(key, &chaincfg.TestNet3Params)
 		if err != nil {
 			t.Error(err)
 		}

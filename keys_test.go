@@ -257,7 +257,7 @@ func TestKeyManager_GetKeyForScript(t *testing.T) {
 	if key == nil {
 		t.Error("Returned key is nil")
 	}
-	testAddr, err := key.Address(&chaincfg.MainNetParams)
+	testAddr, err := Address(key, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Error(err)
 	}
@@ -268,7 +268,7 @@ func TestKeyManager_GetKeyForScript(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	importAddr, err := key.Address(&chaincfg.MainNetParams)
+	importAddr, err := Address(key, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Error(err)
 	}
@@ -284,11 +284,11 @@ func TestKeyManager_GetKeyForScript(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	retECKey, err := retKey.ECPrivKey()
+	/*retECKey, err := retKey.ECPrivKey()
 	if err != nil {
 		t.Error(err)
-	}
-	if !bytes.Equal(retECKey.Serialize(), importKey.Serialize()) {
+	}*/
+	if !bytes.Equal(retKey.Serialize(), importKey.Serialize()) {
 		t.Error("Failed to return imported key")
 	}
 }

@@ -1,8 +1,10 @@
 package spvwallet
 
 import (
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcutil"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/btcsuite/goleveldb/leveldb/errors"
 )
@@ -20,6 +22,15 @@ type KeyManager struct {
 
 	internalKey *hd.ExtendedKey
 	externalKey *hd.ExtendedKey
+}
+
+func Address(key *btcec.PrivateKey, params *chaincfg.Params) (btcutil.Address, error) {
+	addr, err := btcutil.NewAddressPubKeyHash(btcutil.Hash160(key.PubKey().SerializeCompressed()), params)
+	if err != nil {
+		return nil, err
+	}
+
+	return addr, nil
 }
 
 func NewKeyManager(db Keys, params *chaincfg.Params, masterPrivKey *hd.ExtendedKey) (*KeyManager, error) {
@@ -130,24 +141,20 @@ func (km *KeyManager) GetKeys() []*hd.ExtendedKey {
 	return keys
 }
 
-func (km *KeyManager) GetKeyForScript(scriptPubKey []byte) (*hd.ExtendedKey, error) {
+func (km *KeyManager) GetKeyForScript(scriptPubKey []byte) (*btcec.PrivateKey, error) {
 	keyPath, err := km.datastore.GetPathForScript(scriptPubKey)
 	if err != nil {
 		key, err := km.datastore.GetKeyForScript(scriptPubKey)
 		if err != nil {
 			return nil, err
 		}
-		hdKey := hd.NewExtendedKey(
-			km.params.HDPrivateKeyID[:],
-			key.Serialize(),
-			make([]byte, 32),
-			[]byte{0x00, 0x00, 0x00, 0x00},
-			0,
-			0,
-			true)
-		return hdKey, nil
+		return key, nil
 	}
-	return km.generateChildKey(keyPath.Purpose, uint32(keyPath.Index))
+	hdKey, err := km.generateChildKey(keyPath.Purpose, uint32(keyPath.Index))
+	if err != nil {
+		return nil, err
+	}
+	return hdKey.ECPrivKey()
 }
 
 // Mark the given key as used and extend the lookahead window

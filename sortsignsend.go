@@ -68,10 +68,10 @@ func NewCoin(txid []byte, index uint32, value btc.Amount, numConfs int64, script
 	return coinset.Coin(c)
 }
 
-func (w *SPVWallet) gatherCoins() map[coinset.Coin]*hd.ExtendedKey {
+func (w *SPVWallet) gatherCoins() map[coinset.Coin]*btcec.PrivateKey {
 	height, _ := w.blockchain.db.Height()
 	utxos, _ := w.txstore.Utxos().GetAll()
-	m := make(map[coinset.Coin]*hd.ExtendedKey)
+	m := make(map[coinset.Coin]*btcec.PrivateKey)
 	for _, u := range utxos {
 		if u.WatchOnly {
 			continue
@@ -304,7 +304,7 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 	return buf.Bytes(), nil
 }
 
-func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel FeeLevel) (*chainhash.Hash, error) {
+func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, privKey *btcec.PrivateKey, redeemScript *[]byte, feeLevel FeeLevel) (*chainhash.Hash, error) {
 	var internalAddr btc.Address
 	if address != nil {
 		internalAddr = *address
@@ -350,10 +350,10 @@ func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.Ext
 	txsort.InPlaceSort(tx)
 
 	// Sign tx
-	privKey, err := key.ECPrivKey()
+	/*privKey, err := key.ECPrivKey()
 	if err != nil {
 		return nil, err
-	}
+	}*/
 	pk := privKey.PubKey().SerializeCompressed()
 	addressPub, err := btc.NewAddressPubKey(pk, w.params)
 
@@ -423,15 +423,11 @@ func (w *SPVWallet) buildTx(amount int64, addr btc.Address, feeLevel FeeLevel, o
 			inputs = append(inputs, in)
 			additionalPrevScripts[*outpoint] = c.PkScript()
 			key := coinMap[c]
-			addr, err := key.Address(w.params)
+			addr, err := Address(key, w.params)
 			if err != nil {
 				continue
 			}
-			privKey, err := key.ECPrivKey()
-			if err != nil {
-				continue
-			}
-			wif, _ := btc.NewWIF(privKey, w.params, true)
+			wif, _ := btc.NewWIF(key, w.params, true)
 			additionalKeysByAddress[addr.EncodeAddress()] = wif
 		}
 		return total, inputs, scripts, nil
