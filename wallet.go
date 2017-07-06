@@ -278,6 +278,12 @@ func (w *SPVWallet) checkIfStxoIsConfirmed(utxo Utxo, stxos []Stxo) bool {
 			} else {
 				return w.checkIfStxoIsConfirmed(stxo.Utxo, stxos)
 			}
+		} else if stxo.Utxo.IsEqual(&utxo) {
+			if stxo.Utxo.AtHeight > 0 {
+				return true
+			} else {
+				return false
+			}
 		}
 	}
 	return false
