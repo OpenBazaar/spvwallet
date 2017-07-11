@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"sync"
+	"time"
 )
 
 type SPVWallet struct {
@@ -36,6 +37,8 @@ type SPVWallet struct {
 	fpAccumulator map[int32]int32
 	blockQueue    chan chainhash.Hash
 	mutex         *sync.RWMutex
+
+	creationDate time.Time
 
 	running bool
 
@@ -76,6 +79,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		masterPrivateKey: mPrivKey,
 		masterPublicKey:  mPubKey,
 		params:           config.Params,
+		creationDate:     config.CreationDate,
 		feeProvider: NewFeeProvider(
 			config.MaxFee,
 			config.HighFee,
@@ -98,7 +102,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		return nil, err
 	}
 
-	w.blockchain, err = NewBlockchain(w.repoPath, config.CreationDate, w.params)
+	w.blockchain, err = NewBlockchain(w.repoPath, w.creationDate, w.params)
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +353,7 @@ func (w *SPVWallet) Close() {
 func (w *SPVWallet) ReSyncBlockchain(fromHeight int32) {
 	w.Close()
 	os.Remove(path.Join(w.repoPath, "headers.bin"))
-	blockchain, err := NewBlockchain(w.repoPath, w.params)
+	blockchain, err := NewBlockchain(w.repoPath, w.creationDate, w.params)
 	if err != nil {
 		return
 	}

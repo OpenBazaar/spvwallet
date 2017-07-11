@@ -47,7 +47,7 @@ func init() {
 	regtestCheckpoint = Checkpoint{0, chaincfg.RegressionNetParams.GenesisBlock.Header}
 }
 
-func GetCheckpoint(walletCreationDate time.Time, params chaincfg.Params) Checkpoint {
+func GetCheckpoint(walletCreationDate time.Time, params *chaincfg.Params) Checkpoint {
 	switch params.Name {
 	case chaincfg.MainNetParams.Name:
 		for i := len(mainnetCheckpoints) - 1; i >= 0; i-- {
@@ -64,7 +64,7 @@ func GetCheckpoint(walletCreationDate time.Time, params chaincfg.Params) Checkpo
 		}
 		return testnet3Checkpoints[0]
 
-	case chaincfg.RegressionNetParams.Name:
+	default:
 		return regtestCheckpoint
 	}
 }

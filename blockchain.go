@@ -49,7 +49,7 @@ func NewBlockchain(filePath string, walletCreationDate time.Time, params *chainc
 	h, err := b.db.Height()
 	if h == 0 || err != nil {
 		log.Info("Initializing headers db with checkpoints")
-		checkpoint := GetCheckpoint(nil, params)
+		checkpoint := GetCheckpoint(walletCreationDate, params)
 		// Put the checkpoint to the db
 		sh := StoredHeader{
 			header:    checkpoint.Header,
