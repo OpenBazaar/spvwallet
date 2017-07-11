@@ -98,7 +98,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		return nil, err
 	}
 
-	w.blockchain, err = NewBlockchain(w.repoPath, w.params)
+	w.blockchain, err = NewBlockchain(w.repoPath, config.CreationDate, w.params)
 	if err != nil {
 		return nil, err
 	}

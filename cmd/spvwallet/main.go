@@ -18,22 +18,24 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"time"
 )
 
 var parser = flags.NewParser(nil, flags.Default)
 
 type Start struct {
-	DataDir          string `short:"d" long:"datadir" description:"specify the data directory to be used"`
-	Testnet          bool   `short:"t" long:"testnet" description:"use the test network"`
-	Regtest          bool   `short:"r" long:"regtest" description:"run in regression test mode"`
-	Mnemonic         string `short:"m" long:"mnemonic" description:"specify a mnemonic seed to use to derive the keychain"`
-	TrustedPeer      string `short:"i" long:"trustedpeer" description:"specify a single trusted peer to connect to"`
-	Tor              bool   `long:"tor" description:"connect via a running Tor daemon"`
-	FeeAPI           string `short:"f" long:"feeapi" description:"fee API to use to fetch current fee rates. set as empty string to disable API lookups." default:"https://bitcoinfees.21.co/api/v1/fees/recommended"`
-	MaxFee           uint64 `short:"x" long:"maxfee" description:"the fee-per-byte ceiling beyond which fees cannot go" default:"2000"`
-	LowDefaultFee    uint64 `short:"e" long:"economicfee" description:"the default low fee-per-byte" default:"140"`
-	MediumDefaultFee uint64 `short:"n" long:"normalfee" description:"the default medium fee-per-byte" default:"160"`
-	HighDefaultFee   uint64 `short:"p" long:"priorityfee" description:"the default high fee-per-byte" default:"180"`
+	DataDir            string `short:"d" long:"datadir" description:"specify the data directory to be used"`
+	Testnet            bool   `short:"t" long:"testnet" description:"use the test network"`
+	Regtest            bool   `short:"r" long:"regtest" description:"run in regression test mode"`
+	Mnemonic           string `short:"m" long:"mnemonic" description:"specify a mnemonic seed to use to derive the keychain"`
+	WalletCreationDate string `short:"w" long:"walletcreationdate" description:"specify the date the seed was created. if omitted the wallet will sync from the oldest checkpoint."`
+	TrustedPeer        string `short:"i" long:"trustedpeer" description:"specify a single trusted peer to connect to"`
+	Tor                bool   `long:"tor" description:"connect via a running Tor daemon"`
+	FeeAPI             string `short:"f" long:"feeapi" description:"fee API to use to fetch current fee rates. set as empty string to disable API lookups." default:"https://bitcoinfees.21.co/api/v1/fees/recommended"`
+	MaxFee             uint64 `short:"x" long:"maxfee" description:"the fee-per-byte ceiling beyond which fees cannot go" default:"2000"`
+	LowDefaultFee      uint64 `short:"e" long:"economicfee" description:"the default low fee-per-byte" default:"140"`
+	MediumDefaultFee   uint64 `short:"n" long:"normalfee" description:"the default medium fee-per-byte" default:"160"`
+	HighDefaultFee     uint64 `short:"p" long:"priorityfee" description:"the default high fee-per-byte" default:"180"`
 }
 type Version struct{}
 
@@ -88,6 +90,15 @@ func (x *Start) Execute(args []string) error {
 		config.Params = &chaincfg.RegressionNetParams
 		config.RepoPath = path.Join(config.RepoPath, "regtest")
 	}
+	creationDate := time.Now()
+	if x.WalletCreationDate != "" {
+		creationDate, err = time.Parse(time.RFC3339, x.WalletCreationDate)
+		if err != nil {
+			return errors.New("Wallet creation date timestamp must be in RFC3339 format")
+		}
+	}
+	config.CreationDate = creationDate
+
 	_, ferr := os.Stat(config.RepoPath)
 	if os.IsNotExist(ferr) {
 		os.Mkdir(config.RepoPath, os.ModePerm)
