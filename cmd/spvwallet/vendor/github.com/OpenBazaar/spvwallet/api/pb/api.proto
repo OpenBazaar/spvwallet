@@ -1,0 +1,190 @@
+syntax = "proto3";
+
+package pb;
+
+import "google/protobuf/timestamp.proto";
+
+service API {
+  rpc Stop (Empty) returns (Empty) {}
+  rpc CurrentAddress (KeySelection) returns (Address) {}
+  rpc NewAddress (KeySelection) returns (Address) {}
+  rpc ChainTip (Empty) returns (Height) {}
+  rpc Balance (Empty) returns (Balances) {}
+  rpc MasterPrivateKey (Empty) returns (Key) {}
+  rpc MasterPublicKey (Empty) returns (Key) {}
+  rpc HasKey (Address) returns (BoolResponse) {}
+  rpc Params (Empty) returns (NetParams) {}
+  rpc Transactions (Empty) returns (TransactionList) {}
+  rpc GetTransaction (Txid) returns (Tx) {}
+  rpc GetFeePerByte (FeeLevelSelection) returns (FeePerByte) {}
+  rpc Spend (SpendInfo) returns (Txid) {}
+  rpc BumpFee (Txid) returns (Txid) {}
+  rpc Peers (Empty) returns (PeerList) {}
+  rpc AddWatchedScript (Address) returns (Empty) {}
+  rpc GetConfirmations (Txid) returns (Confirmations) {}
+  rpc SweepAddress (SweepInfo) returns (Txid) {}
+  rpc ReSyncBlockchain (Height) returns (Empty) {}
+  rpc CreateMultisigSignature (CreateMultisigInfo) returns (SignatureList) {}
+  rpc Multisign (MultisignInfo) returns (RawTx) {}
+  rpc EstimateFee (EstimateFeeData) returns (Fee) {}
+  rpc WalletNotify (Empty) returns (stream Tx) {}
+}
+
+message Empty {}
+
+enum KeyPurpose {
+    INTERNAL = 0;
+    EXTERNAL = 1;
+}
+
+message KeySelection {
+    KeyPurpose purpose = 1;
+}
+
+message Address {
+    string addr = 1;
+}
+
+message Height {
+    uint32 height = 1;
+}
+
+message Balances {
+    uint64 confirmed   = 1;
+    uint64 unconfirmed = 2;
+}
+
+message Key {
+    string key = 1;
+}
+
+message BoolResponse {
+    bool bool = 1;
+}
+
+message NetParams {
+    string name = 1;
+}
+
+message TransactionList {
+    repeated Tx transactions = 1;
+}
+
+message Tx {
+    string txid                         = 1;
+    int64 value                         = 2;
+    int32 height                        = 3;
+    google.protobuf.Timestamp timestamp = 4;
+    bool watchOnly                      = 5;
+    bytes raw                           = 6;
+}
+
+message Txid {
+    string hash = 1;
+}
+
+enum FeeLevel {
+    ECONOMIC = 0;
+    NORMAL   = 1;
+    PRIORITY = 2;
+}
+
+message FeeLevelSelection {
+    FeeLevel feeLevel = 1;
+}
+
+message FeePerByte {
+    uint64 fee = 1;
+}
+
+message Fee {
+    uint64 fee = 1;
+}
+
+message SpendInfo {
+    string address    = 1;
+    uint64 amount     = 2;
+    FeeLevel feeLevel = 3;
+}
+
+message PeerList {
+    repeated Peer peers = 1;
+}
+
+message Peer {
+    string address                          = 1;
+    uint64 bytesSent                        = 2;
+    uint64 bytesReceived                    = 3;
+    bool   connected                        = 4;
+    int32  ID                               = 5;
+    int32  lastBlock                        = 6;
+    uint32 protocolVersion                  = 7;
+    string services                         = 8;
+    string userAgent                        = 9;
+    google.protobuf.Timestamp timeConnected = 10;
+}
+
+message Confirmations {
+    uint32 confirmations = 1;
+}
+
+message Utxo {
+    string txid  = 1;
+    uint32 index = 2;
+    uint64 value = 3;
+}
+
+message SweepInfo {
+    repeated Utxo utxos = 1;
+    string address      = 2;
+    string key          = 3;
+    bytes redeemScript  = 4;
+    FeeLevel feeLevel   = 5;
+}
+
+message Input {
+    string txid  = 1;
+    uint32 index = 2;
+}
+
+message Output {
+    bytes scriptPubKey = 1;
+    uint64 value       = 2;
+}
+
+message Signature {
+    uint32 index    = 1;
+    bytes signature = 2;
+}
+
+message CreateMultisigInfo {
+    repeated Input inputs   = 1;
+    repeated Output outputs = 2;
+    string key              = 3;
+    bytes redeemScript      = 4;
+    uint64 feePerByte       = 5;
+}
+
+message SignatureList {
+    repeated Signature sigs = 1;
+}
+
+message MultisignInfo {
+    repeated Input inputs   = 1;
+    repeated Output outputs = 2;
+    repeated Signature sig1 = 3;
+    repeated Signature sig2 = 4;
+    bytes redeemScript      = 5;
+    uint64 feePerByte       = 6;
+    bool broadcast          = 7;
+}
+
+message RawTx {
+    bytes tx = 1;
+}
+
+message EstimateFeeData {
+    repeated Input inputs   = 1;
+    repeated Output outputs = 2;
+    uint64 feePerByte       = 3;
+}
