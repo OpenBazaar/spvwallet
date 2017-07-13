@@ -46,10 +46,13 @@ func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, wa
 func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, spvwallet.Txn, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
+	var txn spvwallet.Txn
 	stmt, err := t.db.Prepare("select tx, value, height, timestamp, watchOnly from txns where txid=?")
+	if err != nil {
+		return nil, txn, err
+	}
 	defer stmt.Close()
 	var ret []byte
-	var txn spvwallet.Txn
 	var value int
 	var height int
 	var timestamp int
@@ -81,10 +84,10 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]spvwallet.Txn, error) {
 	var ret []spvwallet.Txn
 	stm := "select tx, value, height, timestamp, watchOnly from txns"
 	rows, err := t.db.Query(stm)
-	defer rows.Close()
 	if err != nil {
 		return ret, err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var tx []byte
 		var value int
