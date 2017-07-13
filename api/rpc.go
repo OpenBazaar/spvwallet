@@ -289,7 +289,7 @@ func (s *server) GetConfirmations(ctx context.Context, in *pb.Txid) (*pb.Confirm
 	if err != nil {
 		return nil, err
 	}
-	confirms, err := s.w.GetConfirmations(*ch)
+	confirms, _, err := s.w.GetConfirmations(*ch)
 	if err != nil {
 		return nil, err
 	}
