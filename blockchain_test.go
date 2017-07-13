@@ -44,8 +44,10 @@ func createBlockChain(bc *Blockchain) error {
 	if err != nil {
 		return err
 	}
+	x := best.height
 	last := best.header
 	for i := 0; i < 2015; i++ {
+		x++
 		hdr := wire.BlockHeader{}
 		hdr.PrevBlock = last.BlockHash()
 		hdr.Nonce = 0
@@ -61,7 +63,7 @@ func createBlockChain(bc *Blockchain) error {
 		hdr.Version = 3
 		sh := StoredHeader{
 			header:    hdr,
-			height:    uint32(i) + 1,
+			height:    x,
 			totalWork: big.NewInt(0),
 		}
 		bc.db.Put(sh, true)
@@ -70,8 +72,10 @@ func createBlockChain(bc *Blockchain) error {
 	return nil
 }
 
+var MockCreationTime time.Time
+
 func TestNewBlockchain(t *testing.T) {
-	bc, err := NewBlockchain("", &chaincfg.MainNetParams)
+	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Error(err)
 	}
@@ -80,18 +84,18 @@ func TestNewBlockchain(t *testing.T) {
 		t.Error(err)
 	}
 	bestHash := best.header.BlockHash()
-	checkHash := mainnetCheckpoint.BlockHash()
+	checkHash := mainnetCheckpoints[0].Header.BlockHash()
 	if !bestHash.IsEqual(&checkHash) {
 		t.Error("Blockchain failed to initialize with correct mainnet checkpoint")
 	}
-	if best.height != MAINNET_CHECKPOINT_HEIGHT {
+	if best.height != mainnetCheckpoints[0].Height {
 		t.Error("Blockchain failed to initialized with correct mainnet checkpoint height")
 	}
 	if best.totalWork.Uint64() != 0 {
 		t.Error("Blockchain failed to initialized with correct mainnet total work")
 	}
 	os.RemoveAll("headers.bin")
-	bc, err = NewBlockchain("", &chaincfg.TestNet3Params)
+	bc, err = NewBlockchain("", MockCreationTime, &chaincfg.TestNet3Params)
 	if err != nil {
 		t.Error(err)
 	}
@@ -100,18 +104,18 @@ func TestNewBlockchain(t *testing.T) {
 		t.Error(err)
 	}
 	bestHash = best.header.BlockHash()
-	checkHash = testnet3Checkpoint.BlockHash()
+	checkHash = testnet3Checkpoints[0].Header.BlockHash()
 	if !bestHash.IsEqual(&checkHash) {
 		t.Error("Blockchain failed to initialize with correct testnet checkpoint")
 	}
-	if best.height != TESTNET3_CHECKPOINT_HEIGHT {
+	if best.height != testnet3Checkpoints[0].Height {
 		t.Error("Blockchain failed to initialized with correct testnet checkpoint height")
 	}
 	if best.totalWork.Uint64() != 0 {
 		t.Error("Blockchain failed to initialized with correct testnet total work")
 	}
 	os.RemoveAll("headers.bin")
-	bc, err = NewBlockchain("", &chaincfg.RegressionNetParams)
+	bc, err = NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
@@ -120,11 +124,11 @@ func TestNewBlockchain(t *testing.T) {
 		t.Error(err)
 	}
 	bestHash = best.header.BlockHash()
-	checkHash = regtestCheckpoint.BlockHash()
+	checkHash = regtestCheckpoint.Header.BlockHash()
 	if !bestHash.IsEqual(&checkHash) {
 		t.Error("Blockchain failed to initialize with correct regtest checkpoint")
 	}
-	if best.height != REGTEST_CHECKPOINT_HEIGHT {
+	if best.height != regtestCheckpoint.Height {
 		t.Error("Blockchain failed to initialized with correct regtest checkpoint height")
 	}
 	if best.totalWork.Uint64() != 0 {
@@ -134,11 +138,11 @@ func TestNewBlockchain(t *testing.T) {
 }
 
 func TestBlockchain_CommitHeader(t *testing.T) {
-	bc, err := NewBlockchain("", &chaincfg.RegressionNetParams)
+	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
-	var headers = []wire.BlockHeader{regtestCheckpoint}
+	var headers = []wire.BlockHeader{regtestCheckpoint.Header}
 	for i, c := range chain {
 		b, err := hex.DecodeString(c)
 		if err != nil {
@@ -177,11 +181,11 @@ func TestBlockchain_CommitHeader(t *testing.T) {
 }
 
 func Test_Reorg(t *testing.T) {
-	bc, err := NewBlockchain("", &chaincfg.RegressionNetParams)
+	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
-	var headers = []wire.BlockHeader{regtestCheckpoint}
+	var headers = []wire.BlockHeader{regtestCheckpoint.Header}
 	for i, c := range chain {
 		b, err := hex.DecodeString(c)
 		if err != nil {
@@ -250,7 +254,7 @@ func Test_Reorg(t *testing.T) {
 }
 
 func TestBlockchain_GetLastGoodHeader(t *testing.T) {
-	bc, err := NewBlockchain("", &chaincfg.RegressionNetParams)
+	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
@@ -286,7 +290,7 @@ func TestBlockchain_GetLastGoodHeader(t *testing.T) {
 
 func TestBlockchain_CheckHeader(t *testing.T) {
 	params := &chaincfg.RegressionNetParams
-	bc, err := NewBlockchain("", params)
+	bc, err := NewBlockchain("", MockCreationTime, params)
 	if err != nil {
 		t.Error(err)
 	}
@@ -348,11 +352,11 @@ func TestBlockchain_CheckHeader(t *testing.T) {
 }
 
 func TestBlockchain_GetNPrevBlockHashes(t *testing.T) {
-	bc, err := NewBlockchain("", &chaincfg.RegressionNetParams)
+	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
-	var headers = []wire.BlockHeader{regtestCheckpoint}
+	var headers = []wire.BlockHeader{regtestCheckpoint.Header}
 	for i, c := range chain {
 		b, err := hex.DecodeString(c)
 		if err != nil {
@@ -429,7 +433,7 @@ func TestBlockchain_checkProofOfWork(t *testing.T) {
 }
 
 func TestBlockchain_SetChainState(t *testing.T) {
-	bc, err := NewBlockchain("", &chaincfg.RegressionNetParams)
+	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
@@ -484,11 +488,11 @@ func TestBlockchain_calcDiffAdjust(t *testing.T) {
 }
 
 func TestBlockchain_GetBlockLocatorHashes(t *testing.T) {
-	bc, err := NewBlockchain("", &chaincfg.RegressionNetParams)
+	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
-	var headers = []wire.BlockHeader{regtestCheckpoint}
+	var headers = []wire.BlockHeader{regtestCheckpoint.Header}
 	for i, c := range chain {
 		b, err := hex.DecodeString(c)
 		if err != nil {
@@ -527,7 +531,7 @@ func TestBlockchain_GetBlockLocatorHashes(t *testing.T) {
 }
 
 func TestBlockchain_GetEpoch(t *testing.T) {
-	bc, err := NewBlockchain("", &chaincfg.RegressionNetParams)
+	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
 	}
@@ -547,7 +551,7 @@ func TestBlockchain_GetEpoch(t *testing.T) {
 
 func TestBlockchain_calcRequiredWork(t *testing.T) {
 	params := &chaincfg.TestNet3Params
-	bc, err := NewBlockchain("", params)
+	bc, err := NewBlockchain("", MockCreationTime, params)
 	if err != nil {
 		t.Error(err)
 	}
@@ -567,7 +571,7 @@ func TestBlockchain_calcRequiredWork(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if work <= best.header.Bits {
+	if work >= best.header.Bits {
 		t.Error("Returned in correct bits")
 	}
 	newHdr.Bits = work

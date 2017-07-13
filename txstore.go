@@ -223,6 +223,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32) (uint32, error) {
 	PKscripts := make([][]byte, len(ts.adrs))
 	for i := range ts.adrs {
 		// Iterate through all our addresses
+		// TODO: This will need to test both segwit and legacy once segwit activates
 		PKscripts[i], err = txscript.PayToAddrScript(ts.adrs[i])
 		if err != nil {
 			return hits, err

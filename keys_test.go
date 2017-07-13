@@ -142,11 +142,7 @@ func TestKeyManager_MarkKeyAsUsed(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	script, err := txscript.PayToAddrScript(addr)
-	if err != nil {
-		t.Error(err)
-	}
-	err = km.MarkKeyAsUsed(script)
+	err = km.MarkKeyAsUsed(addr.ScriptAddress())
 	if err != nil {
 		t.Error(err)
 	}
@@ -174,10 +170,10 @@ func TestKeyManager_GetCurrentKey(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	var scriptPubkey string
+	var scriptAddress string
 	for script, key := range mock.keys {
 		if key.path.Purpose == EXTERNAL && key.path.Index == 0 {
-			scriptPubkey = script
+			scriptAddress = script
 			break
 		}
 	}
@@ -189,8 +185,7 @@ func TestKeyManager_GetCurrentKey(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	script, err := txscript.PayToAddrScript(addr)
-	if hex.EncodeToString(script) != scriptPubkey {
+	if hex.EncodeToString(addr.ScriptAddress()) != scriptAddress {
 		t.Error("CurrentKey returned wrong key")
 	}
 }
@@ -246,11 +241,7 @@ func TestKeyManager_GetKeyForScript(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	script, err := txscript.PayToAddrScript(addr)
-	if err != nil {
-		t.Error(err)
-	}
-	key, err := km.GetKeyForScript(script)
+	key, err := km.GetKeyForScript(addr.ScriptAddress())
 	if err != nil {
 		t.Error(err)
 	}

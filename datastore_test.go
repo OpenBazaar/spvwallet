@@ -42,29 +42,29 @@ func (m *MockDatastore) WatchedScripts() WatchedScripts {
 }
 
 type keyStoreEntry struct {
-	scriptPubKey []byte
-	path         KeyPath
-	used         bool
-	key          *btcec.PrivateKey
+	scriptAddress []byte
+	path          KeyPath
+	used          bool
+	key           *btcec.PrivateKey
 }
 
 type mockKeyStore struct {
 	keys map[string]*keyStoreEntry
 }
 
-func (m *mockKeyStore) Put(scriptPubKey []byte, keyPath KeyPath) error {
-	m.keys[hex.EncodeToString(scriptPubKey)] = &keyStoreEntry{scriptPubKey, keyPath, false, nil}
+func (m *mockKeyStore) Put(scriptAddress []byte, keyPath KeyPath) error {
+	m.keys[hex.EncodeToString(scriptAddress)] = &keyStoreEntry{scriptAddress, keyPath, false, nil}
 	return nil
 }
 
-func (m *mockKeyStore) ImportKey(scriptPubKey []byte, key *btcec.PrivateKey) error {
+func (m *mockKeyStore) ImportKey(scriptAddress []byte, key *btcec.PrivateKey) error {
 	kp := KeyPath{Purpose: EXTERNAL, Index: -1}
-	m.keys[hex.EncodeToString(scriptPubKey)] = &keyStoreEntry{scriptPubKey, kp, false, key}
+	m.keys[hex.EncodeToString(scriptAddress)] = &keyStoreEntry{scriptAddress, kp, false, key}
 	return nil
 }
 
-func (m *mockKeyStore) MarkKeyAsUsed(scriptPubKey []byte) error {
-	key, ok := m.keys[hex.EncodeToString(scriptPubKey)]
+func (m *mockKeyStore) MarkKeyAsUsed(scriptAddress []byte) error {
+	key, ok := m.keys[hex.EncodeToString(scriptAddress)]
 	if !ok {
 		return errors.New("key does not exist")
 	}
@@ -87,17 +87,17 @@ func (m *mockKeyStore) GetLastKeyIndex(purpose KeyPurpose) (int, bool, error) {
 	return i, used, nil
 }
 
-func (m *mockKeyStore) GetPathForScript(scriptPubKey []byte) (KeyPath, error) {
-	key, ok := m.keys[hex.EncodeToString(scriptPubKey)]
+func (m *mockKeyStore) GetPathForKey(scriptAddress []byte) (KeyPath, error) {
+	key, ok := m.keys[hex.EncodeToString(scriptAddress)]
 	if !ok || key.path.Index == -1 {
 		return KeyPath{}, errors.New("key does not exist")
 	}
 	return key.path, nil
 }
 
-func (m *mockKeyStore) GetKeyForScript(scriptPubKey []byte) (*btcec.PrivateKey, error) {
+func (m *mockKeyStore) GetKey(scriptAddress []byte) (*btcec.PrivateKey, error) {
 	for _, k := range m.keys {
-		if k.path.Index == -1 && bytes.Equal(scriptPubKey, k.scriptPubKey) {
+		if k.path.Index == -1 && bytes.Equal(scriptAddress, k.scriptAddress) {
 			return k.key, nil
 		}
 	}
