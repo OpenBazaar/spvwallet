@@ -22,7 +22,7 @@ func MockWallet() *SPVWallet {
 	createBlockChain(bc)
 
 	peerManager, _ := NewPeerManager(peerCfg)
-	return &SPVWallet{txstore: txstore, peerManager: peerManager, blockchain: bc, keyManager: txstore.keyManager}
+	return &SPVWallet{txstore: txstore, peerManager: peerManager, blockchain: bc, keyManager: txstore.keyManager, params: &chaincfg.TestNet3Params}
 }
 
 func Test_gatherCoins(t *testing.T) {
@@ -45,6 +45,9 @@ func Test_gatherCoins(t *testing.T) {
 	}
 	op := wire.NewOutPoint(h1, 0)
 	err = wallet.txstore.Utxos().Put(Utxo{Op: *op, ScriptPubkey: script1, AtHeight: 5, Value: 10000})
+	if err != nil {
+		t.Error(err)
+	}
 	coinmap := wallet.gatherCoins()
 	for coin, key := range coinmap {
 		if !bytes.Equal(coin.PkScript(), script1) {
