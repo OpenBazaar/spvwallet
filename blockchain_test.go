@@ -571,7 +571,7 @@ func TestBlockchain_calcRequiredWork(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if work >= best.header.Bits {
+	if work <= best.header.Bits {
 		t.Error("Returned in correct bits")
 	}
 	newHdr.Bits = work
