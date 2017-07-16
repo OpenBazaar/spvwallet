@@ -217,7 +217,7 @@ func (w *SPVWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int,
 	}
 
 	if len(keys) < threshold {
-		return nil, fmt.Errorf("unable to generate multisig script with "+
+		return nil, nil, fmt.Errorf("unable to generate multisig script with "+
 			"%d required signatures when there are only %d public "+
 			"keys available", threshold, len(keys))
 	}
@@ -374,6 +374,12 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 
 		if timeLocked {
 			builder.AddData(txscript.OP_1)
+			tx.Version = 2
+			locktime, err := LockTimeFromRedeemScript(*redeemScript)
+			if err != nil {
+				return nil, err
+			}
+			input.Sequence = locktime
 		}
 
 		builder.AddData(redeemScript)
@@ -465,7 +471,8 @@ func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.Ext
 
 	// Check if time locked
 	var timeLocked bool
-	if redeemScript != nil && redeemScript[0] == txscript.OP_IF {
+	rs := *redeemScript
+	if redeemScript != nil && rs[0] == txscript.OP_IF {
 		timeLocked = true
 	}
 
@@ -484,16 +491,22 @@ func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.Ext
 			if err != nil {
 				return nil, err
 			}
-			script, err := txscript.RawTxInSignature(tx, i, redeemScript, txscript.SigHashAll, priv)
+			script, err := txscript.RawTxInSignature(tx, i, *redeemScript, txscript.SigHashAll, priv)
 			if err != nil {
 				return nil, err
 			}
 			builder := txscript.NewScriptBuilder().
 				AddData(script).
 				AddOp(txscript.OP_0).
-				AddData(redeemScript)
+				AddData(*redeemScript)
 			scriptSig, _ := builder.Script()
 			txIn.SignatureScript = scriptSig
+			tx.Version = 2
+			locktime, err := LockTimeFromRedeemScript(*redeemScript)
+			if err != nil {
+				return nil, err
+			}
+			txIn.Sequence = locktime
 		}
 	}
 
@@ -603,4 +616,34 @@ func (w *SPVWallet) buildTx(amount int64, addr btc.Address, feeLevel FeeLevel, o
 
 func (w *SPVWallet) GetFeePerByte(feeLevel FeeLevel) uint64 {
 	return w.feeProvider.GetFeePerByte(feeLevel)
+}
+
+func LockTimeFromRedeemScript(redeemScript []byte) (uint32, error) {
+	if len(redeemScript) < 113 {
+		return 0, errors.New("Redeem script invalid length")
+	}
+	if redeemScript[106] != 103 {
+		return 0, errors.New("Invalid redeem script")
+	}
+	if redeemScript[107] == 0 {
+		return 0, nil
+	}
+	if 81 <= redeemScript[107] && redeemScript[107] <= 96 {
+		return uint32((redeemScript[107] - 81) + 1), nil
+	}
+	var v []byte
+	op := redeemScript[107]
+	if 1 <= op && op <= 75 {
+		for i := 0; i < int(op); i++ {
+			v = append(v, []byte{redeemScript[108 + i]}...)
+		}
+	} else {
+		return 0, errors.New("Too many bytes pushed for sequence")
+	}
+	var result int64
+	for i, val := range v {
+		result |= int64(val) << uint8(8*i)
+	}
+
+	return uint32(result), nil
 }
