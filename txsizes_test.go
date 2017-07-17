@@ -60,7 +60,7 @@ func TestEstimateSerializeSize(t *testing.T) {
 		for _, l := range test.OutputScriptLengths {
 			outputs = append(outputs, &wire.TxOut{PkScript: make([]byte, l)})
 		}
-		actualEstimate := EstimateSerializeSize(test.InputCount, outputs, test.AddChangeOutput)
+		actualEstimate := EstimateSerializeSize(test.InputCount, outputs, test.AddChangeOutput, P2PKH)
 		if actualEstimate != test.ExpectedSizeEstimate {
 			t.Errorf("Test %d: Got %v: Expected %v", i, actualEstimate, test.ExpectedSizeEstimate)
 		}
