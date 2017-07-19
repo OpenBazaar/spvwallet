@@ -564,3 +564,21 @@ func (s *server) WalletNotify(in *pb.Empty, stream pb.API_WalletNotifyServer) er
 	wg.Wait()
 	return nil
 }
+
+type HeaderWriter struct {
+	stream pb.API_DumpHeadersServer
+}
+
+func (h *HeaderWriter) Write(p []byte) (n int, err error) {
+	hdr := &pb.Header{string(p)}
+	if err := h.stream.Send(hdr); err != nil {
+		return 0, err
+	}
+	return 0, nil
+}
+
+func (s *server) DumpHeaders(in *pb.Empty, stream pb.API_DumpHeadersServer) error {
+	writer := HeaderWriter{stream}
+	s.w.DumpHeaders(&writer)
+	return nil
+}

@@ -50,6 +50,10 @@ func SetupCli(parser *flags.Parser) {
 		"return the height of the chain",
 		"Returns the height of the best chain of headers",
 		&chainTip)
+	parser.AddCommand("dumpheaders",
+		"print the header database",
+		"Prints the header database to stdout",
+		&dumpheaders)
 	parser.AddCommand("balance",
 		"get the wallet balance",
 		"Returns both the confirmed and unconfirmed balances",
@@ -918,5 +922,29 @@ func (x *EstimateFee) Execute(args []string) error {
 		return err
 	}
 	fmt.Println(resp.Fee)
+	return nil
+}
+
+type DumpHeaders struct{}
+
+var dumpheaders DumpHeaders
+
+func (x *DumpHeaders) Execute(args []string) error {
+	client, conn, err := newGRPCClient()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	stream, err := client.DumpHeaders(context.Background(), &pb.Empty{})
+	if err != nil {
+		return err
+	}
+	for {
+		hdr, err := stream.Recv()
+		if err != nil {
+			return err
+		}
+		fmt.Println(hdr.Entry)
+	}
 	return nil
 }

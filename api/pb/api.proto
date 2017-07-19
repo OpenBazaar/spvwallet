@@ -28,6 +28,7 @@ service API {
   rpc Multisign (MultisignInfo) returns (RawTx) {}
   rpc EstimateFee (EstimateFeeData) returns (Fee) {}
   rpc WalletNotify (Empty) returns (stream Tx) {}
+  rpc DumpHeaders (Empty) returns (stream Header) {}
 }
 
 message Empty {}
@@ -187,4 +188,8 @@ message EstimateFeeData {
     repeated Input inputs   = 1;
     repeated Output outputs = 2;
     uint64 feePerByte       = 3;
+}
+
+message Header {
+    string entry = 1;
 }
