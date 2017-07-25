@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/OpenBazaar/jsonpb"
+	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api"
 	"github.com/OpenBazaar/spvwallet/api/pb"
 	"github.com/btcsuite/btcd/wire"
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -52,7 +54,9 @@ func SetupCli(parser *flags.Parser) {
 		&chainTip)
 	parser.AddCommand("dumpheaders",
 		"print the header database",
-		"Prints the header database to stdout",
+		"Prints the header database to stdout."+
+			"Args:\n"+
+			"1. Path (string) Optional path to the header file\n",
 		&dumpheaders)
 	parser.AddCommand("balance",
 		"get the wallet balance",
@@ -930,21 +934,26 @@ type DumpHeaders struct{}
 var dumpheaders DumpHeaders
 
 func (x *DumpHeaders) Execute(args []string) error {
-	client, conn, err := newGRPCClient()
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	stream, err := client.DumpHeaders(context.Background(), &pb.Empty{})
-	if err != nil {
-		return err
-	}
-	for {
-		hdr, err := stream.Recv()
+	if len(args) <= 0 {
+		client, conn, err := newGRPCClient()
 		if err != nil {
 			return err
 		}
-		fmt.Println(hdr.Entry)
+		defer conn.Close()
+		stream, err := client.DumpHeaders(context.Background(), &pb.Empty{})
+		if err != nil {
+			return err
+		}
+		for {
+			hdr, err := stream.Recv()
+			if err != nil {
+				return err
+			}
+			fmt.Println(hdr.Entry)
+		}
+	} else {
+		db := spvwallet.NewHeaderDB(args[0])
+		db.Print(os.Stdout)
 	}
 	return nil
 }

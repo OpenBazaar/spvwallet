@@ -13,6 +13,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/btcsuite/btcd/wire"
+	"strings"
 )
 
 const MAX_HEADERS = 2000
@@ -63,8 +64,11 @@ var (
 )
 
 func NewHeaderDB(filePath string) *HeaderDB {
+	if !strings.Contains(filePath, ".bin") {
+		filePath = path.Join(filePath, "headers.bin")
+	}
 	h := new(HeaderDB)
-	db, _ := bolt.Open(path.Join(filePath, "headers.bin"), 0644, &bolt.Options{InitialMmapSize: 5000000})
+	db, _ := bolt.Open(filePath, 0644, &bolt.Options{InitialMmapSize: 5000000})
 	h.db = db
 	h.lock = new(sync.Mutex)
 	h.filePath = filePath
