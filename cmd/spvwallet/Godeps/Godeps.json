@@ -1,0 +1,384 @@
+{
+	"ImportPath": "github.com/OpenBazaar/spvwallet/cmd/spvwallet",
+	"GoVersion": "go1.8",
+	"GodepVersion": "v79",
+	"Deps": [
+		{
+			"ImportPath": "github.com/OpenBazaar/jsonpb",
+			"Rev": "67acdf00ba190f42920cf190a863085cbd6f303c"
+		},
+		{
+			"ImportPath": "github.com/OpenBazaar/spvwallet",
+			"Rev": "f2963f35ff119c0b0c10dccc9f91b0054fd22655"
+		},
+		{
+			"ImportPath": "github.com/OpenBazaar/spvwallet/api",
+			"Rev": "f2963f35ff119c0b0c10dccc9f91b0054fd22655"
+		},
+		{
+			"ImportPath": "github.com/OpenBazaar/spvwallet/api/pb",
+			"Rev": "f2963f35ff119c0b0c10dccc9f91b0054fd22655"
+		},
+		{
+			"ImportPath": "github.com/OpenBazaar/spvwallet/cli",
+			"Rev": "f2963f35ff119c0b0c10dccc9f91b0054fd22655"
+		},
+		{
+			"ImportPath": "github.com/OpenBazaar/spvwallet/db",
+			"Rev": "f2963f35ff119c0b0c10dccc9f91b0054fd22655"
+		},
+		{
+			"ImportPath": "github.com/boltdb/bolt",
+			"Comment": "v1.2.0-21-gd974993",
+			"Rev": "d97499360d1ecebc492ea66c7447ea948f417620"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/addrmgr",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/blockchain",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/btcec",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/chaincfg",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/chaincfg/chainhash",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/connmgr",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/database",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/peer",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/txscript",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcd/wire",
+			"Comment": "BTCD_0_12_0_BETA-320-g292dbeb",
+			"Rev": "292dbebb4d830dbff4d55a8ff0c2975a74ffebcf"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btclog",
+			"Comment": "BTCLOG_0_0_3-8-g73889fb",
+			"Rev": "73889fb79bd687870312b6e40effcecffbd57d30"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcutil",
+			"Comment": "BTCUTIL_0_5_0-26-g61ec18f",
+			"Rev": "61ec18f9c8a4552c209416ce363592e35e416997"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcutil/base58",
+			"Comment": "BTCUTIL_0_5_0-26-g61ec18f",
+			"Rev": "61ec18f9c8a4552c209416ce363592e35e416997"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcutil/bloom",
+			"Comment": "BTCUTIL_0_5_0-26-g61ec18f",
+			"Rev": "61ec18f9c8a4552c209416ce363592e35e416997"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcutil/coinset",
+			"Comment": "BTCUTIL_0_5_0-26-g61ec18f",
+			"Rev": "61ec18f9c8a4552c209416ce363592e35e416997"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcutil/hdkeychain",
+			"Comment": "BTCUTIL_0_5_0-26-g61ec18f",
+			"Rev": "61ec18f9c8a4552c209416ce363592e35e416997"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcutil/txsort",
+			"Comment": "BTCUTIL_0_5_0-26-g61ec18f",
+			"Rev": "61ec18f9c8a4552c209416ce363592e35e416997"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcwallet/internal/helpers",
+			"Comment": "BTCWALLET_0_7_0_ALPHA-81-g5e39e68",
+			"Rev": "5e39e68778629237361c251841af06522bcfc07b"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcwallet/wallet/internal/txsizes",
+			"Comment": "BTCWALLET_0_7_0_ALPHA-81-g5e39e68",
+			"Rev": "5e39e68778629237361c251841af06522bcfc07b"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcwallet/wallet/txauthor",
+			"Comment": "BTCWALLET_0_7_0_ALPHA-81-g5e39e68",
+			"Rev": "5e39e68778629237361c251841af06522bcfc07b"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/btcwallet/wallet/txrules",
+			"Comment": "BTCWALLET_0_7_0_ALPHA-81-g5e39e68",
+			"Rev": "5e39e68778629237361c251841af06522bcfc07b"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/go-socks/socks",
+			"Rev": "cfe8b59e565c1a5bd4e2005d77cd9aa8b2e14524"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/golangcrypto/ripemd160",
+			"Rev": "53f62d9b43e87a6c56975cf862af7edf33a8d0df"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/goleveldb/leveldb/errors",
+			"Rev": "7834afc9e8cd15233b6c3d97e12674a31ca24602"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/goleveldb/leveldb/storage",
+			"Rev": "7834afc9e8cd15233b6c3d97e12674a31ca24602"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/goleveldb/leveldb/util",
+			"Rev": "7834afc9e8cd15233b6c3d97e12674a31ca24602"
+		},
+		{
+			"ImportPath": "github.com/btcsuite/seelog",
+			"Comment": "v2.1-84-g313961b",
+			"Rev": "313961b101eb55f65ae0f03ddd4e322731763b6c"
+		},
+		{
+			"ImportPath": "github.com/davecgh/go-spew/spew",
+			"Comment": "v1.1.0",
+			"Rev": "346938d642f2ec3594ed81d874461961cd0faa76"
+		},
+		{
+			"ImportPath": "github.com/fatih/color",
+			"Comment": "v0.2.0",
+			"Rev": "87d4004f2ab62d0d255e0a38f1680aa534549fe3"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/proto",
+			"Rev": "2bba0603135d7d7f5cb73b2125beeda19c09f4ef"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/protoc-gen-go/descriptor",
+			"Rev": "2bba0603135d7d7f5cb73b2125beeda19c09f4ef"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes",
+			"Rev": "2bba0603135d7d7f5cb73b2125beeda19c09f4ef"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/any",
+			"Rev": "2bba0603135d7d7f5cb73b2125beeda19c09f4ef"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/duration",
+			"Rev": "2bba0603135d7d7f5cb73b2125beeda19c09f4ef"
+		},
+		{
+			"ImportPath": "github.com/golang/protobuf/ptypes/timestamp",
+			"Rev": "2bba0603135d7d7f5cb73b2125beeda19c09f4ef"
+		},
+		{
+			"ImportPath": "github.com/jessevdk/go-flags",
+			"Comment": "v1-334-g6b9493b",
+			"Rev": "6b9493b3cb60367edd942144879646604089e3f7"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-colorable",
+			"Comment": "v0.0.5",
+			"Rev": "9056b7a9f2d1f2d96498d6d146acd1f9d5ed3d59"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-isatty",
+			"Rev": "56b76bdf51f7708750eac80fa38b952bb9f32639"
+		},
+		{
+			"ImportPath": "github.com/mattn/go-sqlite3",
+			"Comment": "v1.1.0-62-g467f50b",
+			"Rev": "467f50b0c026317ad28fc2c0a08aab6f755cfc7a"
+		},
+		{
+			"ImportPath": "github.com/mitchellh/go-homedir",
+			"Rev": "b8bc1bf767474819792c23f32d8286a45736f1c6"
+		},
+		{
+			"ImportPath": "github.com/natefinch/lumberjack",
+			"Comment": "v1.0-21-g514cbda",
+			"Rev": "514cbda263a734ae8caac038dadf05f8f3f9f738"
+		},
+		{
+			"ImportPath": "github.com/op/go-logging",
+			"Comment": "v1-7-g970db52",
+			"Rev": "970db520ece77730c7e4724c61121037378659d9"
+		},
+		{
+			"ImportPath": "github.com/tyler-smith/go-bip39",
+			"Rev": "32e294b638a7246c6f0c85736d627a2562604f80"
+		},
+		{
+			"ImportPath": "github.com/yawning/bulb",
+			"Rev": "2d65b370c8d197791de1288e4d2778a2a3cc5abc"
+		},
+		{
+			"ImportPath": "github.com/yawning/bulb/utils/pkcs1",
+			"Rev": "2d65b370c8d197791de1288e4d2778a2a3cc5abc"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/pbkdf2",
+			"Rev": "5ef0053f77724838734b6945dd364d3847e5de1d"
+		},
+		{
+			"ImportPath": "golang.org/x/crypto/ripemd160",
+			"Rev": "5ef0053f77724838734b6945dd364d3847e5de1d"
+		},
+		{
+			"ImportPath": "golang.org/x/net/context",
+			"Rev": "5602c733f70afc6dcec6766be0d5034d4c4f14de"
+		},
+		{
+			"ImportPath": "golang.org/x/net/http2",
+			"Rev": "5602c733f70afc6dcec6766be0d5034d4c4f14de"
+		},
+		{
+			"ImportPath": "golang.org/x/net/http2/hpack",
+			"Rev": "5602c733f70afc6dcec6766be0d5034d4c4f14de"
+		},
+		{
+			"ImportPath": "golang.org/x/net/idna",
+			"Rev": "5602c733f70afc6dcec6766be0d5034d4c4f14de"
+		},
+		{
+			"ImportPath": "golang.org/x/net/internal/timeseries",
+			"Rev": "5602c733f70afc6dcec6766be0d5034d4c4f14de"
+		},
+		{
+			"ImportPath": "golang.org/x/net/lex/httplex",
+			"Rev": "5602c733f70afc6dcec6766be0d5034d4c4f14de"
+		},
+		{
+			"ImportPath": "golang.org/x/net/proxy",
+			"Rev": "5602c733f70afc6dcec6766be0d5034d4c4f14de"
+		},
+		{
+			"ImportPath": "golang.org/x/net/trace",
+			"Rev": "5602c733f70afc6dcec6766be0d5034d4c4f14de"
+		},
+		{
+			"ImportPath": "golang.org/x/sys/unix",
+			"Rev": "dbc2be9168a660ef302e04b6ff6406de6f967473"
+		},
+		{
+			"ImportPath": "golang.org/x/text/secure/bidirule",
+			"Rev": "f4b4367115ec2de254587813edaa901bc1c723a8"
+		},
+		{
+			"ImportPath": "golang.org/x/text/transform",
+			"Rev": "f4b4367115ec2de254587813edaa901bc1c723a8"
+		},
+		{
+			"ImportPath": "golang.org/x/text/unicode/bidi",
+			"Rev": "f4b4367115ec2de254587813edaa901bc1c723a8"
+		},
+		{
+			"ImportPath": "golang.org/x/text/unicode/norm",
+			"Rev": "f4b4367115ec2de254587813edaa901bc1c723a8"
+		},
+		{
+			"ImportPath": "google.golang.org/genproto/googleapis/rpc/status",
+			"Rev": "411e09b969b1170a9f0c467558eb4c4c110d9c77"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/codes",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/credentials",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/grpclog",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/internal",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/keepalive",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/metadata",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/naming",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/peer",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/reflection",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/reflection/grpc_reflection_v1alpha",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/stats",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/status",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/tap",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		},
+		{
+			"ImportPath": "google.golang.org/grpc/transport",
+			"Comment": "v1.2.0-38-g955c867",
+			"Rev": "955c867061e3b1a5b8f6f07d1efcf1b69af043d8"
+		}
+	]
+}
