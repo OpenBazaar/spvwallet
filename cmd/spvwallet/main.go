@@ -1,12 +1,17 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api"
 	"github.com/OpenBazaar/spvwallet/cli"
 	"github.com/OpenBazaar/spvwallet/db"
+	"github.com/OpenBazaar/spvwallet/gui"
+	"github.com/OpenBazaar/spvwallet/gui/bootstrap"
+	"github.com/asticode/go-astilectron"
+	"github.com/asticode/go-astilog"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/fatih/color"
 	"github.com/jessevdk/go-flags"
@@ -36,6 +41,7 @@ type Start struct {
 	LowDefaultFee      uint64 `short:"e" long:"economicfee" description:"the default low fee-per-byte" default:"140"`
 	MediumDefaultFee   uint64 `short:"n" long:"normalfee" description:"the default medium fee-per-byte" default:"160"`
 	HighDefaultFee     uint64 `short:"p" long:"priorityfee" description:"the default high fee-per-byte" default:"180"`
+	Gui                bool   `long:"gui" description:"launch an experimental GUI"`
 }
 type Version struct{}
 
@@ -175,7 +181,68 @@ func (x *Start) Execute(args []string) error {
 
 	// Start it!
 	printSplashScreen()
-	wallet.Start()
+
+	if x.Gui {
+		go wallet.Start()
+		iconPath := path.Join(config.RepoPath, "icon.png")
+		_, err := os.Stat(iconPath)
+		if os.IsNotExist(err) {
+			f, err := os.Create(iconPath)
+			if err != nil {
+				return err
+			}
+			icon, err := gui.AppIconPngBytes()
+			if err != nil {
+				return err
+			}
+			f.Write(icon)
+			defer f.Close()
+		}
+
+		// Run bootstrap
+		if err := bootstrap.Run(bootstrap.Options{
+			AstilectronOptions: astilectron.Options{
+				AppName:            "spvwallet",
+				AppIconDefaultPath: iconPath,
+				//AppIconDarwinPath:  p + "/gopher.icns",
+				BaseDirectoryPath: config.RepoPath,
+			},
+			Homepage: "index.html",
+			MessageHandler: func(w *astilectron.Window, m bootstrap.MessageIn) {
+				switch m.Name {
+				case "say":
+					// Unmarshal
+					type P struct {
+						Message string `json:"message"`
+					}
+					var p P
+					if err := json.Unmarshal(m.Payload, &p); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+
+					// Send
+					w.Send(bootstrap.MessageOut{Name: "say", Payload: p})
+				}
+			},
+			RestoreAssets: gui.RestoreAssets,
+			WindowOptions: &astilectron.WindowOptions{
+				Center:         astilectron.PtrBool(true),
+				Height:         astilectron.PtrInt(600),
+				Width:          astilectron.PtrInt(600),
+				Maximizable:    astilectron.PtrBool(false),
+				Fullscreenable: astilectron.PtrBool(false),
+				Resizable:      astilectron.PtrBool(false),
+			},
+			TrayOptions: &astilectron.TrayOptions{
+				Image: astilectron.PtrStr(path.Join(config.RepoPath, "icon.png")),
+			},
+		}); err != nil {
+			astilog.Fatal(err)
+		}
+	} else {
+		wallet.Start()
+	}
 	return nil
 }
 
