@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"net/http"
 
+	"github.com/OpenBazaar/spvwallet"
 	"github.com/asticode/go-astilectron"
 	"github.com/julienschmidt/httprouter"
 )
@@ -22,7 +23,10 @@ type Options struct {
 	TemplateData       TemplateData
 	WindowOptions      *astilectron.WindowOptions
 	TrayOptions        *astilectron.TrayOptions
+	TrayChan           chan struct{}
+	ResizeChan         chan int
 	MenuItemOptions    []*astilectron.MenuItemOptions
+	Wallet             *spvwallet.SPVWallet
 }
 
 // AdaptAstilectron is a function that adapts astilectron

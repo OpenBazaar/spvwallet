@@ -78,36 +78,61 @@ func Run(o Options) (err error) {
 		return errors.Wrap(err, "creating window failed")
 	}
 
+	a.On(astilectron.EventNameAppCmdStop, func(e astilectron.Event) (deleteListener bool) {
+		close(o.TrayChan)
+		o.Wallet.Close()
+		return false
+	})
+
+	if o.ResizeChan != nil {
+		go func() {
+			for range o.ResizeChan {
+				w.Resize(757, 700)
+				/*for i := 414; i < 700; i += 35 {
+
+					time.Sleep(time.Nanosecond)
+				}*/
+			}
+		}()
+	}
+
 	// Add tray icon
 	if o.TrayOptions != nil {
-		t := a.NewTray(o.TrayOptions)
-		b := true
-		var m = t.NewMenu([]*astilectron.MenuItemOptions{
-			{
-				Label: astilectron.PtrStr("Open"),
-				OnClick: func(e astilectron.Event) (deleteListener bool) {
-					w.Show()
-					return false
-				},
-				Enabled: &b,
-			},
-			{
-				Label: astilectron.PtrStr("Exit"),
-				OnClick: func(e astilectron.Event) (deleteListener bool) {
-					a.Close()
-					return false
-				},
-				Enabled: &b,
-			},
-		})
+		go func() {
+			for range o.TrayChan {
+				t := a.NewTray(o.TrayOptions)
+				var m = t.NewMenu([]*astilectron.MenuItemOptions{
+					{
+						Label: astilectron.PtrStr("Open"),
+						OnClick: func(e astilectron.Event) (deleteListener bool) {
+							go func() {
+								w.Show()
+								t.Destroy()
+							}()
 
-		// Create the menu
-		if err = m.Create(); err != nil {
-			astilog.Fatal(errors.Wrap(err, "creating tray menu failed"))
-		}
-		if err = t.Create(); err != nil {
-			astilog.Fatal(errors.Wrap(err, "creating tray failed"))
-		}
+							return false
+						},
+						Enabled: astilectron.PtrBool(true),
+					},
+					{
+						Label: astilectron.PtrStr("Exit"),
+						OnClick: func(e astilectron.Event) (deleteListener bool) {
+							a.Stop()
+							return false
+						},
+						Enabled: astilectron.PtrBool(true),
+					},
+				})
+
+				// Create the menu
+				if err = m.Create(); err != nil {
+					astilog.Fatal(errors.Wrap(err, "creating tray menu failed"))
+				}
+				if err = t.Create(); err != nil {
+					astilog.Fatal(errors.Wrap(err, "creating tray failed"))
+				}
+			}
+		}()
 	}
 
 	// Adapt window

@@ -233,5 +233,48 @@ input::-webkit-inner-spin-button {
     cursor: pointer;
 }
 
+.actionBar {
+    height: 48px;
+    width: 100%
+}
 
+.tab {
+    height: 35px;
+    margin-top: 5px;
+    margin-right: 10px;
+    border-radius: 2px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 2px 0 #cfcfcf;
+    border: solid 1px #d2d3d9;
+}
 
+.icon {
+    width: 20px;
+    height: 20px;
+    margin-top: 8px;
+    margin-left: 10px;
+}
+
+.controlIcon {
+    margin-right:10px;
+    cursor: pointer;
+}
+
+.tabText {
+    margin-top: 1px;
+    margin-left: 5px;
+    font-family: "noto_sans";
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 2.43;
+    text-align: left;
+    margin-right: 10px;
+}
+
+.controlSpace {
+    width: 465px;
+}
+
+.minimize {
+    margin-right:0px;
+}

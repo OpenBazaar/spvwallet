@@ -192,7 +192,11 @@ func (x *Start) Execute(args []string) error {
 			Fiat         string `json:"fiat"`
 			Transactions int    `json:"transactions"`
 			Height       uint32 `json:"height"`
+			ExchangeRate string `json:"exchangeRate"`
 		}
+
+		tc := make(chan struct{})
+		rc := make(chan int)
 
 		//go wallet.Start()
 		os.RemoveAll(path.Join(basepath, "resources"))
@@ -251,14 +255,21 @@ func (x *Start) Execute(args []string) error {
 						Fiat:         fmt.Sprintf("%.2f", fiatVal),
 						Transactions: len(txs),
 						Height:       height,
+						ExchangeRate: fmt.Sprintf("%.2f", rate),
 					}
 					w.Send(bootstrap.MessageOut{Name: "statsUpdate", Payload: st})
+				case "minimize":
+					go func() {
+						//w.Hide()
+						//tc <- struct{}{}
+						rc <- 2
+					}()
 				}
 			},
 			RestoreAssets: gui.RestoreAssets,
 			WindowOptions: &astilectron.WindowOptions{
 				Center:         astilectron.PtrBool(true),
-				Height:         astilectron.PtrInt(370),
+				Height:         astilectron.PtrInt(415),
 				Width:          astilectron.PtrInt(757),
 				Maximizable:    astilectron.PtrBool(false),
 				Fullscreenable: astilectron.PtrBool(false),
@@ -267,7 +278,10 @@ func (x *Start) Execute(args []string) error {
 			TrayOptions: &astilectron.TrayOptions{
 				Image: astilectron.PtrStr(iconPath),
 			},
+			TrayChan:          tc,
+			ResizeChan:        rc,
 			BaseDirectoryPath: basepath,
+			Wallet:            wallet,
 		}); err != nil {
 			astilog.Fatal(err)
 		}
