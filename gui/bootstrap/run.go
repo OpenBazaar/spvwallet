@@ -86,12 +86,8 @@ func Run(o Options) (err error) {
 
 	if o.ResizeChan != nil {
 		go func() {
-			for range o.ResizeChan {
-				w.Resize(757, 700)
-				/*for i := 414; i < 700; i += 35 {
-
-					time.Sleep(time.Nanosecond)
-				}*/
+			for n := range o.ResizeChan {
+				w.Resize(684, n)
 			}
 		}()
 	}

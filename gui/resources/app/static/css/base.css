@@ -42,8 +42,8 @@ html {
 }
 
 .Wallet {
-    width: 742px;
-    height: 353px;
+    width: 668px;
+    height: 317px;
     border-radius: 2px;
     background-color: #ffffff;
     box-shadow: 0 1px 2px 0 #cfcfcf;
@@ -53,15 +53,15 @@ html {
 }
 
 .Stats {
-    width: 200px;
-    height: 353px;
+    width: 180px;
+    height: 317px;
     padding-right: 15px;
 }
 
 .Line {
     margin-top: 49.5px;
     width: 2px;
-    height: 291.1px;
+    height: 261.9px;
     border-left: solid 1px #dbdbdb;
 }
 
@@ -106,7 +106,7 @@ html {
 }
 
 .ToggleButton {
-    width: 169px;
+    width: 152px;
     height: 34.8px;
     border-radius: 2px;
     background-color: #ffffff;
@@ -117,7 +117,7 @@ html {
     font-weight: bold;
     color: #252525;
     margin-left: 15px;
-    margin-top: 92px;
+    margin-top: 55px;
     cursor: pointer;
 }
 
@@ -130,7 +130,7 @@ html {
 }
 
 .SendMoney {
-    padding-top: 55px;
+    padding-top: 40.5px;
     height: 18px;
     font-family: "noto_sans";
     font-size: 18px;
@@ -168,7 +168,7 @@ html {
 }
 
 .fieldlabel {
-    margin-top: 16px;
+    margin-top: 14.4px;
     margin-right: 12px;
     display: -webkit-flex;
     display: flex;
@@ -193,8 +193,8 @@ input::-webkit-inner-spin-button {
 }
 
 .input {
-    width: 366px;
-    height: 40px;
+    width: 329px;
+    height: 36px;
     font-family: "noto_sans";
     font-size: 14px;
     color: #252525;
@@ -203,7 +203,7 @@ input::-webkit-inner-spin-button {
 
 .Clear {
     width: 36px;
-    height: 19px;
+    height: 17.1px;
     opacity: 0.5;
     font-family: "noto_sans";
     font-size: 14px;
@@ -215,12 +215,12 @@ input::-webkit-inner-spin-button {
 
 .sendActions {
     margin-top: 13.5px;
-    margin-left: 332px;
+    margin-left: 298.8px;
 }
 
 .SendBtn {
     width: 91px;
-    height: 34.8px;
+    height: 31.4px;
     border-radius: 2px;
     background-image: linear-gradient(to bottom, #54d547, #2bad23);
     box-shadow: 0 0 3px 0 rgba(149, 149, 149, 0.5);
@@ -234,13 +234,13 @@ input::-webkit-inner-spin-button {
 }
 
 .actionBar {
-    height: 48px;
+    height: 43.2px;
     width: 100%
 }
 
 .tab {
-    height: 35px;
-    margin-top: 5px;
+    height: 31.5px;
+    margin-top: 3px;
     margin-right: 10px;
     border-radius: 2px;
     background-color: #ffffff;
@@ -249,10 +249,14 @@ input::-webkit-inner-spin-button {
 }
 
 .icon {
-    width: 20px;
-    height: 20px;
-    margin-top: 8px;
+    width: 18px;
+    height: 18px;
+    margin-top: 7px;
     margin-left: 10px;
+}
+
+.controldiv {
+    cursor: pointer;
 }
 
 .controlIcon {
@@ -261,7 +265,7 @@ input::-webkit-inner-spin-button {
 }
 
 .tabText {
-    margin-top: 1px;
+    margin-top: 0px;
     margin-left: 5px;
     font-family: "noto_sans";
     font-size: 14px;
@@ -272,9 +276,185 @@ input::-webkit-inner-spin-button {
 }
 
 .controlSpace {
-    width: 465px;
+    width: 350px;
 }
 
 .minimize {
     margin-right:0px;
+}
+
+.qrcode {
+    width: 200px;
+    margin-top:8px;
+    margin-left:158px;
+    height: 180px;
+}
+
+.display-address {
+    text-align: center;
+    line-height: 37px;
+    width: 319.5px;
+    height: 36px;
+    border-radius: 2px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 0 0 rgba(219, 219, 219, 0.5);
+    border: solid 1px #dbdbdb;
+    font-family: "noto_sans";
+    font-size: 14px;
+    color: #252525;
+    margin-left: 80px;
+    cursor: pointer;
+}
+
+.need {
+    padding-left: 180px;
+    padding-top: 10px;
+}
+
+.need-icon {
+    width: 18px;
+    height: 18px;
+    padding-right: 3px;
+}
+
+.need-bitcoin {
+    font-family: "noto_sans";
+    font-size: 15px;
+    font-weight: bold;
+    color: #252525;
+    text-decoration:underline;
+    cursor: pointer;
+}
+
+.popup {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.popup .popuptext {
+    visibility: hidden;
+    color: #fff;
+    text-align: center;
+    padding: 8px 0;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -89px;
+
+    width: 185px;
+    height: 115px;
+    border-radius: 2px;
+    background-color: #ffffff;
+    box-shadow: 0 -2px 2px 0 #e8e7e7;
+    border: solid 1px #d2d3d9;
+}
+
+.popup .popuptext:before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -10px;
+    border-width: 10px;
+    border-style: solid;
+    border-color: #d2d3d9 transparent transparent transparent;
+}
+
+.popup .popuptext::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    margin-left: -9px;
+    border-width: 9px;
+    border-style: solid;
+    border-color: #ffffff transparent transparent transparent;
+}
+
+.popup .show {
+    visibility: visible;
+    -webkit-animation: fadeIn .7s;
+    animation: fadeIn .7s;
+}
+
+@-webkit-keyframes fadeIn {
+    from {opacity: 0;}
+    to {opacity: 1;}
+}
+
+@keyframes fadeIn {
+    from {opacity: 0;}
+    to {opacity:1 ;}
+}
+
+.sure {
+    width: 100%;
+    text-align: center;
+    font-family: "noto_sans";
+    margin-top:10px;
+    font-size: 15px;
+    font-weight: bold;
+    color: #252525;
+}
+
+.warning {
+    width: 100%;
+    text-align: center;
+    font-family: "noto_sans";
+    margin-top:10px;
+    font-size: 10px;
+    color: #252525;
+    text-wrap:normal;
+    height:50px;
+}
+
+.separator {
+    width: 99.8%;
+    height: 0px;
+    margin-top: -10px;
+    background-color: #d2d3d9;
+    border: solid .4px #d2d3d9;
+}
+
+.confirmationActions {
+    margin-top: 6.5px;
+    margin-left: 40px;
+}
+
+.cancelPad {
+    margin-right: 6px;
+}
+
+.caution {
+    color: red;
+    font-family: "noto_sans";
+    font-size: 12px;
+    margin-top: 0px;
+    margin-left: 10px;
+    line-height: 2.43;
+    text-align: left;
+    margin-right: 10px;
+}
+
+.invalid-field {
+    margin-left: 83px;
+    margin-bottom: -20px;
+}
+
+.currencySelect {
+    margin-left: -65px;
+    width: 65px;
+    padding-lef: 14px;
+    opacity: 0.75;
+    font-family: "noto_sans";
+    background-color: #ffffff;
+    font-size: 13px;
+    color: #252525;
+    text-align-last:center;
 }

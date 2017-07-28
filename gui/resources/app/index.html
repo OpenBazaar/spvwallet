@@ -16,13 +16,13 @@
         </div>
         <div class="controlSpace"></div>
         <div class="tab flex">
-            <img class="icon controlIcon" src="settings.png">
+            <img class="icon controlIcon controldiv" src="settings.png">
         </div>
-        <div class="tab flex">
+        <div class="tab flex controldiv" onclick="showTransactions()">
             <img class="icon controlIcon" src="list.png">
         </div>
-        <div class="tab flex minimize">
-            <img class="icon controlIcon" src="minimize.png" onclick="minimizeToTray()">
+        <div class="tab flex minimize controldiv" onclick="minimizeToTray();">
+            <img class="icon controlIcon" src="minimize.png">
         </div>
     </div>
     <div class="Wallet">
@@ -34,21 +34,40 @@
             <div class="label">Value in USD</div>
             <div id="nTransactions" class="Stat pad"></div>
             <div class="label">Transactions</div>
-            <button id="sendReceiveButton" class="ToggleButton" onclick="toggleSendReceive()">Receive Money</button>
+            <button id="sendReceiveButton" class="ToggleButton" onclick="toggleSendReceive();">Receive Money</button>
         </div>
         <div class="Line"></div>
         <div id="sendMoney" class="WalletAction">
             <div class="SendMoney Center">Send Money</div>
+            <div id="invalidAddress" class="flex Hidden invalid-field">
+                <div class="flex">
+                    <div class="caution">⚠ Please provide an address</div>
+                </div>
+            </div>
+            <div id="spendError" class="flex Hidden invalid-field">
+                <div class="flex">
+                    <div id="error" class="caution"></div>
+                </div>
+            </div>
             <div class="SendField sndMarg">
                 <div class="SendField">
                     <div class="Description fieldlabel to">To<div class="asterisk">*</div></div>
                     <input id="address" type="text" placeholder="Enter a Bitcoin Address" class="input">
                 </div>
             </div>
+            <div id="invalidAmount" class="flex Hidden invalid-field">
+                <div class="flex">
+                    <div class="caution">⚠ Please provide an amount as a number</div>
+                </div>
+            </div>
             <div class="SendField">
                 <div class="SendField">
                     <div class="Description fieldlabel amount">Amount<div class="asterisk">*</div></div>
                     <input id="amount" type="number" placeholder="0.00" class="input">
+                    <select id="amountType" class="currencySelect" onChange="onCurrencyChange(this.selectedIndex);">
+                        <option value="fiat">USD</option>
+                        <option value="btc">BTC</option>
+                    </select>
                 </div>
             </div>
             <div class="SendField">
@@ -58,45 +77,97 @@
                 </div>
             </div>
             <div class="sendActions flex">
-                <div class="Clear" onclick="clearFields()">Clear</div>
-                <button class="SendBtn">Send</button>
+                <div class="Clear" onclick="clearFields();">Clear</div>
+                <div class="popup">
+                    <span class="popuptext" id="confirmationPopup">
+                        <div class="sure">Are you sure?</div>
+                        <div class="warning">Double check that the address and amount is correct</div>
+                        <div class="separator"></div>
+                        <div class="flex confirmationActions">
+                            <div class="Clear cancelPad" onclick="closePopup();">Cancel</div>
+                            <button class="SendBtn" onclick="sendTransaction()">Yes, Send</button>
+                        </div>
+                    </span>
+                    <button class="SendBtn" onclick="askForConfirmation();">Send</button>
+                </div>
             </div>
         </div>
         <div id="receiveMoney" class="WalletAction Hidden">
             <div class="SendMoney Center">Receive Money</div>
+            <div id="qrcode" class="qrcode"></div>
+            <div id="displayAddress" class="display-address" onclick="copyAddress();"></div>
+            <div class="flex need">
+                <img class="need-icon" src="icon.png">
+                <div class="need-bitcoin" onclick="openCoinbase();return false;" href="#">Need Bitcoin?</div>
+            </div>
         </div>
     </div>
 </body>
+<script type='text/javascript' src="js/qrcode.min.js"></script>
 <script>
-    // TODO: this will need to go in a settings eventually
-    var fiatCode = "USD";
-    var fiatSymbol = "$";
+    var settings;
+    var qr;
 
     function statsLoop() {
-        astilectron.send({name: "getStats", payload: {currencyCode: fiatCode}});
-        setTimeout(statsLoop, 15000);
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+        setTimeout(statsLoop, 10000);
     }
     document.addEventListener('astilectron-ready', function() {
         astilectron.listen(function(message) {
             switch (message.name) {
+                case "settings":
+                    if (message.payload == "") {
+                        console.log("new settings");
+                        var s = {
+                            fiatCode: "USD",
+                            fiatSymbol: "$",
+                            feeLevel: "priority",
+                            selectBox: "btc"
+                        };
+                        settings = s;
+                        astilectron.send({name: "putSettings", payload: JSON.stringify(s)});
+                    } else {
+                        settings = JSON.parse(message.payload)
+                    }
+                    var selectBox = document.getElementById('amountType');
+                    selectBox.value = settings.selectBox;
+                    statsLoop();
+                    break;
                 case "statsUpdate":
                     // TODO: eventually want to display the balance in BTC, mBtc, bits, or Satoshi.
                     var balance = message.payload.confirmed / 100000000;
-                    document.getElementById("btc-balance").innerHTML = balance;
-                    document.getElementById("fiat-balance").innerHTML = fiatSymbol.concat(message.payload.fiat);
+                    document.getElementById("btc-balance").innerHTML = Math.round(balance*100000)/100000;
+                    document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol.concat(message.payload.fiat);
                     document.getElementById("nTransactions").innerHTML = message.payload.transactions;
-                    document.getElementById("exchangeRate").innerHTML = message.payload.exchangeRate;
+                    document.getElementById("exchangeRate").innerHTML = settings.fiatSymbol.concat(message.payload.exchangeRate);
                     document.getElementById("height").innerHTML = message.payload.height;
+                    break;
+                case "address":
+                    qr.clear()
+                    qr.makeCode("bitcoin:"+message.payload)
+                    document.getElementById("displayAddress").innerHTML = message.payload;
+                    break;
+                case "spendError":
+                    var spendError = document.getElementById("spendError")
+                    document.getElementById("error").innerHTML = "⚠ " + message.payload;
+                    spendError.style.display = 'block';
                     break;
             }
         });
-        statsLoop();
+        qr = new QRCode(document.getElementById("qrcode"), {
+            text: "",
+            height: 170,
+            width: 170
+        });
+        astilectron.send({name: "getSettings"});
+        astilectron.send({name: "getAddress"});
     });
     function toggleSendReceive() {
         var btn = document.getElementById("sendReceiveButton");
         var send = document.getElementById('sendMoney');
         var receive = document.getElementById('receiveMoney');
         if (btn.innerText == "Receive Money") {
+            astilectron.send({name: "getAddress"});
             btn.innerText = "Send Money";
             receive.style.display = 'block';
             send.style.display = 'none';
@@ -111,10 +182,100 @@
         document.getElementById("address").value = "";
         document.getElementById("amount").value = "";
         document.getElementById("note").value = "";
+        var invalidAmount = document.getElementById("invalidAmount");
+        invalidAmount.style.display = 'none';
+        var invalidAddress = document.getElementById("invalidAddress");
+        invalidAddress.style.display = 'none';
+        var spendError = document.getElementById("spendError");
+        spendError.style.display = 'none';
     }
 
     function minimizeToTray() {
         astilectron.send({name: "minimize"});
+    }
+
+    function copyAddress(){
+        var d = document.getElementById("displayAddress").innerHTML;
+        astilectron.send({name: "clipboard", payload:{data:d}});
+        document.getElementById("displayAddress").innerHTML = "Copied";
+        setTimeout(function () {
+            document.getElementById("displayAddress").innerHTML = d;
+        }, 1000);
+    }
+
+    function openCoinbase() {
+        astilectron.send({name: "openbrowser"});
+    }
+
+    function askForConfirmation() {
+        var popup = document.getElementById("confirmationPopup");
+        popup.classList.toggle("show");
+    }
+
+    function closePopup() {
+        var popup = document.getElementById("confirmationPopup");
+        popup.classList.toggle("show");
+    }
+
+    function sendTransaction() {
+        var nTransactions = document.getElementById("nTransactions").innerHTML;
+
+        var invalidAddress = document.getElementById("invalidAddress");
+        var invalidAmount = document.getElementById("invalidAmount");
+        var spendError = document.getElementById("spendError");
+        invalidAddress.style.display = 'none';
+        invalidAmount.style.display = 'none';
+        spendError.style.display = 'none';
+
+        var address = document.getElementById("address").value;
+        var valid = true;
+        if (address == "") {
+            invalidAddress.style.display = 'block';
+            valid = false
+        }
+        var amount = document.getElementById("amount").value;
+        if (amount == "") {
+            invalidAmount.style.display = 'block';
+            valid = false;
+        }
+        if (!valid) {
+            closePopup();
+            return
+        }
+
+        var e = document.getElementById("amountType");
+        var amountType = e.options[e.selectedIndex].value;
+        var satoshis;
+        if (amountType == "btc") {
+            satoshis = amount * 100000000;
+        } else {
+            var rate = parseFloat(document.getElementById("exchangeRate").innerHTML.substring(1));
+            satoshis = (amount / rate) * 100000000;
+        }
+
+        var note = document.getElementById("note").value;
+        document.getElementById("nTransactions").innerHTML = parseInt(nTransactions) + 1;
+        astilectron.send({name: "send", payload:{address: address, amount: satoshis, feeLevel: settings.feeLevel, note: note}});
+        closePopup();
+        clearFields();
+    }
+
+    function onCurrencyChange(idx) {
+        var e = document.getElementById("amountType");
+        var amountType = e.options[idx].value;
+        settings.selectBox = amountType;
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+    }
+
+    var showingTransactions = false;
+    function showTransactions() {
+        if (!showingTransactions) {
+            astilectron.send({name: "showTransactions"});
+            showingTransactions = true;
+        } else {
+            astilectron.send({name: "hideTransactions"});
+            showingTransactions = false;
+        }
     }
 </script>
 </body>

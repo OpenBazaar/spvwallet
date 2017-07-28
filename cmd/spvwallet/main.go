@@ -13,17 +13,22 @@ import (
 	"github.com/OpenBazaar/spvwallet/gui/bootstrap"
 	"github.com/asticode/go-astilectron"
 	"github.com/asticode/go-astilog"
+	"github.com/atotto/clipboard"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcutil"
 	"github.com/fatih/color"
 	"github.com/jessevdk/go-flags"
 	"github.com/natefinch/lumberjack"
 	"github.com/op/go-logging"
+	"github.com/skratchdot/open-golang/open"
 	"github.com/yawning/bulb"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
 	"os/signal"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -60,17 +65,22 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-	parser.AddCommand("start",
-		"start the wallet",
-		"The start command starts the wallet daemon",
-		&start)
-	parser.AddCommand("version",
-		"print the version number",
-		"Print the version number and exit",
-		&version)
-	cli.SetupCli(parser)
-	if _, err := parser.Parse(); err != nil {
-		os.Exit(1)
+	if len(os.Args) == 1 {
+		start.Gui = true
+		start.Execute([]string{})
+	} else {
+		parser.AddCommand("start",
+			"start the wallet",
+			"The start command starts the wallet daemon",
+			&start)
+		parser.AddCommand("version",
+			"print the version number",
+			"Print the version number and exit",
+			&version)
+		cli.SetupCli(parser)
+		if _, err := parser.Parse(); err != nil {
+			os.Exit(1)
+		}
 	}
 }
 
@@ -185,6 +195,7 @@ func (x *Start) Execute(args []string) error {
 	printSplashScreen()
 
 	if x.Gui {
+		go wallet.Start()
 		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
 
 		type Stats struct {
@@ -198,7 +209,6 @@ func (x *Start) Execute(args []string) error {
 		tc := make(chan struct{})
 		rc := make(chan int)
 
-		//go wallet.Start()
 		os.RemoveAll(path.Join(basepath, "resources"))
 		iconPath := path.Join(basepath, "icon.png")
 		_, err := os.Stat(iconPath)
@@ -258,19 +268,92 @@ func (x *Start) Execute(args []string) error {
 						ExchangeRate: fmt.Sprintf("%.2f", rate),
 					}
 					w.Send(bootstrap.MessageOut{Name: "statsUpdate", Payload: st})
+				case "getAddress":
+					addr := wallet.CurrentAddress(spvwallet.EXTERNAL)
+					w.Send(bootstrap.MessageOut{Name: "address", Payload: addr.EncodeAddress()})
+				case "send":
+					type P struct {
+						Address  string  `json:"address"`
+						Amount   float64 `json:"amount"`
+						Note     string  `json:"note"`
+						FeeLevel string  `json:"feeLevel"`
+					}
+					var p P
+					if err := json.Unmarshal(m.Payload, &p); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					var feeLevel spvwallet.FeeLevel
+					switch strings.ToLower(p.FeeLevel) {
+					case "priority":
+						feeLevel = spvwallet.PRIOIRTY
+					case "normal":
+						feeLevel = spvwallet.NORMAL
+					case "economic":
+						feeLevel = spvwallet.ECONOMIC
+					default:
+						feeLevel = spvwallet.NORMAL
+					}
+					addr, err := btcutil.DecodeAddress(p.Address, wallet.Params())
+					if err != nil {
+						w.Send(bootstrap.MessageOut{Name: "spendError", Payload: "Invalid address"})
+						return
+					}
+					_, err = wallet.Spend(int64(p.Amount), addr, feeLevel)
+					if err != nil {
+						w.Send(bootstrap.MessageOut{Name: "spendError", Payload: err.Error()})
+					}
+				case "clipboard":
+					type P struct {
+						Data string `json:"data"`
+					}
+					var p P
+					if err := json.Unmarshal(m.Payload, &p); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					clipboard.WriteAll(p.Data)
+				case "putSettings":
+					var settings string
+					if err := json.Unmarshal(m.Payload, &settings); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					f, err := os.Create(path.Join(basepath, "settings.json"))
+					if err != nil {
+						astilog.Error(err.Error())
+						return
+					}
+					defer f.Close()
+					f.WriteString(settings)
+				case "getSettings":
+					settings, err := ioutil.ReadFile(path.Join(basepath, "settings.json"))
+					if err != nil {
+						astilog.Error(err.Error())
+					}
+					w.Send(bootstrap.MessageOut{Name: "settings", Payload: string(settings)})
+				case "openbrowser":
+					open.Run("https://coinbase.com")
 				case "minimize":
 					go func() {
-						//w.Hide()
-						//tc <- struct{}{}
-						rc <- 2
+						w.Hide()
+						tc <- struct{}{}
+					}()
+				case "showTransactions":
+					go func() {
+						rc <- 700
+					}()
+				case "hideTransactions":
+					go func() {
+						rc <- 377
 					}()
 				}
 			},
 			RestoreAssets: gui.RestoreAssets,
 			WindowOptions: &astilectron.WindowOptions{
 				Center:         astilectron.PtrBool(true),
-				Height:         astilectron.PtrInt(415),
-				Width:          astilectron.PtrInt(757),
+				Height:         astilectron.PtrInt(375),
+				Width:          astilectron.PtrInt(683),
 				Maximizable:    astilectron.PtrBool(false),
 				Fullscreenable: astilectron.PtrBool(false),
 				Resizable:      astilectron.PtrBool(false),
