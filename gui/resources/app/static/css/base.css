@@ -1,20 +1,237 @@
-html, body {
-    background-color: #333;
-    color: #fff;
-    height: 100%;
-    margin: 0;
-    padding: 0;
+@font-face {
+    font-family: 'noto_sans';
+    src: url('../fonts/NotoSans-Regular-webfont.ttf') format('truetype');
+    font-weight: normal;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'noto_sans';
+    src: url('../fonts/NotoSans-Bold-webfont.ttf') format('truetype');
+    font-weight: bold;
+    font-style: normal;
+}
+
+@font-face {
+    font-family: 'noto_sans';
+    src: url('../fonts/NotoSans-Italic-webfont.ttf') format('truetype');
+    font-weight: normal;
+    font-style: italic;
+}
+
+@font-face {
+    font-family: 'noto_sans';
+    src: url('../fonts/NotoSans-BoldItalic-webfont.ttf') format('truetype');
+    font-weight: bold;
+    font-style: italic;
+}
+
+html {
+    color: #262626;
+    font-family: "noto_sans";
+    font-size: 10px;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+    letter-spacing: 0;
+    line-height: 1.2;
+}
+
+.flex {
+    display: -webkit-flex;
+    display: flex;
+}
+
+.Wallet {
+    width: 742px;
+    height: 353px;
+    border-radius: 2px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 2px 0 #cfcfcf;
+    border: solid 1px #d2d3d9;
+    display: -webkit-flex;
+    display: flex;
+}
+
+.Stats {
+    width: 200px;
+    height: 353px;
+    padding-right: 15px;
+}
+
+.Line {
+    margin-top: 49.5px;
+    width: 2px;
+    height: 291.1px;
+    border-left: solid 1px #dbdbdb;
+}
+
+.Funds {
+    width: 48px;
+    height: 18px;
+    font-family: "noto_sans";
+    font-size: 16px;
+    font-weight: bold;
+    line-height: 1.13;
+    color: #252525;
+    padding-top: 15px;
+    padding-left: 15px;
+}
+
+.Stat {
+    font-family: "noto_sans";
+    font-size: 22px;
+    font-weight: bold;
+    letter-spacing: 0.4px;
+    padding-left: 15px;
+    color: #2bad23;
+    margin-bottom: -10px;
+}
+
+.pad {
+    padding-top: 11px;
+}
+
+.label {
+    opacity: 0.75;
+    font-family: "noto_sans";
+    font-size: 14px;
+    line-height: 2.43;
+    text-align: left;
+    color: #000000;
+    padding-left: 15px;
+}
+
+.btc-total {
+    padding-top: 11px;
+}
+
+.ToggleButton {
+    width: 169px;
+    height: 34.8px;
+    border-radius: 2px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 0 0 rgba(219, 219, 219, 0.5);
+    border: solid 1px #dbdbdb;
+    font-family: "noto_sans";
+    font-size: 13px;
+    font-weight: bold;
+    color: #252525;
+    margin-left: 15px;
+    margin-top: 92px;
+    cursor: pointer;
+}
+
+.WalletAction {
     width: 100%;
 }
 
-.wrapper {
-    display: table;
-    height: 100%;
-    width: 100%;
-}
-
-.content {
-    display: table-cell;
+.Center {
     text-align: center;
-    vertical-align: middle;
 }
+
+.SendMoney {
+    padding-top: 55px;
+    height: 18px;
+    font-family: "noto_sans";
+    font-size: 18px;
+    font-weight: bold;
+    line-height: 1;
+    color: #252525;
+    margin-bottom: -5px;
+}
+
+.Hidden {
+    display: none;
+}
+
+.sndMarg {
+    margin-top: 8px;
+}
+
+.SendField {
+    display: -webkit-flex;
+    display: flex;
+    align-content: center;
+    width: 100%;
+    margin-top: 10px;
+}
+
+.Description {
+    font-family: "noto_sans";
+    font-size: 14px;
+    color: #252525;
+}
+
+.Description .asterisk {
+    font-weight: bold;
+    color: #2bad23;
+}
+
+.fieldlabel {
+    margin-top: 16px;
+    margin-right: 12px;
+    display: -webkit-flex;
+    display: flex;
+}
+
+.to {
+    margin-left: 58px;
+}
+
+.amount {
+    margin-left: 23px;
+}
+
+.note {
+    margin-left: 51px;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.input {
+    width: 366px;
+    height: 40px;
+    font-family: "noto_sans";
+    font-size: 14px;
+    color: #252525;
+    padding-left: 6.5px;
+}
+
+.Clear {
+    width: 36px;
+    height: 19px;
+    opacity: 0.5;
+    font-family: "noto_sans";
+    font-size: 14px;
+    letter-spacing: 0.3px;
+    color: #252525;
+    margin-top: 10px;
+    cursor: pointer;
+}
+
+.sendActions {
+    margin-top: 13.5px;
+    margin-left: 332px;
+}
+
+.SendBtn {
+    width: 91px;
+    height: 34.8px;
+    border-radius: 2px;
+    background-image: linear-gradient(to bottom, #54d547, #2bad23);
+    box-shadow: 0 0 3px 0 rgba(149, 149, 149, 0.5);
+    border: solid 2px #ffffff;
+    font-family: "noto_sans";
+    font-size: 13px;
+    font-weight: bold;
+    color: #ffffff;
+    margin-left:9.3px;
+    cursor: pointer;
+}
+
+
+

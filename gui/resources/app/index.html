@@ -5,26 +5,91 @@
     <link rel="stylesheet" href="static/css/base.css"/>
 </head>
 <body>
-    <div class="wrapper">
-        <div class="content">
-            <div>Welcome to Astilectron's bootstrap!</div>
-            <div id="click" style="cursor: pointer; text-decoration: underline">Click here to get a hello</div>
+    <div class="Wallet">
+        <div class="Stats">
+            <div class="Funds">Funds</div>
+            <div id="btc-balance" class="Stat pad"></div>
+            <div class="label">Bitcoin</div>
+            <div id="fiat-balance" class="Stat pad"></div>
+            <div class="label">Value in USD</div>
+            <div id="nTransactions" class="Stat pad"></div>
+            <div class="label">Transactions</div>
+            <button id="sendReceiveButton" class="ToggleButton" onclick="toggleSendReceive()">Receive Money</button>
+        </div>
+        <div class="Line"></div>
+        <div id="sendMoney" class="WalletAction">
+            <div class="SendMoney Center">Send Money</div>
+            <div class="SendField sndMarg">
+                <div class="SendField">
+                    <div class="Description fieldlabel to">To<div class="asterisk">*</div></div>
+                    <input id="address" type="text" placeholder="Enter a Bitcoin Address" class="input">
+                </div>
+            </div>
+            <div class="SendField">
+                <div class="SendField">
+                    <div class="Description fieldlabel amount">Amount<div class="asterisk">*</div></div>
+                    <input id="amount" type="number" placeholder="0.00" class="input">
+                </div>
+            </div>
+            <div class="SendField">
+                <div class="SendField">
+                    <div class="Description fieldlabel note">Note</div>
+                    <input id="note" type="text" placeholder="Only seen by you" class="input">
+                </div>
+            </div>
+            <div class="sendActions flex">
+                <div class="Clear" onclick="clearFields()">Clear</div>
+                <button class="SendBtn">Send</button>
+            </div>
+        </div>
+        <div id="receiveMoney" class="WalletAction Hidden">
+            <div class="SendMoney Center">Receive Money</div>
         </div>
     </div>
+</body>
 <script>
-    // Wait for astilectron to be ready
+    // TODO: this will need to go in a settings eventually
+    var fiatCode = "USD";
+    var fiatSymbol = "$";
+
+    function statsLoop() {
+        astilectron.send({name: "getStats", payload: {currencyCode: fiatCode}});
+        setTimeout(statsLoop, 15000);
+    }
     document.addEventListener('astilectron-ready', function() {
         astilectron.listen(function(message) {
             switch (message.name) {
-                case "say":
-                    alert(message.payload.message);
+                case "statsUpdate":
+                    // TODO: eventually want to display the balance in BTC, mBtc, bits, or Satoshi.
+                    var balance = message.payload.confirmed / 100000000;
+                    document.getElementById("btc-balance").innerHTML = balance;
+                    document.getElementById("fiat-balance").innerHTML = fiatSymbol.concat(message.payload.fiat);
+                    document.getElementById("nTransactions").innerHTML = message.payload.transactions;
                     break;
             }
         });
-        document.getElementById("click").onclick = function() {
-            astilectron.send({name: "say", payload: {message: "hello"}})
-        }
+        statsLoop();
     });
+    function toggleSendReceive() {
+        var btn = document.getElementById("sendReceiveButton");
+        var send = document.getElementById('sendMoney');
+        var receive = document.getElementById('receiveMoney');
+        if (btn.innerText == "Receive Money") {
+            btn.innerText = "Send Money";
+            receive.style.display = 'block';
+            send.style.display = 'none';
+        } else {
+            btn.innerText = "Receive Money";
+            receive.style.display = 'none';
+            send.style.display = 'block';
+        }
+    }
+
+    function clearFields() {
+        document.getElementById("address").value = "";
+        document.getElementById("amount").value = "";
+        document.getElementById("note").value = "";
+    }
 </script>
 </body>
 </html>

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/OpenBazaar/openbazaar-go/bitcoin/exchange"
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api"
 	"github.com/OpenBazaar/spvwallet/cli"
@@ -88,6 +89,7 @@ func (x *Start) Execute(args []string) error {
 	if x.Testnet && x.Regtest {
 		return errors.New("Invalid combination of testnet and regtest modes")
 	}
+	basepath := config.RepoPath
 	if x.Testnet {
 		config.Params = &chaincfg.TestNet3Params
 		config.RepoPath = path.Join(config.RepoPath, "testnet")
@@ -183,8 +185,18 @@ func (x *Start) Execute(args []string) error {
 	printSplashScreen()
 
 	if x.Gui {
-		go wallet.Start()
-		iconPath := path.Join(config.RepoPath, "icon.png")
+		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
+
+		type Stats struct {
+			Confirmed    int64  `json:"confirmed"`
+			Fiat         string `json:"fiat"`
+			Transactions int    `json:"transactions"`
+			Height       uint32 `json:"height"`
+		}
+
+		//go wallet.Start()
+		os.RemoveAll(path.Join(basepath, "resources"))
+		iconPath := path.Join(basepath, "icon.png")
 		_, err := os.Stat(iconPath)
 		if os.IsNotExist(err) {
 			f, err := os.Create(iconPath)
@@ -205,38 +217,57 @@ func (x *Start) Execute(args []string) error {
 				AppName:            "spvwallet",
 				AppIconDefaultPath: iconPath,
 				//AppIconDarwinPath:  p + "/gopher.icns",
-				BaseDirectoryPath: config.RepoPath,
+				BaseDirectoryPath: basepath,
 			},
 			Homepage: "index.html",
 			MessageHandler: func(w *astilectron.Window, m bootstrap.MessageIn) {
 				switch m.Name {
-				case "say":
-					// Unmarshal
+				case "getStats":
 					type P struct {
-						Message string `json:"message"`
+						CurrencyCode string `json:"currencyCode"`
 					}
 					var p P
 					if err := json.Unmarshal(m.Payload, &p); err != nil {
 						astilog.Errorf("Unmarshaling %s failed", m.Payload)
 						return
 					}
+					confirmed, _ := wallet.Balance()
+					txs, err := wallet.Transactions()
+					if err != nil {
+						astilog.Errorf(err.Error())
+						return
+					}
+					rate, err := exchangeRates.GetExchangeRate(p.CurrencyCode)
+					if err != nil {
+						astilog.Errorf("Failed to get exchange rate")
+						return
+					}
+					btcVal := confirmed / 100000000
+					fiatVal := float64(btcVal) * rate
+					height := wallet.ChainTip()
 
-					// Send
-					w.Send(bootstrap.MessageOut{Name: "say", Payload: p})
+					st := Stats{
+						Confirmed:    confirmed,
+						Fiat:         fmt.Sprintf("%.2f", fiatVal),
+						Transactions: len(txs),
+						Height:       height,
+					}
+					w.Send(bootstrap.MessageOut{Name: "statsUpdate", Payload: st})
 				}
 			},
 			RestoreAssets: gui.RestoreAssets,
 			WindowOptions: &astilectron.WindowOptions{
 				Center:         astilectron.PtrBool(true),
-				Height:         astilectron.PtrInt(600),
-				Width:          astilectron.PtrInt(600),
+				Height:         astilectron.PtrInt(370),
+				Width:          astilectron.PtrInt(757),
 				Maximizable:    astilectron.PtrBool(false),
 				Fullscreenable: astilectron.PtrBool(false),
 				Resizable:      astilectron.PtrBool(false),
 			},
 			TrayOptions: &astilectron.TrayOptions{
-				Image: astilectron.PtrStr(path.Join(config.RepoPath, "icon.png")),
+				Image: astilectron.PtrStr(iconPath),
 			},
+			BaseDirectoryPath: basepath,
 		}); err != nil {
 			astilog.Fatal(err)
 		}

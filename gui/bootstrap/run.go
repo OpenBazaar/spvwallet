@@ -94,7 +94,7 @@ func Run(o Options) (err error) {
 			{
 				Label: astilectron.PtrStr("Exit"),
 				OnClick: func(e astilectron.Event) (deleteListener bool) {
-					a.Stop()
+					a.Close()
 					return false
 				},
 				Enabled: &b,
