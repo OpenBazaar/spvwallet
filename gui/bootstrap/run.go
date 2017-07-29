@@ -87,7 +87,7 @@ func Run(o Options) (err error) {
 	if o.ResizeChan != nil {
 		go func() {
 			for n := range o.ResizeChan {
-				w.Resize(684, n)
+				w.Resize(617, n)
 			}
 		}()
 	}

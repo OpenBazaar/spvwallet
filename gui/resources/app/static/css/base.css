@@ -42,8 +42,8 @@ html {
 }
 
 .Wallet {
-    width: 668px;
-    height: 317px;
+    width: 601.2px;
+    height: 285px;
     border-radius: 2px;
     background-color: #ffffff;
     box-shadow: 0 1px 2px 0 #cfcfcf;
@@ -53,38 +53,38 @@ html {
 }
 
 .Stats {
-    width: 180px;
-    height: 317px;
-    padding-right: 15px;
+    width: 162px;
+    height: 285px;
+    padding-right: 13.5px;
 }
 
 .Line {
-    margin-top: 49.5px;
+    margin-top: 44.5px;
     width: 2px;
-    height: 261.9px;
+    height: 235.7px;
     border-left: solid 1px #dbdbdb;
 }
 
 .Funds {
-    width: 48px;
+    width: 43.2px;
     height: 18px;
     font-family: "noto_sans";
-    font-size: 16px;
+    font-size: 14px;
     font-weight: bold;
     line-height: 1.13;
     color: #252525;
-    padding-top: 15px;
-    padding-left: 15px;
+    padding-top: 13.5px;
+    padding-left: 13.5px;
 }
 
 .Stat {
     font-family: "noto_sans";
-    font-size: 22px;
+    font-size: 18px;
     font-weight: bold;
     letter-spacing: 0.4px;
     padding-left: 15px;
     color: #2bad23;
-    margin-bottom: -10px;
+    margin-bottom: -8px;
 }
 
 .pad {
@@ -94,7 +94,7 @@ html {
 .label {
     opacity: 0.75;
     font-family: "noto_sans";
-    font-size: 14px;
+    font-size: 11.5px;
     line-height: 2.43;
     text-align: left;
     color: #000000;
@@ -106,18 +106,18 @@ html {
 }
 
 .ToggleButton {
-    width: 152px;
-    height: 34.8px;
+    width: 136.8px;
+    height: 31.3px;
     border-radius: 2px;
     background-color: #ffffff;
     box-shadow: 0 1px 0 0 rgba(219, 219, 219, 0.5);
     border: solid 1px #dbdbdb;
     font-family: "noto_sans";
-    font-size: 13px;
+    font-size: 11.7px;
     font-weight: bold;
     color: #252525;
-    margin-left: 15px;
-    margin-top: 55px;
+    margin-left: 13.5px;
+    margin-top: 60px;
     cursor: pointer;
 }
 
@@ -130,8 +130,8 @@ html {
 }
 
 .SendMoney {
-    padding-top: 40.5px;
-    height: 18px;
+    padding-top: 36.4px;
+    height: 16.2px;
     font-family: "noto_sans";
     font-size: 18px;
     font-weight: bold;
@@ -158,7 +158,7 @@ html {
 
 .Description {
     font-family: "noto_sans";
-    font-size: 14px;
+    font-size: 12.6px;
     color: #252525;
 }
 
@@ -168,22 +168,22 @@ html {
 }
 
 .fieldlabel {
-    margin-top: 14.4px;
+    margin-top: 13px;
     margin-right: 12px;
     display: -webkit-flex;
     display: flex;
 }
 
 .to {
-    margin-left: 58px;
+    margin-left: 53px;
 }
 
 .amount {
-    margin-left: 23px;
+    margin-left: 18px;
 }
 
 .note {
-    margin-left: 51px;
+    margin-left: 46px;
 }
 
 input::-webkit-outer-spin-button,
@@ -193,12 +193,12 @@ input::-webkit-inner-spin-button {
 }
 
 .input {
-    width: 329px;
-    height: 36px;
+    width: 296px;
+    height: 32.4px;
     font-family: "noto_sans";
-    font-size: 14px;
+    font-size: 12.6px;
     color: #252525;
-    padding-left: 6.5px;
+    padding-left: 5.85px;
 }
 
 .Clear {
@@ -206,7 +206,7 @@ input::-webkit-inner-spin-button {
     height: 17.1px;
     opacity: 0.5;
     font-family: "noto_sans";
-    font-size: 14px;
+    font-size: 12.6px;
     letter-spacing: 0.3px;
     color: #252525;
     margin-top: 10px;
@@ -215,31 +215,32 @@ input::-webkit-inner-spin-button {
 
 .sendActions {
     margin-top: 13.5px;
-    margin-left: 298.8px;
+    margin-left: 265.4px;
 }
 
 .SendBtn {
-    width: 91px;
-    height: 31.4px;
+    width: 81.9px;
+    height: 28.3px;
     border-radius: 2px;
     background-image: linear-gradient(to bottom, #54d547, #2bad23);
     box-shadow: 0 0 3px 0 rgba(149, 149, 149, 0.5);
     border: solid 2px #ffffff;
     font-family: "noto_sans";
-    font-size: 13px;
+    font-size: 12.6px;
     font-weight: bold;
     color: #ffffff;
-    margin-left:9.3px;
+    margin-left:8.4px;
+    margin-right: -20px;
     cursor: pointer;
 }
 
 .actionBar {
-    height: 43.2px;
+    height: 38.8px;
     width: 100%
 }
 
 .tab {
-    height: 31.5px;
+    height: 28.3px;
     margin-top: 3px;
     margin-right: 10px;
     border-radius: 2px;
@@ -249,9 +250,9 @@ input::-webkit-inner-spin-button {
 }
 
 .icon {
-    width: 18px;
-    height: 18px;
-    margin-top: 7px;
+    width: 16.2px;
+    height: 16.2px;
+    margin-top: 6px;
     margin-left: 10px;
 }
 
@@ -268,7 +269,7 @@ input::-webkit-inner-spin-button {
     margin-top: 0px;
     margin-left: 5px;
     font-family: "noto_sans";
-    font-size: 14px;
+    font-size: 12.6px;
     font-weight: bold;
     line-height: 2.43;
     text-align: left;
@@ -284,42 +285,42 @@ input::-webkit-inner-spin-button {
 }
 
 .qrcode {
-    width: 200px;
+    width: 180px;
     margin-top:8px;
-    margin-left:158px;
-    height: 180px;
+    margin-left:141px;
+    height: 162px;
 }
 
 .display-address {
     text-align: center;
-    line-height: 37px;
-    width: 319.5px;
-    height: 36px;
+    line-height: 33px;
+    width: 287.55px;
+    height: 32.4px;
     border-radius: 2px;
     background-color: #ffffff;
     box-shadow: 0 1px 0 0 rgba(219, 219, 219, 0.5);
     border: solid 1px #dbdbdb;
     font-family: "noto_sans";
-    font-size: 14px;
+    font-size: 12.6px;
     color: #252525;
-    margin-left: 80px;
+    margin-left: 75px;
     cursor: pointer;
 }
 
 .need {
-    padding-left: 180px;
+    padding-left: 162px;
     padding-top: 10px;
 }
 
 .need-icon {
-    width: 18px;
-    height: 18px;
-    padding-right: 3px;
+    width: 16.2px;
+    height: 16.2px;
+    padding-right: 2.7px;
 }
 
 .need-bitcoin {
     font-family: "noto_sans";
-    font-size: 15px;
+    font-size: 13.5px;
     font-weight: bold;
     color: #252525;
     text-decoration:underline;
@@ -340,15 +341,15 @@ input::-webkit-inner-spin-button {
     visibility: hidden;
     color: #fff;
     text-align: center;
-    padding: 8px 0;
+    padding: 7.2px 0;
     position: absolute;
     z-index: 1;
     bottom: 125%;
     left: 50%;
-    margin-left: -89px;
+    margin-left: -70px;
 
-    width: 185px;
-    height: 115px;
+    width: 166.5px;
+    height: 103.9px;
     border-radius: 2px;
     background-color: #ffffff;
     box-shadow: 0 -2px 2px 0 #e8e7e7;
@@ -397,8 +398,8 @@ input::-webkit-inner-spin-button {
     width: 100%;
     text-align: center;
     font-family: "noto_sans";
-    margin-top:10px;
-    font-size: 15px;
+    margin-top:9px;
+    font-size: 13.5px;
     font-weight: bold;
     color: #252525;
 }
@@ -408,7 +409,7 @@ input::-webkit-inner-spin-button {
     text-align: center;
     font-family: "noto_sans";
     margin-top:10px;
-    font-size: 10px;
+    font-size: 9px;
     color: #252525;
     text-wrap:normal;
     height:50px;
@@ -417,25 +418,27 @@ input::-webkit-inner-spin-button {
 .separator {
     width: 99.8%;
     height: 0px;
-    margin-top: -10px;
+    margin-top: -15px;
     background-color: #d2d3d9;
     border: solid .4px #d2d3d9;
 }
 
 .confirmationActions {
-    margin-top: 6.5px;
-    margin-left: 40px;
+    margin-top: 5.5px;
+    margin-left: 30px;
 }
 
 .cancelPad {
-    margin-right: 6px;
+    margin-right: 5.4px;
+    margin-top: 5.5px;
 }
 
 .caution {
     color: red;
     font-family: "noto_sans";
     font-size: 12px;
-    margin-top: 0px;
+    margin-top: 1px;
+    margin-bottom: -3px;
     margin-left: 10px;
     line-height: 2.43;
     text-align: left;
@@ -454,7 +457,59 @@ input::-webkit-inner-spin-button {
     opacity: 0.75;
     font-family: "noto_sans";
     background-color: #ffffff;
-    font-size: 13px;
+    font-size: 12.6px;
     color: #252525;
     text-align-last:center;
+}
+
+.Transactions {
+    width: 601.2px;
+    height: 285px;
+    margin-top: 10px;
+    display: none;
+    border-radius: 2px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 2px 0 #cfcfcf;
+    border: solid 1px #d2d3d9;
+    padding-bottom: 12px;
+    overflow-y: scroll;
+}
+
+.Transactions::-webkit-scrollbar-track
+{
+    background-color: #F5F5F5;
+}
+
+.Transactions::-webkit-scrollbar
+{
+    width: 8px;
+    background-color: #F5F5F5;
+}
+
+.Transactions::-webkit-scrollbar-thumb
+{
+    background-color: #2bad23;
+    border: 2px solid #2bad23;
+}
+
+.transactions-label {
+    margin-top: 12px;
+    margin-left:12px;
+    height: 15.2px;
+    font-family: "noto_sans";
+    font-size: 18px;
+    font-weight: bold;
+    line-height: 1;
+    color: #252525;
+    margin-bottom: 12px;
+}
+
+.tx {
+    width: 569.2px;
+    height: 62px;
+    border-radius: 2px;
+    background-color: #ffffff;
+    border: solid 1px #dbdbdb;
+    margin-top: -2px;
+    margin-left: 12px;
 }

@@ -102,11 +102,16 @@
             </div>
         </div>
     </div>
+    <div class="Transactions" id="transactions">
+        <div class="transactions-label">Transactions</div>
+        <div id="txArea"></div>
+    </div>
 </body>
 <script type='text/javascript' src="js/qrcode.min.js"></script>
 <script>
     var settings;
     var qr;
+    document.getElementById("transactions").style.display = 'none';
 
     function statsLoop() {
         astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
@@ -152,16 +157,42 @@
                     document.getElementById("error").innerHTML = "⚠ " + message.payload;
                     spendError.style.display = 'block';
                     break;
+                case "transactions":
+                    var txArea = document.getElementById("txArea");
+                    for (i in message.payload){
+                        var tx = createTx(message.payload[i]);
+                        txArea.appendChild(tx);
+                    }
+
             }
         });
         qr = new QRCode(document.getElementById("qrcode"), {
             text: "",
-            height: 170,
-            width: 170
+            height: 153,
+            width: 153
         });
         astilectron.send({name: "getSettings"});
         astilectron.send({name: "getAddress"});
     });
+
+    function createTx(tx) {
+        var entry = document.createElement("div");
+        var outerDiv = document.createElement("div");
+        outerDiv.classList.add('flex');
+        var leftDiv = document.createElement("div");
+        var rightDiv = document.createElement("div");
+        rightDiv.classList.add('flex');
+        var leftTopDiv = document.createElement("div");
+        var leftBottomDiv = document.createElement("div");
+        leftDiv.appendChild(leftTopDiv);
+        leftDiv.appendChild(leftBottomDiv);
+        outerDiv.appendChild(leftDiv);
+        outerDiv.appendChild(rightDiv);
+        entry.classList.add('tx');
+        entry.appendChild(outerDiv);
+        return entry
+    }
+
     function toggleSendReceive() {
         var btn = document.getElementById("sendReceiveButton");
         var send = document.getElementById('sendMoney');
@@ -219,6 +250,8 @@
 
     function sendTransaction() {
         var nTransactions = document.getElementById("nTransactions").innerHTML;
+        var btcBalance = parseFloat(document.getElementById("btc-balance").innerHTML);
+        var fiatBalance = parseFloat(document.getElementById("fiat-balance").innerHTML.substring(1));
 
         var invalidAddress = document.getElementById("invalidAddress");
         var invalidAmount = document.getElementById("invalidAmount");
@@ -246,15 +279,22 @@
         var e = document.getElementById("amountType");
         var amountType = e.options[e.selectedIndex].value;
         var satoshis;
+        var rate = parseFloat(document.getElementById("exchangeRate").innerHTML.substring(1));
         if (amountType == "btc") {
             satoshis = amount * 100000000;
         } else {
-            var rate = parseFloat(document.getElementById("exchangeRate").innerHTML.substring(1));
             satoshis = (amount / rate) * 100000000;
         }
 
         var note = document.getElementById("note").value;
+
+        var newBtcBalance = ((btcBalance*100000000) - satoshis) / 100000000;
+        var newFiatBalnce = newBtcBalance * rate;
+
         document.getElementById("nTransactions").innerHTML = parseInt(nTransactions) + 1;
+        document.getElementById("btc-balance").innerHTML = Math.round(newBtcBalance*100000)/100000;
+        document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol.concat(newFiatBalnce.toFixed(2));
+
         astilectron.send({name: "send", payload:{address: address, amount: satoshis, feeLevel: settings.feeLevel, note: note}});
         closePopup();
         clearFields();
@@ -272,7 +312,9 @@
         if (!showingTransactions) {
             astilectron.send({name: "showTransactions"});
             showingTransactions = true;
+            document.getElementById("transactions").style.display = 'block';
         } else {
+            document.getElementById("transactions").style.display = 'none';
             astilectron.send({name: "hideTransactions"});
             showingTransactions = false;
         }

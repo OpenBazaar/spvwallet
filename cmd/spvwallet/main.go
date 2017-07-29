@@ -195,7 +195,7 @@ func (x *Start) Execute(args []string) error {
 	printSplashScreen()
 
 	if x.Gui {
-		go wallet.Start()
+		//go wallet.Start()
 		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
 
 		type Stats struct {
@@ -256,7 +256,7 @@ func (x *Start) Execute(args []string) error {
 						astilog.Errorf("Failed to get exchange rate")
 						return
 					}
-					btcVal := confirmed / 100000000
+					btcVal := float64(confirmed) / 100000000
 					fiatVal := float64(btcVal) * rate
 					height := wallet.ChainTip()
 
@@ -341,19 +341,24 @@ func (x *Start) Execute(args []string) error {
 					}()
 				case "showTransactions":
 					go func() {
-						rc <- 700
+						rc <- 649
 					}()
+					txs, err := wallet.Transactions()
+					if err != nil {
+						w.Send(bootstrap.MessageOut{Name: "txError", Payload: err.Error()})
+					}
+					w.Send(bootstrap.MessageOut{Name: "transactions", Payload: txs})
 				case "hideTransactions":
 					go func() {
-						rc <- 377
+						rc <- 341
 					}()
 				}
 			},
 			RestoreAssets: gui.RestoreAssets,
 			WindowOptions: &astilectron.WindowOptions{
 				Center:         astilectron.PtrBool(true),
-				Height:         astilectron.PtrInt(375),
-				Width:          astilectron.PtrInt(683),
+				Height:         astilectron.PtrInt(339),
+				Width:          astilectron.PtrInt(617),
 				Maximizable:    astilectron.PtrBool(false),
 				Fullscreenable: astilectron.PtrBool(false),
 				Resizable:      astilectron.PtrBool(false),
