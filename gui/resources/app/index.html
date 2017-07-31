@@ -15,7 +15,7 @@
             <div id="height" class="tabText"></div>
         </div>
         <div class="controlSpace"></div>
-        <div class="tab flex">
+        <div class="tab flex" onclick="showSettings()">
             <img class="icon controlIcon controldiv" src="settings.png">
         </div>
         <div class="tab flex controldiv" onclick="showTransactions()">
@@ -106,23 +106,58 @@
         <div class="transactions-label">Transactions</div>
         <div id="txArea"></div>
     </div>
+    <div class="Transactions" id="settings">
+        <div class="transactions-label">Settings</div>
+        <div class="setting">Fiat Currency</div>
+        <div class="setting">Bitcoin Unit</div>
+        <div class="setting">Transaction Fee</div>
+    </div>
 </body>
 <script type='text/javascript' src="js/qrcode.min.js"></script>
 <script>
     var settings;
+    var exchangeRate;
+    var height;
     var qr;
+    var txs = new Object();
+    var showingTransactions = false;
+    var showingSettings = false;
     document.getElementById("transactions").style.display = 'none';
+    document.getElementById("settings").style.display = 'none';
 
     function statsLoop() {
         astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
         setTimeout(statsLoop, 10000);
     }
+
+    function txUpdateLoop() {
+        if (!showingTransactions) {
+            return;
+        }
+        for (var txid in txs) {
+            var tx = txs[txid];
+            var confDiv = document.getElementById(tx.Txid+"-confirmations");
+            var timeDiv = document.getElementById(tx.Txid+"-time");
+            var fiatDiv = document.getElementById(tx.Txid+"-fiat");
+            var iconDiv = document.getElementById(tx.Txid+"-icon");
+            var confirms = makeConfirmations(tx.Height);
+            confDiv.innerHTML = "(" + confirms + " confirmations)";
+            var sign = "+";
+            if (tx.Value < 0) {
+                sign = "-"
+            }
+            fiatDiv.innerHTML = sign + makeFiatValue(tx.Value);
+            timeDiv.innerHTML = timePassed(tx.Timestamp) + " ago";
+            makeConfirmationIcon(confirms, tx.Timestamp, iconDiv);
+        }
+        setTimeout(txUpdateLoop, 3000);
+    }
+
     document.addEventListener('astilectron-ready', function() {
         astilectron.listen(function(message) {
             switch (message.name) {
                 case "settings":
                     if (message.payload == "") {
-                        console.log("new settings");
                         var s = {
                             fiatCode: "USD",
                             fiatSymbol: "$",
@@ -141,28 +176,42 @@
                 case "statsUpdate":
                     // TODO: eventually want to display the balance in BTC, mBtc, bits, or Satoshi.
                     var balance = message.payload.confirmed / 100000000;
-                    document.getElementById("btc-balance").innerHTML = Math.round(balance*100000)/100000;
-                    document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol.concat(message.payload.fiat);
+                    document.getElementById("btc-balance").innerHTML = Math.round(balance * 100000) / 100000;
+                    document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol + message.payload.fiat;
                     document.getElementById("nTransactions").innerHTML = message.payload.transactions;
-                    document.getElementById("exchangeRate").innerHTML = settings.fiatSymbol.concat(message.payload.exchangeRate);
+                    document.getElementById("exchangeRate").innerHTML = settings.fiatSymbol + message.payload.exchangeRate;
                     document.getElementById("height").innerHTML = message.payload.height;
+                    exchangeRate = message.payload.exchangeRate;
+                    height = message.payload.height;
                     break;
                 case "address":
-                    qr.clear()
-                    qr.makeCode("bitcoin:"+message.payload)
+                    qr.clear();
+                    qr.makeCode("bitcoin:" + message.payload);
                     document.getElementById("displayAddress").innerHTML = message.payload;
                     break;
                 case "spendError":
-                    var spendError = document.getElementById("spendError")
+                    var spendError = document.getElementById("spendError");
                     document.getElementById("error").innerHTML = "⚠ " + message.payload;
                     spendError.style.display = 'block';
                     break;
                 case "transactions":
                     var txArea = document.getElementById("txArea");
-                    for (i in message.payload){
+                    for (i = message.payload.length - 1; i >= 0; i--) {
+                        txs[message.payload[i].Txid] = message.payload[i];
                         var tx = createTx(message.payload[i]);
                         txArea.appendChild(tx);
                     }
+                    break;
+                case "newTransaction":
+                    height = message.payload;
+                    if (showingTransactions) {
+                        var txArea = document.getElementById("txArea");
+                        while (txArea.hasChildNodes()) {
+                            txArea.removeChild(txArea.lastChild);
+                        }
+                        astilectron.send({name: "getTransactions"});
+                    }
+                    break;
 
             }
         });
@@ -180,10 +229,71 @@
         var outerDiv = document.createElement("div");
         outerDiv.classList.add('flex');
         var leftDiv = document.createElement("div");
+        leftDiv.classList.add('details-width');
         var rightDiv = document.createElement("div");
         rightDiv.classList.add('flex');
+
+        var viewDetails = document.createElement("button");
+        viewDetails.innerText = "View Details";
+        viewDetails.classList.add("viewdetails");
+        viewDetails.onclick = function() {
+            astilectron.send({name: "openbrowser", payload: "https://blockchain.info/tx/" + tx.Txid});
+        };
+        rightDiv.appendChild(viewDetails);
+
         var leftTopDiv = document.createElement("div");
+        leftTopDiv.classList.add('flex');
+        var fiatDiv = document.createElement("div");
+        var btcValue = tx.Value / 100000000;
+        var sign = "+";
+        if (parseFloat(tx.Value) < 0) {
+            btcValue *= -1;
+            sign = "-"
+        }
+        fiatDiv.innerHTML = sign + makeFiatValue(tx.Value);
+        fiatDiv.id = tx.Txid + "-fiat";
+        fiatDiv.classList.add('bold', 'tx-margin');
+        var btcDiv = document.createElement("div");
+        btcDiv.innerHTML = "(" + Math.round(btcValue*100000)/100000 + " BTC)";
+        btcDiv.classList.add('bold', 'tx-margin');
+
+        var iconDiv = document.createElement("div");
+        iconDiv.id = tx.Txid + "-icon";
+
+        leftTopDiv.appendChild(iconDiv);
+        leftTopDiv.appendChild(fiatDiv);
+        leftTopDiv.appendChild(btcDiv);
+        leftTopDiv.classList.add('tx-text');
+
         var leftBottomDiv = document.createElement("div");
+        leftBottomDiv.classList.add('flex', 'tx-text2');
+        var timeDiv = document.createElement("div");
+        timeDiv.innerHTML = timePassed(tx.Timestamp) + " ago";
+        timeDiv.id = tx.Txid + "-time";
+        timeDiv.classList.add('time-margin');
+        leftBottomDiv.appendChild(timeDiv);
+
+        var confDiv = document.createElement("div");
+        confDiv.classList.add('tx-margin');
+        var confirms = makeConfirmations(tx.Height);
+        confDiv.innerHTML = "(" + confirms + " confirmations)";
+        confDiv.id = tx.Txid + "-confirmations";
+        leftBottomDiv.appendChild(confDiv);
+
+        makeConfirmationIcon(confirms, tx.Timestamp, iconDiv);
+
+        var txidDiv = document.createElement("div");
+        txidDiv.innerHTML = tx.Txid.substring(0, 9) + "...";
+        leftBottomDiv.appendChild(txidDiv);
+        txidDiv.classList.add('tx-margin', 'controldiv');
+        txidDiv.onclick = function(){
+            astilectron.send({name: "clipboard", payload:{data:tx.Txid}});
+            txidDiv.innerHTML = "Copied";
+            setTimeout(function () {
+                txidDiv.innerHTML = tx.Txid.substring(0, 9) + "...";
+            }, 1000);
+        };
+
         leftDiv.appendChild(leftTopDiv);
         leftDiv.appendChild(leftBottomDiv);
         outerDiv.appendChild(leftDiv);
@@ -191,6 +301,79 @@
         entry.classList.add('tx');
         entry.appendChild(outerDiv);
         return entry
+    }
+
+    function makeFiatValue(val) {
+        var btcValue = val / 100000000;
+        var fiatValue = (btcValue*exchangeRate).toFixed(2);
+        var sign = "+";
+        if (parseFloat(val) < 0) {
+            sign = "-";
+            fiatValue *= -1;
+        }
+        return settings.fiatSymbol + fiatValue;
+    }
+
+    function makeConfirmations(txHeight) {
+        var confirmations = 0;
+        if (txHeight == height) {
+            confirmations = 1;
+        } else if (txHeight > 0) {
+            confirmations = (height - txHeight) + 1;
+        }
+        return confirmations;
+    }
+
+    function isStuck(ts) {
+        var unix = Date.parse(ts) / 1000;
+        var now = Math.floor(Date.now() / 1000);
+        if ((now - unix) > 86400) {
+            return true
+        }
+        return false
+    }
+
+    function isDead(ts) {
+        var unix = Date.parse(ts) / 1000;
+        var now = Math.floor(Date.now() / 1000);
+        if ((now - unix) > (86400 * 7)) {
+            return true
+        }
+        return false
+    }
+
+    function makeConfirmationIcon(confirms, ts, iconDiv) {
+        var stuck = isStuck(ts);
+        var dead = isDead(ts);
+        if (confirms == 0 && dead) {
+            iconDiv.innerHTML = "✕";
+            iconDiv.classList.add('cross');
+        } else if (confirms == 0 && stuck) {
+            iconDiv.innerHTML = "⚠";
+            iconDiv.classList.add('caution');
+        } else if (confirms < 6) {
+                iconDiv.innerHTML = "🕜";
+        } else {
+            iconDiv.classList.add('checkmark');
+            iconDiv.innerHTML = "✓";
+        }
+    }
+
+    function timePassed(ts) {
+        var unix = Date.parse(ts) / 1000;
+        var now = Math.floor(Date.now() / 1000);
+        var secondsPassed = now - unix;
+        if (Math.floor(secondsPassed / 31449600) > 0) {
+            return Math.floor(secondsPassed / 31449600) + "y";
+        } else if (Math.floor(secondsPassed / 604800) > 0) {
+            return Math.floor(secondsPassed / 604800) + "w";
+        } else if (Math.floor(secondsPassed / 86400) > 0) {
+            return Math.floor(secondsPassed / 86400) + "d";
+        } else if (Math.floor(secondsPassed / 3600) > 0){
+            return Math.floor(secondsPassed / 3600) + "h";
+        } else {
+            return Math.floor(secondsPassed / 60) + "m";
+        }
     }
 
     function toggleSendReceive() {
@@ -235,7 +418,7 @@
     }
 
     function openCoinbase() {
-        astilectron.send({name: "openbrowser"});
+        astilectron.send({name: "openbrowser", payload: "https://coinbase.com"});
     }
 
     function askForConfirmation() {
@@ -279,21 +462,20 @@
         var e = document.getElementById("amountType");
         var amountType = e.options[e.selectedIndex].value;
         var satoshis;
-        var rate = parseFloat(document.getElementById("exchangeRate").innerHTML.substring(1));
         if (amountType == "btc") {
             satoshis = amount * 100000000;
         } else {
-            satoshis = (amount / rate) * 100000000;
+            satoshis = (amount / exchangeRate) * 100000000;
         }
 
         var note = document.getElementById("note").value;
 
         var newBtcBalance = ((btcBalance*100000000) - satoshis) / 100000000;
-        var newFiatBalnce = newBtcBalance * rate;
+        var newFiatBalance = newBtcBalance * exchangeRate;
 
         document.getElementById("nTransactions").innerHTML = parseInt(nTransactions) + 1;
         document.getElementById("btc-balance").innerHTML = Math.round(newBtcBalance*100000)/100000;
-        document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol.concat(newFiatBalnce.toFixed(2));
+        document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol + newFiatBalance.toFixed(2);
 
         astilectron.send({name: "send", payload:{address: address, amount: satoshis, feeLevel: settings.feeLevel, note: note}});
         closePopup();
@@ -307,16 +489,36 @@
         astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
     }
 
-    var showingTransactions = false;
     function showTransactions() {
         if (!showingTransactions) {
+            document.getElementById("settings").style.display = 'none';
+            showingSettings = false;
             astilectron.send({name: "showTransactions"});
             showingTransactions = true;
             document.getElementById("transactions").style.display = 'block';
+            txUpdateLoop()
         } else {
             document.getElementById("transactions").style.display = 'none';
-            astilectron.send({name: "hideTransactions"});
+            astilectron.send({name: "hide"});
+            var txArea = document.getElementById("txArea");
+            while (txArea.hasChildNodes()) {
+                txArea.removeChild(txArea.lastChild);
+            }
             showingTransactions = false;
+        }
+    }
+
+    function showSettings() {
+        if (!showingSettings) {
+            document.getElementById("transactions").style.display = 'none';
+            showingTransactions = false;
+            document.getElementById("settings").style.display = 'block';
+            astilectron.send({name: "showSettings"});
+            showingSettings = true;
+        } else {
+            document.getElementById("settings").style.display = 'none';
+            astilectron.send({name: "hide"});
+            showingSettings = false;
         }
     }
 </script>

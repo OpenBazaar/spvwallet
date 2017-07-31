@@ -84,13 +84,16 @@ func Run(o Options) (err error) {
 		return false
 	})
 
-	if o.ResizeChan != nil {
-		go func() {
-			for n := range o.ResizeChan {
-				w.Resize(617, n)
+	go func() {
+		for {
+			select {
+			case n := <-o.ResizeChan:
+				w.Resize(619, n)
+			case height := <-o.TransactionChan:
+				w.Send(MessageOut{Name: "newTransaction", Payload: height})
 			}
-		}()
-	}
+		}
+	}()
 
 	// Add tray icon
 	if o.TrayOptions != nil {

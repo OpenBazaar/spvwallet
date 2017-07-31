@@ -90,6 +90,7 @@ func NewHeaderDB(filePath string) *HeaderDB {
 func (h *HeaderDB) Put(sh StoredHeader, newBestHeader bool) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
+	h.cache.Set(sh)
 	return h.db.Update(func(btx *bolt.Tx) error {
 		hdrs := btx.Bucket(BKTHeaders)
 		ser, err := serializeHeader(sh)

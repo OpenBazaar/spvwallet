@@ -25,6 +25,7 @@ type Options struct {
 	TrayOptions        *astilectron.TrayOptions
 	TrayChan           chan struct{}
 	ResizeChan         chan int
+	TransactionChan    chan uint32
 	MenuItemOptions    []*astilectron.MenuItemOptions
 	Wallet             *spvwallet.SPVWallet
 }

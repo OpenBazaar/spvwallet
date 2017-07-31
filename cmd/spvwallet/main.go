@@ -195,7 +195,7 @@ func (x *Start) Execute(args []string) error {
 	printSplashScreen()
 
 	if x.Gui {
-		//go wallet.Start()
+		go wallet.Start()
 		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
 
 		type Stats struct {
@@ -205,6 +205,12 @@ func (x *Start) Execute(args []string) error {
 			Height       uint32 `json:"height"`
 			ExchangeRate string `json:"exchangeRate"`
 		}
+
+		txc := make(chan uint32)
+		listener := func(spvwallet.TransactionCallback) {
+			txc <- wallet.ChainTip()
+		}
+		wallet.AddTransactionListener(listener)
 
 		tc := make(chan struct{})
 		rc := make(chan int)
@@ -333,7 +339,12 @@ func (x *Start) Execute(args []string) error {
 					}
 					w.Send(bootstrap.MessageOut{Name: "settings", Payload: string(settings)})
 				case "openbrowser":
-					open.Run("https://coinbase.com")
+					var url string
+					if err := json.Unmarshal(m.Payload, &url); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					open.Run(url)
 				case "minimize":
 					go func() {
 						w.Hide()
@@ -348,17 +359,27 @@ func (x *Start) Execute(args []string) error {
 						w.Send(bootstrap.MessageOut{Name: "txError", Payload: err.Error()})
 					}
 					w.Send(bootstrap.MessageOut{Name: "transactions", Payload: txs})
-				case "hideTransactions":
+				case "getTransactions":
+					txs, err := wallet.Transactions()
+					if err != nil {
+						w.Send(bootstrap.MessageOut{Name: "txError", Payload: err.Error()})
+					}
+					w.Send(bootstrap.MessageOut{Name: "transactions", Payload: txs})
+				case "hide":
 					go func() {
 						rc <- 341
+					}()
+				case "showSettings":
+					go func() {
+						rc <- 649
 					}()
 				}
 			},
 			RestoreAssets: gui.RestoreAssets,
 			WindowOptions: &astilectron.WindowOptions{
 				Center:         astilectron.PtrBool(true),
-				Height:         astilectron.PtrInt(339),
-				Width:          astilectron.PtrInt(617),
+				Height:         astilectron.PtrInt(340),
+				Width:          astilectron.PtrInt(619),
 				Maximizable:    astilectron.PtrBool(false),
 				Fullscreenable: astilectron.PtrBool(false),
 				Resizable:      astilectron.PtrBool(false),
@@ -368,6 +389,7 @@ func (x *Start) Execute(args []string) error {
 			},
 			TrayChan:          tc,
 			ResizeChan:        rc,
+			TransactionChan:   txc,
 			BaseDirectoryPath: basepath,
 			Wallet:            wallet,
 		}); err != nil {
