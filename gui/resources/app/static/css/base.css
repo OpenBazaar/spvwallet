@@ -454,7 +454,6 @@ input::-webkit-inner-spin-button {
 .currencySelect {
     margin-left: -65px;
     width: 65px;
-    padding-lef: 14px;
     opacity: 0.75;
     font-family: "noto_sans";
     background-color: #ffffff;
@@ -507,13 +506,13 @@ input::-webkit-inner-spin-button {
 
 .tx {
     width: 562.2px;
-    height: 62px;
+    height: 52px;
     border-radius: 2px;
     background-color: #ffffff;
     border: solid 1px #dbdbdb;
     margin-top: -2px;
     margin-left: 12px;
-    padding-top: 30px;
+    padding-top: 25px;
     padding-left: 12px;
 }
 
@@ -573,11 +572,39 @@ input::-webkit-inner-spin-button {
 
 .setting {
     width: 98%;
-    height: 25px;
+    height: 50px;
     background-color: #ffffff;
     border: solid 1px #dbdbdb;
     margin-top: -2px;
-    padding-top: 30px;
     padding-left: 12px;
     margin-left: -1px;
+}
+
+.noTransactions {
+    width: 100%;
+    margin-top: 130px;
+    text-align: center;
+}
+
+.settingSelect {
+    width: 120px;
+    height: 99%;
+    opacity: 0.75;
+    font-family: "noto_sans";
+    background-color: #ffffff;
+    font-size: 12.6px;
+    color: #252525;
+    margin-left: 300px;
+    text-align-last:center;
+}
+
+.settingLabel{
+    width: 200px;
+    height: 100%;
+    line-height: 3.5;
+    text-align: left;
+    padding-left: 15px;
+    font-family: "noto_sans";
+    font-size: 14px;
+    color: #252525;
 }

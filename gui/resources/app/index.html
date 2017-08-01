@@ -31,7 +31,7 @@
             <div id="btc-balance" class="Stat pad"></div>
             <div class="label">Bitcoin</div>
             <div id="fiat-balance" class="Stat pad"></div>
-            <div class="label">Value in USD</div>
+            <div id="fiat-balance-label" class="label"></div>
             <div id="nTransactions" class="Stat pad"></div>
             <div class="label">Transactions</div>
             <button id="sendReceiveButton" class="ToggleButton" onclick="toggleSendReceive();">Receive Money</button>
@@ -66,7 +66,7 @@
                     <input id="amount" type="number" placeholder="0.00" class="input">
                     <select id="amountType" class="currencySelect" onChange="onCurrencyChange(this.selectedIndex);">
                         <option value="fiat">USD</option>
-                        <option value="btc">BTC</option>
+                        <option value="bitcoin">BTC</option>
                     </select>
                 </div>
             </div>
@@ -104,13 +104,65 @@
     </div>
     <div class="Transactions" id="transactions">
         <div class="transactions-label">Transactions</div>
+        <div class="Description noTransactions" id="noTransactions">You have no transactions.</div>
         <div id="txArea"></div>
     </div>
     <div class="Transactions" id="settings">
         <div class="transactions-label">Settings</div>
-        <div class="setting">Fiat Currency</div>
-        <div class="setting">Bitcoin Unit</div>
-        <div class="setting">Transaction Fee</div>
+        <div class="setting flex">
+            <div class="settingLabel">Fiat Currency</div>
+            <select id="fiatCurrencySetting" class="settingSelect" onclick="onFiatChange(this.selectedIndex);">
+                <option value="AUD">AUD</option>
+                <option value="BRL">BRL</option>
+                <option value="CAD">CAD</option>
+                <option value="CHF">CHF</option>
+                <option value="CLP">CLP</option>
+                <option value="CNY">CNY</option>
+                <option value="CZK">CZK</option>
+                <option value="DKK">DKK</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="HKD">HKD</option>
+                <option value="HUF">HUF</option>
+                <option value="IDR">IDR</option>
+                <option value="ILS">ILS</option>
+                <option value="INR">INR</option>
+                <option value="JPY">JPY</option>
+                <option value="KRW">KRW</option>
+                <option value="MXN">MXN</option>
+                <option value="MYR">MYR</option>
+                <option value="NOK">NOK</option>
+                <option value="NZD">NZD</option>
+                <option value="PHP">PHP</option>
+                <option value="PKR">PKR</option>
+                <option value="PLN">PLN</option>
+                <option value="RUB">RUB</option>
+                <option value="SEK">SEK</option>
+                <option value="SGD">SGD</option>
+                <option value="THB">THB</option>
+                <option value="TRY">TRY</option>
+                <option value="TWD">TWD</option>
+                <option value="USD">USD</option>
+                <option value="ZAR">ZAR</option>
+            </select>
+        </div>
+        <div class="setting flex">
+            <div class="settingLabel">BitcoinUnit</div>
+            <select id="bitcoinUnitSetting" class="settingSelect">
+                <option value="btc">BTC</option>
+                <option value="mbtc">mBTC</option>
+                <option value="bits">bits</option>
+                <option value="satoshi">Satoshi</option>
+            </select>
+        </div>
+        <div class="setting flex">
+            <div class="settingLabel">Transaction Fee</div>
+            <select id="feeSetting" class="settingSelect">
+                <option value="priority">Priority</option>
+                <option value="normal">Normal</option>
+                <option value="economic">Economic</option>
+            </select>
+        </div>
     </div>
 </body>
 <script type='text/javascript' src="js/qrcode.min.js"></script>
@@ -162,7 +214,8 @@
                             fiatCode: "USD",
                             fiatSymbol: "$",
                             feeLevel: "priority",
-                            selectBox: "btc"
+                            selectBox: "bitcoin",
+                            bitcoinUnit: "BTC"
                         };
                         settings = s;
                         astilectron.send({name: "putSettings", payload: JSON.stringify(s)});
@@ -170,7 +223,12 @@
                         settings = JSON.parse(message.payload)
                     }
                     var selectBox = document.getElementById('amountType');
+                    selectBox.options[0].text = settings.fiatCode;
+                    selectBox.options[1].text = settings.bitcoinUnit;
                     selectBox.value = settings.selectBox;
+                    var fiatBox = document.getElementById('fiatCurrencySetting');
+                    fiatBox.value = settings.fiatCode;
+                    document.getElementById('fiat-balance-label').innerHTML = "Value in " + settings.fiatCode;
                     statsLoop();
                     break;
                 case "statsUpdate":
@@ -196,6 +254,9 @@
                     break;
                 case "transactions":
                     var txArea = document.getElementById("txArea");
+                    if (message.payload.length > 0) {
+                        document.getElementById("noTransactions").style.display = 'none';
+                    }
                     for (i = message.payload.length - 1; i >= 0; i--) {
                         txs[message.payload[i].Txid] = message.payload[i];
                         var tx = createTx(message.payload[i]);
@@ -487,6 +548,56 @@
         var amountType = e.options[idx].value;
         settings.selectBox = amountType;
         astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+    }
+
+    var currencySymbols = {
+            "AUD": "$",
+            "BRL": "R$",
+            "CAD": "$",
+            "CHF": "Fr.",
+            "CLP": "$",
+            "CNY": "¥",
+            "CZK": "Kč",
+            "DKK": "kr",
+            "EUR": "€",
+            "GBP": "£",
+            "HKD": "$",
+            "HUF": "Ft",
+            "IDR": "Rp",
+            "ILS": "₪",
+            "INR": "₹",
+            "JPY": "¥",
+            "KRW": "₩",
+            "MXN": "$",
+            "MYR": "RM",
+            "NOK": "kr",
+            "NZD": "$",
+            "PHP": "₱",
+            "PKR": "₨",
+            "PLN": "zł",
+            "RUB": "₽",
+            "SEK": "kr",
+            "SGD": "$",
+            "THB": "฿",
+            "TRY": "₺",
+            "TWD": "NT$",
+            "USD": "$",
+            "ZAR": "R"
+    };
+
+    function onFiatChange(idx) {
+        var e = document.getElementById("fiatCurrencySetting");
+        var currencyCode = e.options[idx].value;
+        settings.fiatCode = currencyCode;
+        var symbol = currencySymbols[currencyCode];
+        settings.fiatSymbol = symbol;
+
+        var at = document.getElementById("amountType");
+        var amountType = at.options[0].text = currencyCode;
+
+        document.getElementById('fiat-balance-label').innerHTML = "Value in " + settings.fiatCode;
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
     }
 
     function showTransactions() {

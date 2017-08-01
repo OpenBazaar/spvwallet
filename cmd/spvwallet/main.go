@@ -195,7 +195,7 @@ func (x *Start) Execute(args []string) error {
 	printSplashScreen()
 
 	if x.Gui {
-		go wallet.Start()
+		//go wallet.Start()
 		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
 
 		type Stats struct {
