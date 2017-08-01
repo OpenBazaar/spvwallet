@@ -31,8 +31,7 @@ func (w *SPVWallet) startChainDownload(p *peer.Peer) {
 	if w.blockchain.ChainState() == SYNCING {
 		height, _ := w.blockchain.db.Height()
 		if height >= uint32(p.LastBlock()) {
-			moarCh := w.peerManager.CheckForMoreBlocks(height)
-			moar := <-moarCh
+			moar := w.peerManager.CheckForMoreBlocks(height)
 			if !moar {
 				log.Info("Chain download complete")
 				w.blockchain.SetChainState(WAITING)

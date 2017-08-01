@@ -276,13 +276,6 @@ func (pm *PeerManager) onDisconnection(req *connmgr.ConnReq) {
 }
 
 func (pm *PeerManager) selectNewDownlaodPeer() {
-	for {
-		if len(pm.connectedPeers) < int(pm.targetOutbound/2) {
-			time.Sleep(time.Second * 1)
-		} else {
-			break
-		}
-	}
 	for _, peer := range pm.connectedPeers {
 		pm.setDownloadPeer(peer)
 		break
@@ -326,30 +319,19 @@ func (pm *PeerManager) DequeueTx(peer *peer.Peer, txid chainhash.Hash) (int32, e
 // Iterates over our peers and sees if any are reporting a height
 // greater than our height. If so switch them to the download peer
 // and start the chain download again.
-func (pm *PeerManager) CheckForMoreBlocks(height uint32) <-chan bool {
-	ch := make(chan bool, 1)
-	go func(ch chan bool) {
-		pm.peerMutex.RLock()
-		defer pm.peerMutex.RUnlock()
+func (pm *PeerManager) CheckForMoreBlocks(height uint32) bool {
+	pm.peerMutex.RLock()
+	defer pm.peerMutex.RUnlock()
 
-		for {
-			if len(pm.connectedPeers) < int(pm.targetOutbound/2) {
-				time.Sleep(time.Second * 1)
-			} else {
-				break
-			}
+	moar := false
+	for _, peer := range pm.connectedPeers {
+		if uint32(peer.LastBlock()) > height {
+			pm.downloadPeer = peer
+			go pm.startChainDownload(peer)
+			moar = true
 		}
-		moar := false
-		for _, peer := range pm.connectedPeers {
-			if uint32(peer.LastBlock()) > height {
-				pm.downloadPeer = peer
-				go pm.startChainDownload(peer)
-				moar = true
-			}
-		}
-		ch <- moar
-	}(ch)
-	return ch
+	}
+	return moar
 }
 
 // Called by connManager when it adds a new connection
