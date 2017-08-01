@@ -31,7 +31,8 @@ func (w *SPVWallet) startChainDownload(p *peer.Peer) {
 	if w.blockchain.ChainState() == SYNCING {
 		height, _ := w.blockchain.db.Height()
 		if height >= uint32(p.LastBlock()) {
-			moar := w.peerManager.CheckForMoreBlocks(height)
+			moarCh := w.peerManager.CheckForMoreBlocks(height)
+			moar := <-moarCh
 			if !moar {
 				log.Info("Chain download complete")
 				w.blockchain.SetChainState(WAITING)
@@ -80,10 +81,12 @@ func (w *SPVWallet) onMerkleBlock(p *peer.Peer, m *wire.MsgMerkleBlock) {
 		if err != nil {
 			log.Error(err)
 		}
-		w.blockchain.SetChainState(SYNCING)
-		w.blockchain.db.Put(*reorg, true)
-		go w.startChainDownload(p)
-		return
+		if w.blockchain.state != SYNCING {
+			w.blockchain.SetChainState(SYNCING)
+			w.blockchain.db.Put(*reorg, true)
+			go w.startChainDownload(p)
+			return
+		}
 	}
 
 	for _, txid := range txids {

@@ -253,7 +253,7 @@ func Test_Reorg(t *testing.T) {
 	os.RemoveAll("headers.bin")
 }
 
-func TestBlockchain_GetLastGoodHeader(t *testing.T) {
+func TestBlockchain_GetCommonAncestor(t *testing.T) {
 	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
@@ -278,7 +278,7 @@ func TestBlockchain_GetLastGoodHeader(t *testing.T) {
 	}
 	currentBest := StoredHeader{header: hdr, height: 11}
 
-	last, err := bc.GetLastGoodHeader(currentBest, prevBest)
+	last, err := bc.GetCommonAncestor(currentBest, prevBest)
 	if err != nil {
 		t.Error(err)
 	}
