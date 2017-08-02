@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/btcsuite/btcd/btcec"
+	"math/rand"
 	"strconv"
 	"sync"
 )
@@ -41,9 +42,10 @@ func (k *KeysDB) ImportKey(scriptAddress []byte, key *btcec.PrivateKey) error {
 	if err != nil {
 		return err
 	}
-	stmt, _ := tx.Prepare("insert into keys(scriptAddress, purpose, used, key) values(?,?,?,?)")
+	index := rand.Uint32()
+	stmt, _ := tx.Prepare("insert into keys(scriptAddress, purpose, keyIndex, used, key) values(?,?,?,?,?)")
 	defer stmt.Close()
-	_, err = stmt.Exec(hex.EncodeToString(scriptAddress), -1, 0, hex.EncodeToString(key.Serialize()))
+	_, err = stmt.Exec(hex.EncodeToString(scriptAddress), -1, index, 1, hex.EncodeToString(key.Serialize()))
 	if err != nil {
 		tx.Rollback()
 		return err

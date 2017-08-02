@@ -343,6 +343,7 @@ func (w *SPVWallet) ReSyncBlockchain(fromHeight int32) {
 		return
 	}
 	w.blockchain = blockchain
+	w.txstore.PopulateAdrs()
 	w.peerManager, err = NewPeerManager(w.config)
 	if err != nil {
 		return

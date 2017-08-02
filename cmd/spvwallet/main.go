@@ -172,6 +172,14 @@ func (x *Start) Execute(args []string) error {
 		config.Mnemonic = mn
 	}
 
+	// Write version file
+	f, err := os.Create(path.Join(basepath, "version"))
+	if err != nil {
+		return err
+	}
+	f.Write([]byte("1"))
+	f.Close()
+
 	// Load settings
 	type Settings struct {
 		FiatCode      string `json:"fiatCode"`
@@ -238,7 +246,7 @@ func (x *Start) Execute(args []string) error {
 	printSplashScreen()
 
 	if x.Gui {
-		//go wallet.Start()
+		go wallet.Start()
 
 		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
 
