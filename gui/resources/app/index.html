@@ -148,20 +148,110 @@
         </div>
         <div class="setting flex">
             <div class="settingLabel">BitcoinUnit</div>
-            <select id="bitcoinUnitSetting" class="settingSelect">
-                <option value="btc">BTC</option>
-                <option value="mbtc">mBTC</option>
+            <select id="bitcoinUnitSetting" class="settingSelect" onclick="onBitcoinUnitChange(this.selectedIndex);">
+                <option value="BTC">BTC</option>
+                <option value="mBTC">mBTC</option>
                 <option value="bits">bits</option>
-                <option value="satoshi">Satoshi</option>
+                <option value="satoshi">satoshi</option>
             </select>
         </div>
         <div class="setting flex">
             <div class="settingLabel">Transaction Fee</div>
-            <select id="feeSetting" class="settingSelect">
+            <select id="feeSetting" class="settingSelect" onclick="onFeeChange(this.selectedIndex);">
                 <option value="priority">Priority</option>
                 <option value="normal">Normal</option>
                 <option value="economic">Economic</option>
             </select>
+        </div>
+        <div class="setting flex">
+            <div class="settingLabel">Decimal Places</div>
+            <select id="decimalSetting" class="settingSelect" onclick="onDecimaChange(this.selectedIndex);">
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+            </select>
+        </div>
+        <div id="mnemonic" class="setting">
+            <div class="flex checkMargin">
+                <div class="checkLabel">Show mnemonic seed</div>
+                <input type="checkbox" id="mnemonicSwitch" onchange="showMnemonic(this)"/><label for="mnemonicSwitch"></label>
+            </div>
+        </div>
+        <div class="setting">
+            <div class="flex">
+                <div class="resyncLabel">Resync Blockchain</div>
+                <div class="resyncPopup">
+                        <span class="resyncPopuptext" id="resyncPopup">
+                            <div class="sure">Are you sure?</div>
+                            <div class="warning">Clicking yes will re-download the blockchain and scan for any missing payments.</div>
+                            <div class="separator"></div>
+                            <div class="flex confirmationActions">
+                                <div class="Clear cancelPad" onclick="closeResyncPopup();">Cancel</div>
+                                <button class="SendBtn">Yes, Do it</button>
+                            </div>
+                        </span>
+                    <button class="ResyncBtn" onclick="askForResyncConfirmation();">Go</button>
+                </div>
+            </div>
+        </div>
+        <div class="setting">
+            <div class="flex">
+                <div class="shortInputLabel">Set trusted Peer:</div>
+                <input id="trustedPeer" type="text" placeholder="<ip>:<port>" class="shortinput">
+                <div class="resyncPopup">
+                        <span class="resyncPopuptext" id="trustedPeerPopup">
+                            <div class="sure">Set trusted peer?</div>
+                            <div class="warning">You will need to restart for this to take effect.</div>
+                            <div class="separator"></div>
+                            <div class="flex confirmationActions">
+                                <div class="Clear cancelPad" onclick="closeTrustedPeerPopup();">Cancel</div>
+                                <button class="SendBtn">Yes, Do it</button>
+                            </div>
+                        </span>
+                    <button class="SetBtn" onclick="askForTrustedPeerConfirmation();">Set</button>
+                </div>
+            </div>
+        </div>
+        <div class="setting">
+            <div class="flex">
+                <div class="shortInputLabel">Set socks5 proxy:</div>
+                <input id="proxy" type="text" placeholder="<ip>:<port>" class="shortinput">
+                <div class="resyncPopup">
+                        <span class="resyncPopuptext" id="proxyPopup">
+                            <div class="sure">Set socks5 proxy?</div>
+                            <div class="warning">You will need to restart for this to take effect.</div>
+                            <div class="separator"></div>
+                            <div class="flex confirmationActions">
+                                <div class="Clear cancelPad" onclick="closeProxyPopup();">Cancel</div>
+                                <button class="SendBtn">Yes, Do it</button>
+                            </div>
+                        </span>
+                    <button class="SetBtn" onclick="askForProxyConfirmation();">Set</button>
+                </div>
+            </div>
+        </div>
+        <div class="setting">
+            <div class="flex restore-margin">
+                <input id="restoreMnemonic" type="text" placeholder="Enter a twelve word mnemonic seed" class="mninput">
+                <div class="restorePopup">
+                        <span class="restorePopuptext" id="restorePopup">
+                            <div class="sure">Are you sure?</div>
+                            <div class="restoreWarning">Clicking yes will delete your existing wallet, including any coins in it, and restore from the seed you entered.</div>
+                            <div class="separator"></div>
+                            <div class="flex confirmationActions">
+                                <div class="Clear cancelPad" onclick="closeRestorePopup();">Cancel</div>
+                                <button class="SendBtn">Yes, Do it</button>
+                            </div>
+                        </span>
+                    <button class="RestoreBtn" onclick="askForRestoreConfirmation();">Restore From Seed</button>
+                </div>
+            </div>
         </div>
     </div>
 </body>
@@ -172,8 +262,10 @@
     var height;
     var qr;
     var txs = new Object();
+    var confirmedSatoshis;
     var showingTransactions = false;
     var showingSettings = false;
+    var mnemonic;
     document.getElementById("transactions").style.display = 'none';
     document.getElementById("settings").style.display = 'none';
 
@@ -215,7 +307,8 @@
                             fiatSymbol: "$",
                             feeLevel: "priority",
                             selectBox: "bitcoin",
-                            bitcoinUnit: "BTC"
+                            bitcoinUnit: "BTC",
+                            decimalPlaces: 5
                         };
                         settings = s;
                         astilectron.send({name: "putSettings", payload: JSON.stringify(s)});
@@ -229,18 +322,23 @@
                     var fiatBox = document.getElementById('fiatCurrencySetting');
                     fiatBox.value = settings.fiatCode;
                     document.getElementById('fiat-balance-label').innerHTML = "Value in " + settings.fiatCode;
+                    var decimalBox = document.getElementById('decimalSetting');
+                    decimalBox.value = settings.decimalPlaces;
+                    var unitBox = document.getElementById('bitcoinUnitSetting');
+                    unitBox.value = settings.bitcoinUnit;
+                    var feeBox = document.getElementById('feeSetting');
+                    feeBox.value = settings.feeLevel;
                     statsLoop();
                     break;
                 case "statsUpdate":
-                    // TODO: eventually want to display the balance in BTC, mBtc, bits, or Satoshi.
-                    var balance = message.payload.confirmed / 100000000;
-                    document.getElementById("btc-balance").innerHTML = Math.round(balance * 100000) / 100000;
+                    document.getElementById("btc-balance").innerHTML = satoshiToBTCUnit(message.payload.confirmed);
                     document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol + message.payload.fiat;
                     document.getElementById("nTransactions").innerHTML = message.payload.transactions;
                     document.getElementById("exchangeRate").innerHTML = settings.fiatSymbol + message.payload.exchangeRate;
                     document.getElementById("height").innerHTML = message.payload.height;
                     exchangeRate = message.payload.exchangeRate;
                     height = message.payload.height;
+                    confirmedSatoshis = message.payload.confirmed;
                     break;
                 case "address":
                     qr.clear();
@@ -273,6 +371,8 @@
                         astilectron.send({name: "getTransactions"});
                     }
                     break;
+                case "mnemonic":
+                    mnemonic = message.payload;
 
             }
         });
@@ -283,6 +383,7 @@
         });
         astilectron.send({name: "getSettings"});
         astilectron.send({name: "getAddress"});
+        astilectron.send({name: "getMnemonic"});
     });
 
     function createTx(tx) {
@@ -305,7 +406,7 @@
         var leftTopDiv = document.createElement("div");
         leftTopDiv.classList.add('flex');
         var fiatDiv = document.createElement("div");
-        var btcValue = tx.Value / 100000000;
+        var btcValue = satoshiToBTCUnit(tx.Value);
         var sign = "+";
         if (parseFloat(tx.Value) < 0) {
             btcValue *= -1;
@@ -315,7 +416,7 @@
         fiatDiv.id = tx.Txid + "-fiat";
         fiatDiv.classList.add('bold', 'tx-margin');
         var btcDiv = document.createElement("div");
-        btcDiv.innerHTML = "(" + Math.round(btcValue*100000)/100000 + " BTC)";
+        btcDiv.innerHTML = "(" + btcValue + " " + settings.bitcoinUnit + ")";
         btcDiv.classList.add('bold', 'tx-margin');
 
         var iconDiv = document.createElement("div");
@@ -362,6 +463,26 @@
         entry.classList.add('tx');
         entry.appendChild(outerDiv);
         return entry
+    }
+
+    function satoshiToBTCUnit(satoshis) {
+        var satoshisPerUnit;
+        switch(settings.bitcoinUnit) {
+            case "BTC":
+                satoshisPerUnit = 100000000;
+                break;
+            case "mBTC":
+                satoshisPerUnit = 100000;
+                break;
+            case "bits":
+                satoshisPerUnit = 100;
+                break;
+            case "satoshi":
+                return satoshis
+        }
+        var decimal = Math.pow(10, settings.decimalPlaces);
+        var val = satoshis / satoshisPerUnit;
+        return Math.floor(val * decimal) / decimal;
     }
 
     function makeFiatValue(val) {
@@ -487,14 +608,53 @@
         popup.classList.toggle("show");
     }
 
+    function askForRestoreConfirmation() {
+        var popup = document.getElementById("restorePopup");
+        popup.classList.toggle("show");
+    }
+
+    function askForTrustedPeerConfirmation() {
+        var popup = document.getElementById("trustedPeerPopup");
+        popup.classList.toggle("show");
+    }
+
+    function askForResyncConfirmation() {
+        var popup = document.getElementById("resyncPopup");
+        popup.classList.toggle("show");
+    }
+
+    function askForProxyConfirmation() {
+        var popup = document.getElementById("proxyPopup");
+        popup.classList.toggle("show");
+    }
+
     function closePopup() {
         var popup = document.getElementById("confirmationPopup");
         popup.classList.toggle("show");
     }
 
+    function closeRestorePopup() {
+        var popup = document.getElementById("restorePopup");
+        popup.classList.toggle("show");
+    }
+
+    function closeResyncPopup() {
+        var popup = document.getElementById("resyncPopup");
+        popup.classList.toggle("show");
+    }
+
+    function closeTrustedPeerPopup() {
+        var popup = document.getElementById("trustedPeerPopup");
+        popup.classList.toggle("show");
+    }
+
+    function closeProxyPopup() {
+        var popup = document.getElementById("proxyPopup");
+        popup.classList.toggle("show");
+    }
+
     function sendTransaction() {
         var nTransactions = document.getElementById("nTransactions").innerHTML;
-        var btcBalance = parseFloat(document.getElementById("btc-balance").innerHTML);
         var fiatBalance = parseFloat(document.getElementById("fiat-balance").innerHTML.substring(1));
 
         var invalidAddress = document.getElementById("invalidAddress");
@@ -523,19 +683,31 @@
         var e = document.getElementById("amountType");
         var amountType = e.options[e.selectedIndex].value;
         var satoshis;
-        if (amountType == "btc") {
-            satoshis = amount * 100000000;
+        if (amountType == "bitcoin") {
+            switch(settings.bitcoinUnit) {
+                case "BTC":
+                    satoshis = amount * 100000000;
+                    break;
+                case "mBTC":
+                    satoshis = amount * 100000;
+                    break;
+                case "bits":
+                    satoshis = amount * 100;
+                    break;
+                case "satoshi":
+                    satoshis = amount;
+            }
         } else {
             satoshis = (amount / exchangeRate) * 100000000;
         }
 
         var note = document.getElementById("note").value;
 
-        var newBtcBalance = ((btcBalance*100000000) - satoshis) / 100000000;
-        var newFiatBalance = newBtcBalance * exchangeRate;
+        var newBtcBalance = satoshiToBTCUnit(confirmedSatoshis - satoshis);
+        var newFiatBalance = ((confirmedSatoshis - satoshis) / 100000000) * exchangeRate;
 
         document.getElementById("nTransactions").innerHTML = parseInt(nTransactions) + 1;
-        document.getElementById("btc-balance").innerHTML = Math.round(newBtcBalance*100000)/100000;
+        document.getElementById("btc-balance").innerHTML = newBtcBalance;
         document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol + newFiatBalance.toFixed(2);
 
         astilectron.send({name: "send", payload:{address: address, amount: satoshis, feeLevel: settings.feeLevel, note: note}});
@@ -598,6 +770,56 @@
         document.getElementById('fiat-balance-label').innerHTML = "Value in " + settings.fiatCode;
         astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
         astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+    }
+
+    function onBitcoinUnitChange(idx) {
+        var e = document.getElementById("bitcoinUnitSetting");
+        var unit = e.options[idx].value;
+        settings.bitcoinUnit = unit;
+
+        var at = document.getElementById("amountType");
+        var amountType = at.options[1].text = unit;
+
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+    }
+
+    function onDecimaChange(idx) {
+        var e = document.getElementById("decimalSetting");
+        var places = e.options[idx].value;
+        settings.decimalPlaces = places;
+
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+    }
+
+    function onFeeChange(idx) {
+        var e = document.getElementById("feeSetting");
+        var feeLevel = e.options[idx].value;
+        settings.feeLevel = feeLevel;
+
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+    }
+
+    function showMnemonic(id) {
+        var outerDiv = document.getElementById("mnemonic");
+        if (id.checked) {
+            var wrapper = document.createElement("div");
+            var mnDiv = document.createElement("div");
+            mnDiv.innerText = mnemonic;
+            mnDiv.classList.add("mnemonic");
+            var desc = document.createElement("div");
+            desc.innerText = "*BIP39 mnemonic seed using BIP44 derivation. Write it down and store it in a safe place. You can use it to restore your coins later."
+            desc.classList.add("mnDesc");
+            wrapper.appendChild(mnDiv);
+            wrapper.appendChild(desc);
+            outerDiv.appendChild(wrapper);
+            outerDiv.style.height = "150px";
+        } else {
+            outerDiv.removeChild(outerDiv.lastChild);
+            outerDiv.style.height = "50px";
+        }
     }
 
     function showTransactions() {

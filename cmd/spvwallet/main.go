@@ -373,6 +373,8 @@ func (x *Start) Execute(args []string) error {
 					go func() {
 						rc <- 649
 					}()
+				case "getMnemonic":
+					w.Send(bootstrap.MessageOut{Name: "mnemonic", Payload: wallet.Mnemonic()})
 				}
 			},
 			RestoreAssets: gui.RestoreAssets,
@@ -392,6 +394,7 @@ func (x *Start) Execute(args []string) error {
 			TransactionChan:   txc,
 			BaseDirectoryPath: basepath,
 			Wallet:            wallet,
+			//Debug:             true,
 		}); err != nil {
 			astilog.Fatal(err)
 		}

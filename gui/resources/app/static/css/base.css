@@ -608,3 +608,298 @@ input::-webkit-inner-spin-button {
     font-size: 14px;
     color: #252525;
 }
+
+input[type=checkbox]{
+    height: 0;
+    width: 0;
+    visibility: hidden;
+}
+
+label {
+    cursor: pointer;
+    text-indent: -9999px;
+    width: 50px;
+    height: 25px;
+    background: grey;
+    display: block;
+    border-radius: 25px;
+    position: relative;
+}
+
+label:after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 5px;
+    width: 20px;
+    height: 20px;
+    background: #fff;
+    border-radius: 20px;
+    transition: 0.3s;
+}
+
+input:checked + label {
+    background: #2bad23;
+}
+
+input:checked + label:after {
+    left: calc(100% - 5px);
+    transform: translateX(-100%);
+}
+
+label:active:after {
+    width: 30px;
+}
+
+.checkLabel{
+    height: 100%;
+    width: 485px;
+    text-align: left;
+    line-height: 1.8;
+    padding-left: 15px;
+    font-family: "noto_sans";
+    font-size: 14px;
+    color: #252525;
+}
+
+.checkMargin {
+    margin-top: 13px;
+    height: 50px;
+}
+
+.mnemonic {
+    margin-top: -10px;
+    margin-left: 12px;
+    padding: 8px;
+    width: 530px;
+    font-family: "noto_sans";
+    font-size: 22px;
+    background: #dbdbdb;
+    border-radius: 2px;
+}
+
+.mnDesc {
+    margin-top: 2px;
+    margin-left: 12px;
+    width: 530px;
+    font-family: "noto_sans";
+    font-size: 10px;
+}
+
+.restore-margin {
+    margin-top: 7px;
+    margin-left: 12px;
+}
+
+.RestoreBtn {
+    width: 140px;
+    height: 28.3px;
+    margin-top: 5px;
+    margin-left: 19px;
+    border-radius: 2px;
+    background-image: linear-gradient(to bottom, #54d547, #2bad23);
+    box-shadow: 0 0 3px 0 rgba(149, 149, 149, 0.5);
+    border: solid 2px #ffffff;
+    font-family: "noto_sans";
+    font-size: 12.6px;
+    font-weight: bold;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.mninput {
+    width: 400px;
+    height: 32.4px;
+    font-family: "noto_sans";
+    font-size: 12.6px;
+    color: #252525;
+}
+
+.restoreWarning {
+    width: 75%;
+    text-align: center;
+    margin-left: 25px;
+    font-family: "noto_sans";
+    margin-top:10px;
+    font-size: 9px;
+    color: #252525;
+    text-wrap:normal;
+    height:65px;
+}
+
+.restorePopup {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.restorePopup .restorePopuptext {
+    visibility: hidden;
+    color: #fff;
+    text-align: center;
+    padding: 7.2px 0;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -120px;
+
+    width: 200.5px;
+    height: 130.9px;
+    border-radius: 2px;
+    background-color: #ffffff;
+    box-shadow: 0 -2px 2px 0 #e8e7e7;
+    border: solid 1px #d2d3d9;
+}
+
+.restorePopup .restorePopuptext:before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 60%;
+    margin-left: 0px;
+    border-width: 10px;
+    border-style: solid;
+    border-color: #d2d3d9 transparent transparent transparent;
+}
+
+.restorePopup .restorePopuptext::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 60%;
+    margin-left: 1px;
+    border-width: 9px;
+    border-style: solid;
+    border-color: #ffffff transparent transparent transparent;
+}
+
+.restorePopup .show {
+    visibility: visible;
+    -webkit-animation: fadeIn .7s;
+    animation: fadeIn .7s;
+}
+
+.ResyncBtn {
+    width: 85px;
+    height: 28.3px;
+    margin-top: 9px;
+    margin-left: 273px;
+    border-radius: 2px;
+    background-image: linear-gradient(to bottom, #54d547, #2bad23);
+    box-shadow: 0 0 3px 0 rgba(149, 149, 149, 0.5);
+    border: solid 2px #ffffff;
+    font-family: "noto_sans";
+    font-size: 12.6px;
+    font-weight: bold;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.resyncLabel{
+    width: 200px;
+    height: 100%;
+    line-height: 3.5;
+    text-align: left;
+    padding-left: 15px;
+    font-family: "noto_sans";
+    font-size: 14px;
+    color: #252525;
+}
+
+.resyncPopup {
+    position: relative;
+    display: inline-block;
+    cursor: pointer;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.resyncPopup .resyncPopuptext {
+    visibility: hidden;
+    color: #fff;
+    text-align: center;
+    padding: 7.2px 0;
+    position: absolute;
+    z-index: 1;
+    bottom: 125%;
+    left: 50%;
+    margin-left: -18px;
+
+    width: 200.5px;
+    height: 115.9px;
+    border-radius: 2px;
+    background-color: #ffffff;
+    box-shadow: 0 -2px 2px 0 #e8e7e7;
+    border: solid 1px #d2d3d9;
+}
+
+.resyncPopup .resyncPopuptext:before {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 71%;
+    margin-left: 0px;
+    border-width: 10px;
+    border-style: solid;
+    border-color: #d2d3d9 transparent transparent transparent;
+}
+
+.resyncPopup .resyncPopuptext::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 71%;
+    margin-left: 1px;
+    border-width: 9px;
+    border-style: solid;
+    border-color: #ffffff transparent transparent transparent;
+}
+
+.resyncPopup .show {
+    visibility: visible;
+    -webkit-animation: fadeIn .7s;
+    animation: fadeIn .7s;
+}
+
+.shortinput {
+    width: 200px;
+    height: 32.4px;
+    margin-top: 7px;
+    font-family: "noto_sans";
+    font-size: 12.6px;
+    color: #252525;
+}
+.shortInputLabel{
+    width: 125px;
+    height: 100%;
+    line-height: 3.8;
+    text-align: left;
+    padding-left: 15px;
+    font-family: "noto_sans";
+    font-size: 14px;
+    color: #252525;
+}
+
+.SetBtn {
+    width: 85px;
+    height: 28.3px;
+    margin-top: 11px;
+    margin-left: 145px;
+    margin-right: -130px;
+    border-radius: 2px;
+    background-image: linear-gradient(to bottom, #54d547, #2bad23);
+    box-shadow: 0 0 3px 0 rgba(149, 149, 149, 0.5);
+    border: solid 2px #ffffff;
+    font-family: "noto_sans";
+    font-size: 12.6px;
+    font-weight: bold;
+    color: #ffffff;
+    cursor: pointer;
+}

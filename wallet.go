@@ -24,6 +24,8 @@ type SPVWallet struct {
 	masterPrivateKey *hd.ExtendedKey
 	masterPublicKey  *hd.ExtendedKey
 
+	mnemonic string
+
 	feeProvider *FeeProvider
 
 	repoPath string
@@ -79,6 +81,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		repoPath:         config.RepoPath,
 		masterPrivateKey: mPrivKey,
 		masterPublicKey:  mPubKey,
+		mnemonic:         config.Mnemonic,
 		params:           config.Params,
 		creationDate:     config.CreationDate,
 		feeProvider: NewFeeProvider(
@@ -182,6 +185,10 @@ func (w *SPVWallet) MasterPrivateKey() *hd.ExtendedKey {
 
 func (w *SPVWallet) MasterPublicKey() *hd.ExtendedKey {
 	return w.masterPublicKey
+}
+
+func (w *SPVWallet) Mnemonic() string {
+	return w.mnemonic
 }
 
 func (w *SPVWallet) ConnectedPeers() []*peer.Peer {
