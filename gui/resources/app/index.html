@@ -193,7 +193,7 @@
                             <div class="separator"></div>
                             <div class="flex confirmationActions">
                                 <div class="Clear cancelPad" onclick="closeResyncPopup();">Cancel</div>
-                                <button class="SendBtn">Yes, Do it</button>
+                                <button class="SendBtn" onclick="resync();">Yes, Do it</button>
                             </div>
                         </span>
                     <button class="ResyncBtn" onclick="askForResyncConfirmation();">Go</button>
@@ -202,7 +202,7 @@
         </div>
         <div class="setting">
             <div class="flex">
-                <div class="shortInputLabel">Set trusted Peer:</div>
+                <div class="shortInputLabel">Set trusted peer:</div>
                 <input id="trustedPeer" type="text" placeholder="<ip>:<port>" class="shortinput">
                 <div class="resyncPopup">
                         <span class="resyncPopuptext" id="trustedPeerPopup">
@@ -211,7 +211,7 @@
                             <div class="separator"></div>
                             <div class="flex confirmationActions">
                                 <div class="Clear cancelPad" onclick="closeTrustedPeerPopup();">Cancel</div>
-                                <button class="SendBtn">Yes, Do it</button>
+                                <button class="SendBtn" onclick="setTrustedPeer();">Yes, Do it</button>
                             </div>
                         </span>
                     <button class="SetBtn" onclick="askForTrustedPeerConfirmation();">Set</button>
@@ -229,7 +229,7 @@
                             <div class="separator"></div>
                             <div class="flex confirmationActions">
                                 <div class="Clear cancelPad" onclick="closeProxyPopup();">Cancel</div>
-                                <button class="SendBtn">Yes, Do it</button>
+                                <button class="SendBtn" onclick="setProxy();">Yes, Do it</button>
                             </div>
                         </span>
                     <button class="SetBtn" onclick="askForProxyConfirmation();">Set</button>
@@ -246,7 +246,7 @@
                             <div class="separator"></div>
                             <div class="flex confirmationActions">
                                 <div class="Clear cancelPad" onclick="closeRestorePopup();">Cancel</div>
-                                <button class="SendBtn">Yes, Do it</button>
+                                <button class="SendBtn" onclick="restoreFromSeed()">Yes, Do it</button>
                             </div>
                         </span>
                     <button class="RestoreBtn" onclick="askForRestoreConfirmation();">Restore From Seed</button>
@@ -308,7 +308,9 @@
                             feeLevel: "priority",
                             selectBox: "bitcoin",
                             bitcoinUnit: "BTC",
-                            decimalPlaces: 5
+                            decimalPlaces: 5,
+                            trustedPeer: "",
+                            proxy: "",
                         };
                         settings = s;
                         astilectron.send({name: "putSettings", payload: JSON.stringify(s)});
@@ -328,6 +330,8 @@
                     unitBox.value = settings.bitcoinUnit;
                     var feeBox = document.getElementById('feeSetting');
                     feeBox.value = settings.feeLevel;
+                    document.getElementById("trustedPeer").value = settings.trustedPeer;
+                    document.getElementById("proxy").value = settings.proxy;
                     statsLoop();
                     break;
                 case "statsUpdate":
@@ -800,6 +804,30 @@
 
         astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
         astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+    }
+
+    function setTrustedPeer() {
+        settings.trustedPeer = document.getElementById("trustedPeer").value;
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        closeTrustedPeerPopup()
+    }
+
+    function setProxy() {
+        settings.proxy = document.getElementById("proxy").value;
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        closeProxyPopup()
+    }
+
+    function resync() {
+        astilectron.send({name: "resync"});
+        closeResyncPopup()
+    }
+
+    function restoreFromSeed() {
+        var seed = document.getElementById("restoreMnemonic").value;
+        astilectron.send({name: "restore", payload: seed});
+        document.getElementById("restoreMnemonic").value = "";
+        closeRestorePopup()
     }
 
     function showMnemonic(id) {

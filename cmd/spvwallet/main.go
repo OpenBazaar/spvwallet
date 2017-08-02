@@ -22,6 +22,7 @@ import (
 	"github.com/op/go-logging"
 	"github.com/skratchdot/open-golang/open"
 	"github.com/yawning/bulb"
+	"golang.org/x/net/proxy"
 	"io/ioutil"
 	"net"
 	"net/url"
@@ -108,14 +109,6 @@ func (x *Start) Execute(args []string) error {
 		config.Params = &chaincfg.RegressionNetParams
 		config.RepoPath = path.Join(config.RepoPath, "regtest")
 	}
-	creationDate := time.Now()
-	if x.WalletCreationDate != "" {
-		creationDate, err = time.Parse(time.RFC3339, x.WalletCreationDate)
-		if err != nil {
-			return errors.New("Wallet creation date timestamp must be in RFC3339 format")
-		}
-	}
-	config.CreationDate = creationDate
 
 	_, ferr := os.Stat(config.RepoPath)
 	if os.IsNotExist(ferr) {
@@ -179,6 +172,53 @@ func (x *Start) Execute(args []string) error {
 		config.Mnemonic = mn
 	}
 
+	// Load settings
+	type Settings struct {
+		FiatCode      string `json:"fiatCode"`
+		FiatSymbol    string `json:"fiatSymbol"`
+		FeeLevel      string `json:"feeLevel"`
+		SelectBox     string `json:"selectBox"`
+		BitcoinUnit   string `json:"bitcoinUnit"`
+		DecimalPlaces int    `json:"decimalPlaces"`
+		TrustedPeer   string `json:"trustedPeer"`
+		Proxy         string `json:"proxy"`
+	}
+
+	var settings Settings
+	s, err := ioutil.ReadFile(path.Join(basepath, "settings.json"))
+	if err == nil {
+		json.Unmarshal([]byte(s), &settings)
+	}
+	if settings.TrustedPeer != "" {
+		var tp net.Addr
+		tp, err = net.ResolveTCPAddr("tcp", settings.TrustedPeer)
+		if err != nil {
+			return err
+		}
+		config.TrustedPeer = tp
+	}
+
+	if settings.Proxy != "" {
+		tbProxyURL, err := url.Parse("socks5://" + settings.Proxy)
+		if err != nil {
+			return err
+		}
+		tbDialer, err := proxy.FromURL(tbProxyURL, proxy.Direct)
+		if err != nil {
+			return err
+		}
+		config.Proxy = tbDialer
+	}
+
+	creationDate := time.Time{}
+	if x.WalletCreationDate != "" {
+		creationDate, err = time.Parse(time.RFC3339, x.WalletCreationDate)
+		if err != nil {
+			return errors.New("Wallet creation date timestamp must be in RFC3339 format")
+		}
+	}
+	config.CreationDate = creationDate
+
 	// Create the wallet
 	wallet, err = spvwallet.NewSPVWallet(config)
 	if err != nil {
@@ -188,6 +228,9 @@ func (x *Start) Execute(args []string) error {
 	if err := sqliteDatastore.SetMnemonic(config.Mnemonic); err != nil {
 		return err
 	}
+	if err := sqliteDatastore.SetCreationDate(config.CreationDate); err != nil {
+		return err
+	}
 
 	go api.ServeAPI(wallet)
 
@@ -195,7 +238,8 @@ func (x *Start) Execute(args []string) error {
 	printSplashScreen()
 
 	if x.Gui {
-		//go wallet.Start()
+		go wallet.Start()
+
 		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
 
 		type Stats struct {
@@ -215,7 +259,7 @@ func (x *Start) Execute(args []string) error {
 		tc := make(chan struct{})
 		rc := make(chan int)
 
-		os.RemoveAll(path.Join(basepath, "resources"))
+		//os.RemoveAll(path.Join(basepath, "resources"))
 		iconPath := path.Join(basepath, "icon.png")
 		_, err := os.Stat(iconPath)
 		if os.IsNotExist(err) {
@@ -320,18 +364,29 @@ func (x *Start) Execute(args []string) error {
 					}
 					clipboard.WriteAll(p.Data)
 				case "putSettings":
-					var settings string
-					if err := json.Unmarshal(m.Payload, &settings); err != nil {
+					var setstr string
+					if err := json.Unmarshal(m.Payload, &setstr); err != nil {
 						astilog.Errorf("Unmarshaling %s failed", m.Payload)
 						return
 					}
+					var settings Settings
+					if err := json.Unmarshal([]byte(setstr), &settings); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+
 					f, err := os.Create(path.Join(basepath, "settings.json"))
 					if err != nil {
 						astilog.Error(err.Error())
 						return
 					}
 					defer f.Close()
-					f.WriteString(settings)
+					b, err := json.MarshalIndent(&settings, "", "    ")
+					if err != nil {
+						astilog.Error(err.Error())
+						return
+					}
+					f.Write(b)
 				case "getSettings":
 					settings, err := ioutil.ReadFile(path.Join(basepath, "settings.json"))
 					if err != nil {
@@ -345,6 +400,27 @@ func (x *Start) Execute(args []string) error {
 						return
 					}
 					open.Run(url)
+				case "resync":
+					wallet.ReSyncBlockchain(0)
+				case "restore":
+					var mnemonic string
+					if err := json.Unmarshal(m.Payload, &mnemonic); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					wallet.Close()
+					os.Remove(path.Join(config.RepoPath, "wallet.db"))
+					os.Remove(path.Join(config.RepoPath, "headers.bin"))
+					sqliteDatastore, _ := db.Create(config.RepoPath)
+					config.DB = sqliteDatastore
+					config.Mnemonic = mnemonic
+					config.CreationDate = time.Time{}
+					wallet, err = spvwallet.NewSPVWallet(config)
+					if err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					go wallet.Start()
 				case "minimize":
 					go func() {
 						w.Hide()

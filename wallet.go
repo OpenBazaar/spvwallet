@@ -66,6 +66,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 			return nil, err
 		}
 		config.Mnemonic = mnemonic
+		config.CreationDate = time.Now()
 	}
 	seed := b39.NewSeed(config.Mnemonic, "")
 
