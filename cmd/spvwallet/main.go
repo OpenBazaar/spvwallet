@@ -238,7 +238,7 @@ func (x *Start) Execute(args []string) error {
 	printSplashScreen()
 
 	if x.Gui {
-		go wallet.Start()
+		//go wallet.Start()
 
 		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
 
@@ -420,6 +420,8 @@ func (x *Start) Execute(args []string) error {
 						astilog.Errorf("Unmarshaling %s failed", m.Payload)
 						return
 					}
+					sqliteDatastore.SetMnemonic(mnemonic)
+					sqliteDatastore.SetCreationDate(time.Time{})
 					go wallet.Start()
 				case "minimize":
 					go func() {

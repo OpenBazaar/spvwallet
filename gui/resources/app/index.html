@@ -827,6 +827,7 @@
         var seed = document.getElementById("restoreMnemonic").value;
         astilectron.send({name: "restore", payload: seed});
         document.getElementById("restoreMnemonic").value = "";
+        mnemonic = seed;
         closeRestorePopup()
     }
 

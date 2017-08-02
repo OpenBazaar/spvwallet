@@ -1,12 +1,11 @@
 package bootstrap
 
 import (
-	"os"
-	"path/filepath"
-
 	"github.com/asticode/go-astilectron"
 	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
+	"os"
+	"path/filepath"
 )
 
 func Asset(src string) ([]byte, error) {
