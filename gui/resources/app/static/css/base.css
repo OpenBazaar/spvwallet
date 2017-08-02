@@ -42,8 +42,9 @@ html {
 }
 
 .Wallet {
-    width: 601.2px;
+    width: 602.2px;
     height: 285px;
+    margin-left: 1px;
     border-radius: 2px;
     background-color: #ffffff;
     box-shadow: 0 1px 2px 0 #cfcfcf;
@@ -235,6 +236,7 @@ input::-webkit-inner-spin-button {
 }
 
 .actionBar {
+    margin-left: 2px;
     height: 38.8px;
     width: 100%
 }
@@ -281,7 +283,7 @@ input::-webkit-inner-spin-button {
 }
 
 .minimize {
-    margin-right:0px;
+    margin-right: 5px;
 }
 
 .qrcode {
@@ -463,9 +465,10 @@ input::-webkit-inner-spin-button {
 }
 
 .Transactions {
-    width: 601.2px;
+    width: 602.2px;
     height: 285px;
     margin-top: 10px;
+    margin-left: 1px;
     display: none;
     border-radius: 2px;
     background-color: #ffffff;
@@ -488,8 +491,8 @@ input::-webkit-inner-spin-button {
 
 .Transactions::-webkit-scrollbar-thumb
 {
-    background-color: #2bad23;
-    border: 2px solid #2bad23;
+    background-color: #cfcfcf;
+    border: 2px solid #cfcfcf;
 }
 
 .transactions-label {
@@ -571,7 +574,7 @@ input::-webkit-inner-spin-button {
 }
 
 .setting {
-    width: 98%;
+    width: 97%;
     height: 50px;
     background-color: #ffffff;
     border: solid 1px #dbdbdb;

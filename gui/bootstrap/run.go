@@ -87,7 +87,7 @@ func Run(o Options) (err error) {
 		for {
 			select {
 			case n := <-o.ResizeChan:
-				w.Resize(619, n)
+				w.Resize(621, n)
 			case height := <-o.TransactionChan:
 				w.Send(MessageOut{Name: "newTransaction", Payload: height})
 			}

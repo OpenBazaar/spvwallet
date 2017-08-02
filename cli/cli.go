@@ -952,7 +952,7 @@ func (x *DumpHeaders) Execute(args []string) error {
 			fmt.Println(hdr.Entry)
 		}
 	} else {
-		db := spvwallet.NewHeaderDB(args[0])
+		db, _ := spvwallet.NewHeaderDB(args[0])
 		db.Print(os.Stdout)
 	}
 	return nil

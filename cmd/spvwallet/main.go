@@ -267,7 +267,7 @@ func (x *Start) Execute(args []string) error {
 		tc := make(chan struct{})
 		rc := make(chan int)
 
-		//os.RemoveAll(path.Join(basepath, "resources"))
+		os.RemoveAll(path.Join(basepath, "resources"))
 		iconPath := path.Join(basepath, "icon.png")
 		_, err := os.Stat(iconPath)
 		if os.IsNotExist(err) {
@@ -467,7 +467,7 @@ func (x *Start) Execute(args []string) error {
 			WindowOptions: &astilectron.WindowOptions{
 				Center:         astilectron.PtrBool(true),
 				Height:         astilectron.PtrInt(340),
-				Width:          astilectron.PtrInt(619),
+				Width:          astilectron.PtrInt(621),
 				Maximizable:    astilectron.PtrBool(false),
 				Fullscreenable: astilectron.PtrBool(false),
 				Resizable:      astilectron.PtrBool(false),
