@@ -1,23 +1,35 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/OpenBazaar/openbazaar-go/bitcoin/exchange"
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api"
 	"github.com/OpenBazaar/spvwallet/cli"
 	"github.com/OpenBazaar/spvwallet/db"
+	"github.com/OpenBazaar/spvwallet/gui"
+	"github.com/OpenBazaar/spvwallet/gui/bootstrap"
+	"github.com/asticode/go-astilectron"
+	"github.com/asticode/go-astilog"
+	"github.com/atotto/clipboard"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcutil"
 	"github.com/fatih/color"
 	"github.com/jessevdk/go-flags"
 	"github.com/natefinch/lumberjack"
 	"github.com/op/go-logging"
+	"github.com/skratchdot/open-golang/open"
 	"github.com/yawning/bulb"
+	"golang.org/x/net/proxy"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
 	"os/signal"
 	"path"
+	"strings"
 	"time"
 )
 
@@ -36,6 +48,7 @@ type Start struct {
 	LowDefaultFee      uint64 `short:"e" long:"economicfee" description:"the default low fee-per-byte" default:"140"`
 	MediumDefaultFee   uint64 `short:"n" long:"normalfee" description:"the default medium fee-per-byte" default:"160"`
 	HighDefaultFee     uint64 `short:"p" long:"priorityfee" description:"the default high fee-per-byte" default:"180"`
+	Gui                bool   `long:"gui" description:"launch an experimental GUI"`
 }
 type Version struct{}
 
@@ -53,17 +66,22 @@ func main() {
 			os.Exit(1)
 		}
 	}()
-	parser.AddCommand("start",
-		"start the wallet",
-		"The start command starts the wallet daemon",
-		&start)
-	parser.AddCommand("version",
-		"print the version number",
-		"Print the version number and exit",
-		&version)
-	cli.SetupCli(parser)
-	if _, err := parser.Parse(); err != nil {
-		os.Exit(1)
+	if len(os.Args) == 1 {
+		start.Gui = true
+		start.Execute([]string{})
+	} else {
+		parser.AddCommand("start",
+			"start the wallet",
+			"The start command starts the wallet daemon",
+			&start)
+		parser.AddCommand("version",
+			"print the version number",
+			"Print the version number and exit",
+			&version)
+		cli.SetupCli(parser)
+		if _, err := parser.Parse(); err != nil {
+			os.Exit(1)
+		}
 	}
 }
 
@@ -82,6 +100,7 @@ func (x *Start) Execute(args []string) error {
 	if x.Testnet && x.Regtest {
 		return errors.New("Invalid combination of testnet and regtest modes")
 	}
+	basepath := config.RepoPath
 	if x.Testnet {
 		config.Params = &chaincfg.TestNet3Params
 		config.RepoPath = path.Join(config.RepoPath, "testnet")
@@ -90,14 +109,6 @@ func (x *Start) Execute(args []string) error {
 		config.Params = &chaincfg.RegressionNetParams
 		config.RepoPath = path.Join(config.RepoPath, "regtest")
 	}
-	creationDate := time.Now()
-	if x.WalletCreationDate != "" {
-		creationDate, err = time.Parse(time.RFC3339, x.WalletCreationDate)
-		if err != nil {
-			return errors.New("Wallet creation date timestamp must be in RFC3339 format")
-		}
-	}
-	config.CreationDate = creationDate
 
 	_, ferr := os.Stat(config.RepoPath)
 	if os.IsNotExist(ferr) {
@@ -161,6 +172,61 @@ func (x *Start) Execute(args []string) error {
 		config.Mnemonic = mn
 	}
 
+	// Write version file
+	f, err := os.Create(path.Join(basepath, "version"))
+	if err != nil {
+		return err
+	}
+	f.Write([]byte("1"))
+	f.Close()
+
+	// Load settings
+	type Settings struct {
+		FiatCode      string `json:"fiatCode"`
+		FiatSymbol    string `json:"fiatSymbol"`
+		FeeLevel      string `json:"feeLevel"`
+		SelectBox     string `json:"selectBox"`
+		BitcoinUnit   string `json:"bitcoinUnit"`
+		DecimalPlaces int    `json:"decimalPlaces"`
+		TrustedPeer   string `json:"trustedPeer"`
+		Proxy         string `json:"proxy"`
+	}
+
+	var settings Settings
+	s, err := ioutil.ReadFile(path.Join(basepath, "settings.json"))
+	if err == nil {
+		json.Unmarshal([]byte(s), &settings)
+	}
+	if settings.TrustedPeer != "" {
+		var tp net.Addr
+		tp, err = net.ResolveTCPAddr("tcp", settings.TrustedPeer)
+		if err != nil {
+			return err
+		}
+		config.TrustedPeer = tp
+	}
+
+	if settings.Proxy != "" {
+		tbProxyURL, err := url.Parse("socks5://" + settings.Proxy)
+		if err != nil {
+			return err
+		}
+		tbDialer, err := proxy.FromURL(tbProxyURL, proxy.Direct)
+		if err != nil {
+			return err
+		}
+		config.Proxy = tbDialer
+	}
+
+	creationDate := time.Time{}
+	if x.WalletCreationDate != "" {
+		creationDate, err = time.Parse(time.RFC3339, x.WalletCreationDate)
+		if err != nil {
+			return errors.New("Wallet creation date timestamp must be in RFC3339 format")
+		}
+	}
+	config.CreationDate = creationDate
+
 	// Create the wallet
 	wallet, err = spvwallet.NewSPVWallet(config)
 	if err != nil {
@@ -170,12 +236,257 @@ func (x *Start) Execute(args []string) error {
 	if err := sqliteDatastore.SetMnemonic(config.Mnemonic); err != nil {
 		return err
 	}
+	if err := sqliteDatastore.SetCreationDate(config.CreationDate); err != nil {
+		return err
+	}
 
 	go api.ServeAPI(wallet)
 
 	// Start it!
 	printSplashScreen()
-	wallet.Start()
+
+	if x.Gui {
+		go wallet.Start()
+
+		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
+
+		type Stats struct {
+			Confirmed    int64  `json:"confirmed"`
+			Fiat         string `json:"fiat"`
+			Transactions int    `json:"transactions"`
+			Height       uint32 `json:"height"`
+			ExchangeRate string `json:"exchangeRate"`
+		}
+
+		txc := make(chan uint32)
+		listener := func(spvwallet.TransactionCallback) {
+			txc <- wallet.ChainTip()
+		}
+		wallet.AddTransactionListener(listener)
+
+		tc := make(chan struct{})
+		rc := make(chan int)
+
+		//os.RemoveAll(path.Join(basepath, "resources"))
+		iconPath := path.Join(basepath, "icon.png")
+		_, err := os.Stat(iconPath)
+		if os.IsNotExist(err) {
+			f, err := os.Create(iconPath)
+			if err != nil {
+				return err
+			}
+			icon, err := gui.AppIconPngBytes()
+			if err != nil {
+				return err
+			}
+			f.Write(icon)
+			defer f.Close()
+		}
+
+		// Run bootstrap
+		if err := bootstrap.Run(bootstrap.Options{
+			AstilectronOptions: astilectron.Options{
+				AppName:            "spvwallet",
+				AppIconDefaultPath: iconPath,
+				//AppIconDarwinPath:  p + "/gopher.icns",
+				BaseDirectoryPath: basepath,
+			},
+			Homepage: "index.html",
+			MessageHandler: func(w *astilectron.Window, m bootstrap.MessageIn) {
+				switch m.Name {
+				case "getStats":
+					type P struct {
+						CurrencyCode string `json:"currencyCode"`
+					}
+					var p P
+					if err := json.Unmarshal(m.Payload, &p); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					confirmed, _ := wallet.Balance()
+					txs, err := wallet.Transactions()
+					if err != nil {
+						astilog.Errorf(err.Error())
+						return
+					}
+					rate, err := exchangeRates.GetExchangeRate(p.CurrencyCode)
+					if err != nil {
+						astilog.Errorf("Failed to get exchange rate")
+						return
+					}
+					btcVal := float64(confirmed) / 100000000
+					fiatVal := float64(btcVal) * rate
+					height := wallet.ChainTip()
+
+					st := Stats{
+						Confirmed:    confirmed,
+						Fiat:         fmt.Sprintf("%.2f", fiatVal),
+						Transactions: len(txs),
+						Height:       height,
+						ExchangeRate: fmt.Sprintf("%.2f", rate),
+					}
+					w.Send(bootstrap.MessageOut{Name: "statsUpdate", Payload: st})
+				case "getAddress":
+					addr := wallet.CurrentAddress(spvwallet.EXTERNAL)
+					w.Send(bootstrap.MessageOut{Name: "address", Payload: addr.EncodeAddress()})
+				case "send":
+					type P struct {
+						Address  string  `json:"address"`
+						Amount   float64 `json:"amount"`
+						Note     string  `json:"note"`
+						FeeLevel string  `json:"feeLevel"`
+					}
+					var p P
+					if err := json.Unmarshal(m.Payload, &p); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					var feeLevel spvwallet.FeeLevel
+					switch strings.ToLower(p.FeeLevel) {
+					case "priority":
+						feeLevel = spvwallet.PRIOIRTY
+					case "normal":
+						feeLevel = spvwallet.NORMAL
+					case "economic":
+						feeLevel = spvwallet.ECONOMIC
+					default:
+						feeLevel = spvwallet.NORMAL
+					}
+					addr, err := btcutil.DecodeAddress(p.Address, wallet.Params())
+					if err != nil {
+						w.Send(bootstrap.MessageOut{Name: "spendError", Payload: "Invalid address"})
+						return
+					}
+					_, err = wallet.Spend(int64(p.Amount), addr, feeLevel)
+					if err != nil {
+						w.Send(bootstrap.MessageOut{Name: "spendError", Payload: err.Error()})
+					}
+				case "clipboard":
+					type P struct {
+						Data string `json:"data"`
+					}
+					var p P
+					if err := json.Unmarshal(m.Payload, &p); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					clipboard.WriteAll(p.Data)
+				case "putSettings":
+					var setstr string
+					if err := json.Unmarshal(m.Payload, &setstr); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					var settings Settings
+					if err := json.Unmarshal([]byte(setstr), &settings); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+
+					f, err := os.Create(path.Join(basepath, "settings.json"))
+					if err != nil {
+						astilog.Error(err.Error())
+						return
+					}
+					defer f.Close()
+					b, err := json.MarshalIndent(&settings, "", "    ")
+					if err != nil {
+						astilog.Error(err.Error())
+						return
+					}
+					f.Write(b)
+				case "getSettings":
+					settings, err := ioutil.ReadFile(path.Join(basepath, "settings.json"))
+					if err != nil {
+						astilog.Error(err.Error())
+					}
+					w.Send(bootstrap.MessageOut{Name: "settings", Payload: string(settings)})
+				case "openbrowser":
+					var url string
+					if err := json.Unmarshal(m.Payload, &url); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					open.Run(url)
+				case "resync":
+					wallet.ReSyncBlockchain(0)
+				case "restore":
+					var mnemonic string
+					if err := json.Unmarshal(m.Payload, &mnemonic); err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					wallet.Close()
+					os.Remove(path.Join(config.RepoPath, "wallet.db"))
+					os.Remove(path.Join(config.RepoPath, "headers.bin"))
+					sqliteDatastore, _ := db.Create(config.RepoPath)
+					config.DB = sqliteDatastore
+					config.Mnemonic = mnemonic
+					config.CreationDate = time.Time{}
+					wallet, err = spvwallet.NewSPVWallet(config)
+					if err != nil {
+						astilog.Errorf("Unmarshaling %s failed", m.Payload)
+						return
+					}
+					sqliteDatastore.SetMnemonic(mnemonic)
+					sqliteDatastore.SetCreationDate(time.Time{})
+					go wallet.Start()
+				case "minimize":
+					go func() {
+						w.Hide()
+						tc <- struct{}{}
+					}()
+				case "showTransactions":
+					go func() {
+						rc <- 649
+					}()
+					txs, err := wallet.Transactions()
+					if err != nil {
+						w.Send(bootstrap.MessageOut{Name: "txError", Payload: err.Error()})
+					}
+					w.Send(bootstrap.MessageOut{Name: "transactions", Payload: txs})
+				case "getTransactions":
+					txs, err := wallet.Transactions()
+					if err != nil {
+						w.Send(bootstrap.MessageOut{Name: "txError", Payload: err.Error()})
+					}
+					w.Send(bootstrap.MessageOut{Name: "transactions", Payload: txs})
+				case "hide":
+					go func() {
+						rc <- 341
+					}()
+				case "showSettings":
+					go func() {
+						rc <- 649
+					}()
+				case "getMnemonic":
+					w.Send(bootstrap.MessageOut{Name: "mnemonic", Payload: wallet.Mnemonic()})
+				}
+			},
+			RestoreAssets: gui.RestoreAssets,
+			WindowOptions: &astilectron.WindowOptions{
+				Center:         astilectron.PtrBool(true),
+				Height:         astilectron.PtrInt(340),
+				Width:          astilectron.PtrInt(619),
+				Maximizable:    astilectron.PtrBool(false),
+				Fullscreenable: astilectron.PtrBool(false),
+				Resizable:      astilectron.PtrBool(false),
+			},
+			TrayOptions: &astilectron.TrayOptions{
+				Image: astilectron.PtrStr(iconPath),
+			},
+			TrayChan:          tc,
+			ResizeChan:        rc,
+			TransactionChan:   txc,
+			BaseDirectoryPath: basepath,
+			Wallet:            wallet,
+			//Debug:             true,
+		}); err != nil {
+			astilog.Fatal(err)
+		}
+	} else {
+		wallet.Start()
+	}
 	return nil
 }
 

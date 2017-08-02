@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="static/css/base.css"/>
+</head>
+<body>
+    <div class="flex actionBar">
+        <div class="tab flex">
+            <img class="icon" src="icon.png">
+            <div id="exchangeRate" class="tabText"></div>
+        </div>
+        <div class="tab flex">
+            <img class="icon" src="block.png">
+            <div id="height" class="tabText"></div>
+        </div>
+        <div class="controlSpace"></div>
+        <div class="tab flex" onclick="showSettings()">
+            <img class="icon controlIcon controldiv" src="settings.png">
+        </div>
+        <div class="tab flex controldiv" onclick="showTransactions()">
+            <img class="icon controlIcon" src="list.png">
+        </div>
+        <div class="tab flex minimize controldiv" onclick="minimizeToTray();">
+            <img class="icon controlIcon" src="minimize.png">
+        </div>
+    </div>
+    <div class="Wallet">
+        <div class="Stats">
+            <div class="Funds">Funds</div>
+            <div id="btc-balance" class="Stat pad"></div>
+            <div class="label">Bitcoin</div>
+            <div id="fiat-balance" class="Stat pad"></div>
+            <div id="fiat-balance-label" class="label"></div>
+            <div id="nTransactions" class="Stat pad"></div>
+            <div class="label">Transactions</div>
+            <button id="sendReceiveButton" class="ToggleButton" onclick="toggleSendReceive();">Receive Money</button>
+        </div>
+        <div class="Line"></div>
+        <div id="sendMoney" class="WalletAction">
+            <div class="SendMoney Center">Send Money</div>
+            <div id="invalidAddress" class="flex Hidden invalid-field">
+                <div class="flex">
+                    <div class="caution">⚠ Please provide an address</div>
+                </div>
+            </div>
+            <div id="spendError" class="flex Hidden invalid-field">
+                <div class="flex">
+                    <div id="error" class="caution"></div>
+                </div>
+            </div>
+            <div class="SendField sndMarg">
+                <div class="SendField">
+                    <div class="Description fieldlabel to">To<div class="asterisk">*</div></div>
+                    <input id="address" type="text" placeholder="Enter a Bitcoin Address" class="input">
+                </div>
+            </div>
+            <div id="invalidAmount" class="flex Hidden invalid-field">
+                <div class="flex">
+                    <div class="caution">⚠ Please provide an amount as a number</div>
+                </div>
+            </div>
+            <div class="SendField">
+                <div class="SendField">
+                    <div class="Description fieldlabel amount">Amount<div class="asterisk">*</div></div>
+                    <input id="amount" type="number" placeholder="0.00" class="input">
+                    <select id="amountType" class="currencySelect" onChange="onCurrencyChange(this.selectedIndex);">
+                        <option value="fiat">USD</option>
+                        <option value="bitcoin">BTC</option>
+                    </select>
+                </div>
+            </div>
+            <div class="SendField">
+                <div class="SendField">
+                    <div class="Description fieldlabel note">Note</div>
+                    <input id="note" type="text" placeholder="Only seen by you" class="input">
+                </div>
+            </div>
+            <div class="sendActions flex">
+                <div class="Clear" onclick="clearFields();">Clear</div>
+                <div class="popup">
+                    <span class="popuptext" id="confirmationPopup">
+                        <div class="sure">Are you sure?</div>
+                        <div class="warning">Double check that the address and amount is correct</div>
+                        <div class="separator"></div>
+                        <div class="flex confirmationActions">
+                            <div class="Clear cancelPad" onclick="closePopup();">Cancel</div>
+                            <button class="SendBtn" onclick="sendTransaction()">Yes, Send</button>
+                        </div>
+                    </span>
+                    <button class="SendBtn" onclick="askForConfirmation();">Send</button>
+                </div>
+            </div>
+        </div>
+        <div id="receiveMoney" class="WalletAction Hidden">
+            <div class="SendMoney Center">Receive Money</div>
+            <div id="qrcode" class="qrcode"></div>
+            <div id="displayAddress" class="display-address" onclick="copyAddress();"></div>
+            <div class="flex need">
+                <img class="need-icon" src="icon.png">
+                <div class="need-bitcoin" onclick="openCoinbase();return false;" href="#">Need Bitcoin?</div>
+            </div>
+        </div>
+    </div>
+    <div class="Transactions" id="transactions">
+        <div class="transactions-label">Transactions</div>
+        <div class="Description noTransactions" id="noTransactions">You have no transactions.</div>
+        <div id="txArea"></div>
+    </div>
+    <div class="Transactions" id="settings">
+        <div class="transactions-label">Settings</div>
+        <div class="setting flex">
+            <div class="settingLabel">Fiat Currency</div>
+            <select id="fiatCurrencySetting" class="settingSelect" onclick="onFiatChange(this.selectedIndex);">
+                <option value="AUD">AUD</option>
+                <option value="BRL">BRL</option>
+                <option value="CAD">CAD</option>
+                <option value="CHF">CHF</option>
+                <option value="CLP">CLP</option>
+                <option value="CNY">CNY</option>
+                <option value="CZK">CZK</option>
+                <option value="DKK">DKK</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="HKD">HKD</option>
+                <option value="HUF">HUF</option>
+                <option value="IDR">IDR</option>
+                <option value="ILS">ILS</option>
+                <option value="INR">INR</option>
+                <option value="JPY">JPY</option>
+                <option value="KRW">KRW</option>
+                <option value="MXN">MXN</option>
+                <option value="MYR">MYR</option>
+                <option value="NOK">NOK</option>
+                <option value="NZD">NZD</option>
+                <option value="PHP">PHP</option>
+                <option value="PKR">PKR</option>
+                <option value="PLN">PLN</option>
+                <option value="RUB">RUB</option>
+                <option value="SEK">SEK</option>
+                <option value="SGD">SGD</option>
+                <option value="THB">THB</option>
+                <option value="TRY">TRY</option>
+                <option value="TWD">TWD</option>
+                <option value="USD">USD</option>
+                <option value="ZAR">ZAR</option>
+            </select>
+        </div>
+        <div class="setting flex">
+            <div class="settingLabel">BitcoinUnit</div>
+            <select id="bitcoinUnitSetting" class="settingSelect" onclick="onBitcoinUnitChange(this.selectedIndex);">
+                <option value="BTC">BTC</option>
+                <option value="mBTC">mBTC</option>
+                <option value="bits">bits</option>
+                <option value="satoshi">satoshi</option>
+            </select>
+        </div>
+        <div class="setting flex">
+            <div class="settingLabel">Transaction Fee</div>
+            <select id="feeSetting" class="settingSelect" onclick="onFeeChange(this.selectedIndex);">
+                <option value="priority">Priority</option>
+                <option value="normal">Normal</option>
+                <option value="economic">Economic</option>
+            </select>
+        </div>
+        <div class="setting flex">
+            <div class="settingLabel">Decimal Places</div>
+            <select id="decimalSetting" class="settingSelect" onclick="onDecimaChange(this.selectedIndex);">
+                <option value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+                <option value="6">6</option>
+                <option value="7">7</option>
+                <option value="8">8</option>
+            </select>
+        </div>
+        <div id="mnemonic" class="setting">
+            <div class="flex checkMargin">
+                <div class="checkLabel">Show mnemonic seed</div>
+                <input type="checkbox" id="mnemonicSwitch" onchange="showMnemonic(this)"/><label for="mnemonicSwitch"></label>
+            </div>
+        </div>
+        <div class="setting">
+            <div class="flex">
+                <div class="resyncLabel">Resync Blockchain</div>
+                <div class="resyncPopup">
+                        <span class="resyncPopuptext" id="resyncPopup">
+                            <div class="sure">Are you sure?</div>
+                            <div class="warning">Clicking yes will re-download the blockchain and scan for any missing payments.</div>
+                            <div class="separator"></div>
+                            <div class="flex confirmationActions">
+                                <div class="Clear cancelPad" onclick="closeResyncPopup();">Cancel</div>
+                                <button class="SendBtn" onclick="resync();">Yes, Do it</button>
+                            </div>
+                        </span>
+                    <button class="ResyncBtn" onclick="askForResyncConfirmation();">Go</button>
+                </div>
+            </div>
+        </div>
+        <div class="setting">
+            <div class="flex">
+                <div class="shortInputLabel">Set trusted peer:</div>
+                <input id="trustedPeer" type="text" placeholder="<ip>:<port>" class="shortinput">
+                <div class="resyncPopup">
+                        <span class="resyncPopuptext" id="trustedPeerPopup">
+                            <div class="sure">Set trusted peer?</div>
+                            <div class="warning">You will need to restart for this to take effect.</div>
+                            <div class="separator"></div>
+                            <div class="flex confirmationActions">
+                                <div class="Clear cancelPad" onclick="closeTrustedPeerPopup();">Cancel</div>
+                                <button class="SendBtn" onclick="setTrustedPeer();">Yes, Do it</button>
+                            </div>
+                        </span>
+                    <button class="SetBtn" onclick="askForTrustedPeerConfirmation();">Set</button>
+                </div>
+            </div>
+        </div>
+        <div class="setting">
+            <div class="flex">
+                <div class="shortInputLabel">Set socks5 proxy:</div>
+                <input id="proxy" type="text" placeholder="<ip>:<port>" class="shortinput">
+                <div class="resyncPopup">
+                        <span class="resyncPopuptext" id="proxyPopup">
+                            <div class="sure">Set socks5 proxy?</div>
+                            <div class="warning">You will need to restart for this to take effect.</div>
+                            <div class="separator"></div>
+                            <div class="flex confirmationActions">
+                                <div class="Clear cancelPad" onclick="closeProxyPopup();">Cancel</div>
+                                <button class="SendBtn" onclick="setProxy();">Yes, Do it</button>
+                            </div>
+                        </span>
+                    <button class="SetBtn" onclick="askForProxyConfirmation();">Set</button>
+                </div>
+            </div>
+        </div>
+        <div class="setting">
+            <div class="flex restore-margin">
+                <input id="restoreMnemonic" type="text" placeholder="Enter a twelve word mnemonic seed" class="mninput">
+                <div class="restorePopup">
+                        <span class="restorePopuptext" id="restorePopup">
+                            <div class="sure">Are you sure?</div>
+                            <div class="restoreWarning">Clicking yes will delete your existing wallet, including any coins in it, and restore from the seed you entered.</div>
+                            <div class="separator"></div>
+                            <div class="flex confirmationActions">
+                                <div class="Clear cancelPad" onclick="closeRestorePopup();">Cancel</div>
+                                <button class="SendBtn" onclick="restoreFromSeed()">Yes, Do it</button>
+                            </div>
+                        </span>
+                    <button class="RestoreBtn" onclick="askForRestoreConfirmation();">Restore From Seed</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script type='text/javascript' src="js/qrcode.min.js"></script>
+<script>
+    var settings;
+    var exchangeRate;
+    var height;
+    var qr;
+    var txs = new Object();
+    var confirmedSatoshis;
+    var showingTransactions = false;
+    var showingSettings = false;
+    var mnemonic;
+    document.getElementById("transactions").style.display = 'none';
+    document.getElementById("settings").style.display = 'none';
+
+    function statsLoop() {
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+        setTimeout(statsLoop, 10000);
+    }
+
+    function txUpdateLoop() {
+        if (!showingTransactions) {
+            return;
+        }
+        for (var txid in txs) {
+            var tx = txs[txid];
+            var confDiv = document.getElementById(tx.Txid+"-confirmations");
+            var timeDiv = document.getElementById(tx.Txid+"-time");
+            var fiatDiv = document.getElementById(tx.Txid+"-fiat");
+            var iconDiv = document.getElementById(tx.Txid+"-icon");
+            var confirms = makeConfirmations(tx.Height);
+            confDiv.innerHTML = "(" + confirms + " confirmations)";
+            var sign = "+";
+            if (tx.Value < 0) {
+                sign = "-"
+            }
+            fiatDiv.innerHTML = sign + makeFiatValue(tx.Value);
+            timeDiv.innerHTML = timePassed(tx.Timestamp) + " ago";
+            makeConfirmationIcon(confirms, tx.Timestamp, iconDiv);
+        }
+        setTimeout(txUpdateLoop, 3000);
+    }
+
+    document.addEventListener('astilectron-ready', function() {
+        astilectron.listen(function(message) {
+            switch (message.name) {
+                case "settings":
+                    if (message.payload == "") {
+                        var s = {
+                            fiatCode: "USD",
+                            fiatSymbol: "$",
+                            feeLevel: "priority",
+                            selectBox: "bitcoin",
+                            bitcoinUnit: "BTC",
+                            decimalPlaces: 5,
+                            trustedPeer: "",
+                            proxy: "",
+                        };
+                        settings = s;
+                        astilectron.send({name: "putSettings", payload: JSON.stringify(s)});
+                    } else {
+                        settings = JSON.parse(message.payload)
+                    }
+                    var selectBox = document.getElementById('amountType');
+                    selectBox.options[0].text = settings.fiatCode;
+                    selectBox.options[1].text = settings.bitcoinUnit;
+                    selectBox.value = settings.selectBox;
+                    var fiatBox = document.getElementById('fiatCurrencySetting');
+                    fiatBox.value = settings.fiatCode;
+                    document.getElementById('fiat-balance-label').innerHTML = "Value in " + settings.fiatCode;
+                    var decimalBox = document.getElementById('decimalSetting');
+                    decimalBox.value = settings.decimalPlaces;
+                    var unitBox = document.getElementById('bitcoinUnitSetting');
+                    unitBox.value = settings.bitcoinUnit;
+                    var feeBox = document.getElementById('feeSetting');
+                    feeBox.value = settings.feeLevel;
+                    document.getElementById("trustedPeer").value = settings.trustedPeer;
+                    document.getElementById("proxy").value = settings.proxy;
+                    statsLoop();
+                    break;
+                case "statsUpdate":
+                    document.getElementById("btc-balance").innerHTML = satoshiToBTCUnit(message.payload.confirmed);
+                    document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol + message.payload.fiat;
+                    document.getElementById("nTransactions").innerHTML = message.payload.transactions;
+                    document.getElementById("exchangeRate").innerHTML = settings.fiatSymbol + message.payload.exchangeRate;
+                    document.getElementById("height").innerHTML = message.payload.height;
+                    exchangeRate = message.payload.exchangeRate;
+                    height = message.payload.height;
+                    confirmedSatoshis = message.payload.confirmed;
+                    break;
+                case "address":
+                    qr.clear();
+                    qr.makeCode("bitcoin:" + message.payload);
+                    document.getElementById("displayAddress").innerHTML = message.payload;
+                    break;
+                case "spendError":
+                    var spendError = document.getElementById("spendError");
+                    document.getElementById("error").innerHTML = "⚠ " + message.payload;
+                    spendError.style.display = 'block';
+                    break;
+                case "transactions":
+                    var txArea = document.getElementById("txArea");
+                    if (message.payload.length > 0) {
+                        document.getElementById("noTransactions").style.display = 'none';
+                    }
+                    for (i = message.payload.length - 1; i >= 0; i--) {
+                        txs[message.payload[i].Txid] = message.payload[i];
+                        var tx = createTx(message.payload[i]);
+                        txArea.appendChild(tx);
+                    }
+                    break;
+                case "newTransaction":
+                    height = message.payload;
+                    if (showingTransactions) {
+                        var txArea = document.getElementById("txArea");
+                        while (txArea.hasChildNodes()) {
+                            txArea.removeChild(txArea.lastChild);
+                        }
+                        astilectron.send({name: "getTransactions"});
+                    }
+                    break;
+                case "mnemonic":
+                    mnemonic = message.payload;
+
+            }
+        });
+        qr = new QRCode(document.getElementById("qrcode"), {
+            text: "",
+            height: 153,
+            width: 153
+        });
+        astilectron.send({name: "getSettings"});
+        astilectron.send({name: "getAddress"});
+        astilectron.send({name: "getMnemonic"});
+    });
+
+    function createTx(tx) {
+        var entry = document.createElement("div");
+        var outerDiv = document.createElement("div");
+        outerDiv.classList.add('flex');
+        var leftDiv = document.createElement("div");
+        leftDiv.classList.add('details-width');
+        var rightDiv = document.createElement("div");
+        rightDiv.classList.add('flex');
+
+        var viewDetails = document.createElement("button");
+        viewDetails.innerText = "View Details";
+        viewDetails.classList.add("viewdetails");
+        viewDetails.onclick = function() {
+            astilectron.send({name: "openbrowser", payload: "https://blockchain.info/tx/" + tx.Txid});
+        };
+        rightDiv.appendChild(viewDetails);
+
+        var leftTopDiv = document.createElement("div");
+        leftTopDiv.classList.add('flex');
+        var fiatDiv = document.createElement("div");
+        var btcValue = satoshiToBTCUnit(tx.Value);
+        var sign = "+";
+        if (parseFloat(tx.Value) < 0) {
+            btcValue *= -1;
+            sign = "-"
+        }
+        fiatDiv.innerHTML = sign + makeFiatValue(tx.Value);
+        fiatDiv.id = tx.Txid + "-fiat";
+        fiatDiv.classList.add('bold', 'tx-margin');
+        var btcDiv = document.createElement("div");
+        btcDiv.innerHTML = "(" + btcValue + " " + settings.bitcoinUnit + ")";
+        btcDiv.classList.add('bold', 'tx-margin');
+
+        var iconDiv = document.createElement("div");
+        iconDiv.id = tx.Txid + "-icon";
+
+        leftTopDiv.appendChild(iconDiv);
+        leftTopDiv.appendChild(fiatDiv);
+        leftTopDiv.appendChild(btcDiv);
+        leftTopDiv.classList.add('tx-text');
+
+        var leftBottomDiv = document.createElement("div");
+        leftBottomDiv.classList.add('flex', 'tx-text2');
+        var timeDiv = document.createElement("div");
+        timeDiv.innerHTML = timePassed(tx.Timestamp) + " ago";
+        timeDiv.id = tx.Txid + "-time";
+        timeDiv.classList.add('time-margin');
+        leftBottomDiv.appendChild(timeDiv);
+
+        var confDiv = document.createElement("div");
+        confDiv.classList.add('tx-margin');
+        var confirms = makeConfirmations(tx.Height);
+        confDiv.innerHTML = "(" + confirms + " confirmations)";
+        confDiv.id = tx.Txid + "-confirmations";
+        leftBottomDiv.appendChild(confDiv);
+
+        makeConfirmationIcon(confirms, tx.Timestamp, iconDiv);
+
+        var txidDiv = document.createElement("div");
+        txidDiv.innerHTML = tx.Txid.substring(0, 9) + "...";
+        leftBottomDiv.appendChild(txidDiv);
+        txidDiv.classList.add('tx-margin', 'controldiv');
+        txidDiv.onclick = function(){
+            astilectron.send({name: "clipboard", payload:{data:tx.Txid}});
+            txidDiv.innerHTML = "Copied";
+            setTimeout(function () {
+                txidDiv.innerHTML = tx.Txid.substring(0, 9) + "...";
+            }, 1000);
+        };
+
+        leftDiv.appendChild(leftTopDiv);
+        leftDiv.appendChild(leftBottomDiv);
+        outerDiv.appendChild(leftDiv);
+        outerDiv.appendChild(rightDiv);
+        entry.classList.add('tx');
+        entry.appendChild(outerDiv);
+        return entry
+    }
+
+    function satoshiToBTCUnit(satoshis) {
+        var satoshisPerUnit;
+        switch(settings.bitcoinUnit) {
+            case "BTC":
+                satoshisPerUnit = 100000000;
+                break;
+            case "mBTC":
+                satoshisPerUnit = 100000;
+                break;
+            case "bits":
+                satoshisPerUnit = 100;
+                break;
+            case "satoshi":
+                return satoshis
+        }
+        var decimal = Math.pow(10, settings.decimalPlaces);
+        var val = satoshis / satoshisPerUnit;
+        return Math.floor(val * decimal) / decimal;
+    }
+
+    function makeFiatValue(val) {
+        var btcValue = val / 100000000;
+        var fiatValue = (btcValue*exchangeRate).toFixed(2);
+        var sign = "+";
+        if (parseFloat(val) < 0) {
+            sign = "-";
+            fiatValue *= -1;
+        }
+        return settings.fiatSymbol + fiatValue;
+    }
+
+    function makeConfirmations(txHeight) {
+        var confirmations = 0;
+        if (txHeight == height) {
+            confirmations = 1;
+        } else if (txHeight > 0) {
+            confirmations = (height - txHeight) + 1;
+        }
+        return confirmations;
+    }
+
+    function isStuck(ts) {
+        var unix = Date.parse(ts) / 1000;
+        var now = Math.floor(Date.now() / 1000);
+        if ((now - unix) > 86400) {
+            return true
+        }
+        return false
+    }
+
+    function isDead(ts) {
+        var unix = Date.parse(ts) / 1000;
+        var now = Math.floor(Date.now() / 1000);
+        if ((now - unix) > (86400 * 7)) {
+            return true
+        }
+        return false
+    }
+
+    function makeConfirmationIcon(confirms, ts, iconDiv) {
+        var stuck = isStuck(ts);
+        var dead = isDead(ts);
+        if (confirms == 0 && dead) {
+            iconDiv.innerHTML = "✕";
+            iconDiv.classList.add('cross');
+        } else if (confirms == 0 && stuck) {
+            iconDiv.innerHTML = "⚠";
+            iconDiv.classList.add('caution');
+        } else if (confirms < 6) {
+                iconDiv.innerHTML = "🕜";
+        } else {
+            iconDiv.classList.add('checkmark');
+            iconDiv.innerHTML = "✓";
+        }
+    }
+
+    function timePassed(ts) {
+        var unix = Date.parse(ts) / 1000;
+        var now = Math.floor(Date.now() / 1000);
+        var secondsPassed = now - unix;
+        if (Math.floor(secondsPassed / 31449600) > 0) {
+            return Math.floor(secondsPassed / 31449600) + "y";
+        } else if (Math.floor(secondsPassed / 604800) > 0) {
+            return Math.floor(secondsPassed / 604800) + "w";
+        } else if (Math.floor(secondsPassed / 86400) > 0) {
+            return Math.floor(secondsPassed / 86400) + "d";
+        } else if (Math.floor(secondsPassed / 3600) > 0){
+            return Math.floor(secondsPassed / 3600) + "h";
+        } else {
+            return Math.floor(secondsPassed / 60) + "m";
+        }
+    }
+
+    function toggleSendReceive() {
+        var btn = document.getElementById("sendReceiveButton");
+        var send = document.getElementById('sendMoney');
+        var receive = document.getElementById('receiveMoney');
+        if (btn.innerText == "Receive Money") {
+            astilectron.send({name: "getAddress"});
+            btn.innerText = "Send Money";
+            receive.style.display = 'block';
+            send.style.display = 'none';
+        } else {
+            btn.innerText = "Receive Money";
+            receive.style.display = 'none';
+            send.style.display = 'block';
+        }
+    }
+
+    function clearFields() {
+        document.getElementById("address").value = "";
+        document.getElementById("amount").value = "";
+        document.getElementById("note").value = "";
+        var invalidAmount = document.getElementById("invalidAmount");
+        invalidAmount.style.display = 'none';
+        var invalidAddress = document.getElementById("invalidAddress");
+        invalidAddress.style.display = 'none';
+        var spendError = document.getElementById("spendError");
+        spendError.style.display = 'none';
+    }
+
+    function minimizeToTray() {
+        astilectron.send({name: "minimize"});
+    }
+
+    function copyAddress(){
+        var d = document.getElementById("displayAddress").innerHTML;
+        astilectron.send({name: "clipboard", payload:{data:d}});
+        document.getElementById("displayAddress").innerHTML = "Copied";
+        setTimeout(function () {
+            document.getElementById("displayAddress").innerHTML = d;
+        }, 1000);
+    }
+
+    function openCoinbase() {
+        astilectron.send({name: "openbrowser", payload: "https://coinbase.com"});
+    }
+
+    function askForConfirmation() {
+        var popup = document.getElementById("confirmationPopup");
+        popup.classList.toggle("show");
+    }
+
+    function askForRestoreConfirmation() {
+        var popup = document.getElementById("restorePopup");
+        popup.classList.toggle("show");
+    }
+
+    function askForTrustedPeerConfirmation() {
+        var popup = document.getElementById("trustedPeerPopup");
+        popup.classList.toggle("show");
+    }
+
+    function askForResyncConfirmation() {
+        var popup = document.getElementById("resyncPopup");
+        popup.classList.toggle("show");
+    }
+
+    function askForProxyConfirmation() {
+        var popup = document.getElementById("proxyPopup");
+        popup.classList.toggle("show");
+    }
+
+    function closePopup() {
+        var popup = document.getElementById("confirmationPopup");
+        popup.classList.toggle("show");
+    }
+
+    function closeRestorePopup() {
+        var popup = document.getElementById("restorePopup");
+        popup.classList.toggle("show");
+    }
+
+    function closeResyncPopup() {
+        var popup = document.getElementById("resyncPopup");
+        popup.classList.toggle("show");
+    }
+
+    function closeTrustedPeerPopup() {
+        var popup = document.getElementById("trustedPeerPopup");
+        popup.classList.toggle("show");
+    }
+
+    function closeProxyPopup() {
+        var popup = document.getElementById("proxyPopup");
+        popup.classList.toggle("show");
+    }
+
+    function sendTransaction() {
+        var nTransactions = document.getElementById("nTransactions").innerHTML;
+        var fiatBalance = parseFloat(document.getElementById("fiat-balance").innerHTML.substring(1));
+
+        var invalidAddress = document.getElementById("invalidAddress");
+        var invalidAmount = document.getElementById("invalidAmount");
+        var spendError = document.getElementById("spendError");
+        invalidAddress.style.display = 'none';
+        invalidAmount.style.display = 'none';
+        spendError.style.display = 'none';
+
+        var address = document.getElementById("address").value;
+        var valid = true;
+        if (address == "") {
+            invalidAddress.style.display = 'block';
+            valid = false
+        }
+        var amount = document.getElementById("amount").value;
+        if (amount == "") {
+            invalidAmount.style.display = 'block';
+            valid = false;
+        }
+        if (!valid) {
+            closePopup();
+            return
+        }
+
+        var e = document.getElementById("amountType");
+        var amountType = e.options[e.selectedIndex].value;
+        var satoshis;
+        if (amountType == "bitcoin") {
+            switch(settings.bitcoinUnit) {
+                case "BTC":
+                    satoshis = amount * 100000000;
+                    break;
+                case "mBTC":
+                    satoshis = amount * 100000;
+                    break;
+                case "bits":
+                    satoshis = amount * 100;
+                    break;
+                case "satoshi":
+                    satoshis = amount;
+            }
+        } else {
+            satoshis = (amount / exchangeRate) * 100000000;
+        }
+
+        var note = document.getElementById("note").value;
+
+        var newBtcBalance = satoshiToBTCUnit(confirmedSatoshis - satoshis);
+        var newFiatBalance = ((confirmedSatoshis - satoshis) / 100000000) * exchangeRate;
+
+        document.getElementById("nTransactions").innerHTML = parseInt(nTransactions) + 1;
+        document.getElementById("btc-balance").innerHTML = newBtcBalance;
+        document.getElementById("fiat-balance").innerHTML = settings.fiatSymbol + newFiatBalance.toFixed(2);
+
+        astilectron.send({name: "send", payload:{address: address, amount: satoshis, feeLevel: settings.feeLevel, note: note}});
+        closePopup();
+        clearFields();
+    }
+
+    function onCurrencyChange(idx) {
+        var e = document.getElementById("amountType");
+        var amountType = e.options[idx].value;
+        settings.selectBox = amountType;
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+    }
+
+    var currencySymbols = {
+            "AUD": "$",
+            "BRL": "R$",
+            "CAD": "$",
+            "CHF": "Fr.",
+            "CLP": "$",
+            "CNY": "¥",
+            "CZK": "Kč",
+            "DKK": "kr",
+            "EUR": "€",
+            "GBP": "£",
+            "HKD": "$",
+            "HUF": "Ft",
+            "IDR": "Rp",
+            "ILS": "₪",
+            "INR": "₹",
+            "JPY": "¥",
+            "KRW": "₩",
+            "MXN": "$",
+            "MYR": "RM",
+            "NOK": "kr",
+            "NZD": "$",
+            "PHP": "₱",
+            "PKR": "₨",
+            "PLN": "zł",
+            "RUB": "₽",
+            "SEK": "kr",
+            "SGD": "$",
+            "THB": "฿",
+            "TRY": "₺",
+            "TWD": "NT$",
+            "USD": "$",
+            "ZAR": "R"
+    };
+
+    function onFiatChange(idx) {
+        var e = document.getElementById("fiatCurrencySetting");
+        var currencyCode = e.options[idx].value;
+        settings.fiatCode = currencyCode;
+        var symbol = currencySymbols[currencyCode];
+        settings.fiatSymbol = symbol;
+
+        var at = document.getElementById("amountType");
+        var amountType = at.options[0].text = currencyCode;
+
+        document.getElementById('fiat-balance-label').innerHTML = "Value in " + settings.fiatCode;
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+    }
+
+    function onBitcoinUnitChange(idx) {
+        var e = document.getElementById("bitcoinUnitSetting");
+        var unit = e.options[idx].value;
+        settings.bitcoinUnit = unit;
+
+        var at = document.getElementById("amountType");
+        var amountType = at.options[1].text = unit;
+
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+    }
+
+    function onDecimaChange(idx) {
+        var e = document.getElementById("decimalSetting");
+        var places = e.options[idx].value;
+        settings.decimalPlaces = places;
+
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+    }
+
+    function onFeeChange(idx) {
+        var e = document.getElementById("feeSetting");
+        var feeLevel = e.options[idx].value;
+        settings.feeLevel = feeLevel;
+
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        astilectron.send({name: "getStats", payload: {currencyCode: settings.fiatCode}});
+    }
+
+    function setTrustedPeer() {
+        settings.trustedPeer = document.getElementById("trustedPeer").value;
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        closeTrustedPeerPopup()
+    }
+
+    function setProxy() {
+        settings.proxy = document.getElementById("proxy").value;
+        astilectron.send({name: "putSettings", payload: JSON.stringify(settings)});
+        closeProxyPopup()
+    }
+
+    function resync() {
+        astilectron.send({name: "resync"});
+        closeResyncPopup()
+    }
+
+    function restoreFromSeed() {
+        var seed = document.getElementById("restoreMnemonic").value;
+        astilectron.send({name: "restore", payload: seed});
+        document.getElementById("restoreMnemonic").value = "";
+        mnemonic = seed;
+        closeRestorePopup()
+    }
+
+    function showMnemonic(id) {
+        var outerDiv = document.getElementById("mnemonic");
+        if (id.checked) {
+            var wrapper = document.createElement("div");
+            var mnDiv = document.createElement("div");
+            mnDiv.innerText = mnemonic;
+            mnDiv.classList.add("mnemonic");
+            var desc = document.createElement("div");
+            desc.innerText = "*BIP39 mnemonic seed using BIP44 derivation. Write it down and store it in a safe place. You can use it to restore your coins later."
+            desc.classList.add("mnDesc");
+            wrapper.appendChild(mnDiv);
+            wrapper.appendChild(desc);
+            outerDiv.appendChild(wrapper);
+            outerDiv.style.height = "150px";
+        } else {
+            outerDiv.removeChild(outerDiv.lastChild);
+            outerDiv.style.height = "50px";
+        }
+    }
+
+    function showTransactions() {
+        if (!showingTransactions) {
+            document.getElementById("settings").style.display = 'none';
+            showingSettings = false;
+            astilectron.send({name: "showTransactions"});
+            showingTransactions = true;
+            document.getElementById("transactions").style.display = 'block';
+            txUpdateLoop()
+        } else {
+            document.getElementById("transactions").style.display = 'none';
+            astilectron.send({name: "hide"});
+            var txArea = document.getElementById("txArea");
+            while (txArea.hasChildNodes()) {
+                txArea.removeChild(txArea.lastChild);
+            }
+            showingTransactions = false;
+        }
+    }
+
+    function showSettings() {
+        if (!showingSettings) {
+            document.getElementById("transactions").style.display = 'none';
+            showingTransactions = false;
+            document.getElementById("settings").style.display = 'block';
+            astilectron.send({name: "showSettings"});
+            showingSettings = true;
+        } else {
+            document.getElementById("settings").style.display = 'none';
+            astilectron.send({name: "hide"});
+            showingSettings = false;
+        }
+    }
+</script>
+</body>
+</html>
