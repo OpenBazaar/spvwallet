@@ -253,6 +253,10 @@ func (x *Start) Execute(args []string) error {
 		}
 		config.Proxy = tbDialer
 	}
+	config.FeeAPI = settings.Fees.FeeAPI
+	config.HighFee = settings.Fees.Priority
+	config.MediumFee = settings.Fees.Normal
+	config.LowFee = settings.Fees.Economic
 
 	creationDate := time.Time{}
 	if x.WalletCreationDate != "" {
