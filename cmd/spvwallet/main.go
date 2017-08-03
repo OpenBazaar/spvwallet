@@ -253,7 +253,8 @@ func (x *Start) Execute(args []string) error {
 		}
 		config.Proxy = tbDialer
 	}
-	config.FeeAPI = settings.Fees.FeeAPI
+	feeApi, _ := url.Parse(settings.Fees.FeeAPI)
+	config.FeeAPI = *feeApi
 	config.HighFee = settings.Fees.Priority
 	config.MediumFee = settings.Fees.Normal
 	config.LowFee = settings.Fees.Economic
