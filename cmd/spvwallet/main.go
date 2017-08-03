@@ -68,7 +68,7 @@ func main() {
 	}()
 	if len(os.Args) == 1 {
 		start.Gui = true
-		start.Execute([]string{})
+		start.Execute([]string{"defaultSettings"})
 	} else {
 		parser.AddCommand("start",
 			"start the wallet",
@@ -146,10 +146,12 @@ func (x *Start) Execute(args []string) error {
 		}
 		config.FeeAPI = *u
 	}
-	config.MaxFee = x.MaxFee
-	config.LowFee = x.LowDefaultFee
-	config.MediumFee = x.MediumDefaultFee
-	config.HighFee = x.HighDefaultFee
+	if len(args) == 0 {
+		config.MaxFee = x.MaxFee
+		config.LowFee = x.LowDefaultFee
+		config.MediumFee = x.MediumDefaultFee
+		config.HighFee = x.HighDefaultFee
+	}
 
 	// Make the logging a little prettier
 	var fileLogFormat = logging.MustStringFormatter(`%{time:15:04:05.000} [%{shortfunc}] [%{level}] %{message}`)
