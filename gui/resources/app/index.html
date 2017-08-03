@@ -303,22 +303,7 @@
         astilectron.listen(function(message) {
             switch (message.name) {
                 case "settings":
-                    if (message.payload == "") {
-                        var s = {
-                            fiatCode: "USD",
-                            fiatSymbol: "$",
-                            feeLevel: "priority",
-                            selectBox: "bitcoin",
-                            bitcoinUnit: "BTC",
-                            decimalPlaces: 5,
-                            trustedPeer: "",
-                            proxy: "",
-                        };
-                        settings = s;
-                        astilectron.send({name: "putSettings", payload: JSON.stringify(s)});
-                    } else {
-                        settings = JSON.parse(message.payload)
-                    }
+                    settings = JSON.parse(message.payload)
                     var selectBox = document.getElementById('amountType');
                     selectBox.options[0].text = settings.fiatCode;
                     selectBox.options[1].text = settings.bitcoinUnit;
