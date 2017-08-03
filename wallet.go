@@ -207,8 +207,7 @@ func (w *SPVWallet) NewAddress(purpose KeyPurpose) btc.Address {
 	i, _ := w.txstore.Keys().GetUnused(purpose)
 	key, _ := w.keyManager.generateChildKey(purpose, uint32(i[1]))
 	addr, _ := key.Address(w.params)
-	script, _ := txscript.PayToAddrScript(btc.Address(addr))
-	w.txstore.Keys().MarkKeyAsUsed(script)
+	w.txstore.Keys().MarkKeyAsUsed(addr.ScriptAddress())
 	w.txstore.PopulateAdrs()
 	return btc.Address(addr)
 }
