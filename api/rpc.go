@@ -582,3 +582,60 @@ func (s *server) DumpHeaders(in *pb.Empty, stream pb.API_DumpHeadersServer) erro
 	s.w.DumpHeaders(&writer)
 	return nil
 }
+
+func (s *server) GetKey(ctx context.Context, in *pb.Address) (*pb.Key, error) {
+	params, err := s.Params(ctx, &pb.Empty{})
+	if err != nil {
+		return nil, err
+	}
+	var p chaincfg.Params
+	switch params.Name {
+	case chaincfg.TestNet3Params.Name:
+		p = chaincfg.TestNet3Params
+	case chaincfg.MainNetParams.Name:
+		p = chaincfg.MainNetParams
+	case chaincfg.RegressionNetParams.Name:
+		p = chaincfg.RegressionNetParams
+	default:
+		return nil, errors.New("Unknown network parameters")
+	}
+	addr, err := btcutil.DecodeAddress(in.Addr, &p)
+	if err != nil {
+		return nil, err
+	}
+	key, err := s.w.GetKey(addr)
+	if err != nil {
+		return nil, err
+	}
+	wif, err := btcutil.NewWIF(key, &p, true)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.Key{wif.String()}, nil
+}
+
+func (s *server) ListAddresses(ctx context.Context, in *pb.Empty) (*pb.Addresses, error) {
+	addrs := s.w.ListAddresses()
+	var list []*pb.Address
+	for _, addr := range addrs {
+		ret := new(pb.Address)
+		ret.Addr = addr.String()
+		list = append(list, ret)
+	}
+	return &pb.Addresses{list}, nil
+}
+
+func (s *server) ListKeys(ctx context.Context, in *pb.Empty) (*pb.Keys, error) {
+	keys := s.w.ListKeys()
+	var list []*pb.Key
+	for _, key := range keys {
+		ret := new(pb.Key)
+		wif, err := btcutil.NewWIF(&key, s.w.Params(), true)
+		if err != nil {
+			return nil, err
+		}
+		ret.Key = wif.String()
+		list = append(list, ret)
+	}
+	return &pb.Keys{list}, nil
+}

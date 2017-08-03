@@ -27,6 +27,9 @@ service API {
   rpc CreateMultisigSignature (CreateMultisigInfo) returns (SignatureList) {}
   rpc Multisign (MultisignInfo) returns (RawTx) {}
   rpc EstimateFee (EstimateFeeData) returns (Fee) {}
+  rpc GetKey (Address) returns (Key) {}
+  rpc ListKeys (Empty) returns (Keys) {}
+  rpc ListAddresses (Empty) returns (Addresses) {}
   rpc WalletNotify (Empty) returns (stream Tx) {}
   rpc DumpHeaders (Empty) returns (stream Header) {}
 }
@@ -57,6 +60,14 @@ message Balances {
 
 message Key {
     string key = 1;
+}
+
+message Keys {
+    repeated Key keys = 1;
+}
+
+message Addresses {
+    repeated Address addresses = 1;
 }
 
 message BoolResponse {
