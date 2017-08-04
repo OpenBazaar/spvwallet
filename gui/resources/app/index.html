@@ -695,7 +695,13 @@
         var note = document.getElementById("note").value;
 
         var newBtcBalance = satoshiToBTCUnit(confirmedSatoshis - satoshis);
+        if (newBtcBalance < 0) {
+            newBtcBalance = 0;
+        }
         var newFiatBalance = ((confirmedSatoshis - satoshis) / 100000000) * exchangeRate;
+        if (newFiatBalance < 0) {
+            newFiatBalance = 0;
+        }
 
         document.getElementById("nTransactions").innerHTML = parseInt(nTransactions) + 1;
         document.getElementById("btc-balance").innerHTML = newBtcBalance;
