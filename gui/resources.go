@@ -413,20 +413,20 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"resources/app/block.png": resourcesAppBlockPng,
-	"resources/app/caution.png": resourcesAppCautionPng,
-	"resources/app/icon.png": resourcesAppIconPng,
-	"resources/app/index.html": resourcesAppIndexHtml,
-	"resources/app/js/qrcode.min.js": resourcesAppJsQrcodeMinJs,
-	"resources/app/list.png": resourcesAppListPng,
-	"resources/app/minimize.jpg": resourcesAppMinimizeJpg,
-	"resources/app/minimize.png": resourcesAppMinimizePng,
-	"resources/app/settings.png": resourcesAppSettingsPng,
-	"resources/app/static/css/base.css": resourcesAppStaticCssBaseCss,
-	"resources/app/static/fonts/NotoSans-Bold-webfont.ttf": resourcesAppStaticFontsNotosansBoldWebfontTtf,
+	"resources/app/block.png":                                    resourcesAppBlockPng,
+	"resources/app/caution.png":                                  resourcesAppCautionPng,
+	"resources/app/icon.png":                                     resourcesAppIconPng,
+	"resources/app/index.html":                                   resourcesAppIndexHtml,
+	"resources/app/js/qrcode.min.js":                             resourcesAppJsQrcodeMinJs,
+	"resources/app/list.png":                                     resourcesAppListPng,
+	"resources/app/minimize.jpg":                                 resourcesAppMinimizeJpg,
+	"resources/app/minimize.png":                                 resourcesAppMinimizePng,
+	"resources/app/settings.png":                                 resourcesAppSettingsPng,
+	"resources/app/static/css/base.css":                          resourcesAppStaticCssBaseCss,
+	"resources/app/static/fonts/NotoSans-Bold-webfont.ttf":       resourcesAppStaticFontsNotosansBoldWebfontTtf,
 	"resources/app/static/fonts/NotoSans-BoldItalic-webfont.ttf": resourcesAppStaticFontsNotosansBolditalicWebfontTtf,
-	"resources/app/static/fonts/NotoSans-Italic-webfont.ttf": resourcesAppStaticFontsNotosansItalicWebfontTtf,
-	"resources/app/static/fonts/NotoSans-Regular-webfont.ttf": resourcesAppStaticFontsNotosansRegularWebfontTtf,
+	"resources/app/static/fonts/NotoSans-Italic-webfont.ttf":     resourcesAppStaticFontsNotosansItalicWebfontTtf,
+	"resources/app/static/fonts/NotoSans-Regular-webfont.ttf":    resourcesAppStaticFontsNotosansRegularWebfontTtf,
 }
 
 // AssetDir returns the file names below a certain
@@ -468,17 +468,18 @@ type bintree struct {
 	Func     func() (*asset, error)
 	Children map[string]*bintree
 }
+
 var _bintree = &bintree{nil, map[string]*bintree{
 	"resources": &bintree{nil, map[string]*bintree{
 		"app": &bintree{nil, map[string]*bintree{
-			"block.png": &bintree{resourcesAppBlockPng, map[string]*bintree{}},
+			"block.png":   &bintree{resourcesAppBlockPng, map[string]*bintree{}},
 			"caution.png": &bintree{resourcesAppCautionPng, map[string]*bintree{}},
-			"icon.png": &bintree{resourcesAppIconPng, map[string]*bintree{}},
-			"index.html": &bintree{resourcesAppIndexHtml, map[string]*bintree{}},
+			"icon.png":    &bintree{resourcesAppIconPng, map[string]*bintree{}},
+			"index.html":  &bintree{resourcesAppIndexHtml, map[string]*bintree{}},
 			"js": &bintree{nil, map[string]*bintree{
 				"qrcode.min.js": &bintree{resourcesAppJsQrcodeMinJs, map[string]*bintree{}},
 			}},
-			"list.png": &bintree{resourcesAppListPng, map[string]*bintree{}},
+			"list.png":     &bintree{resourcesAppListPng, map[string]*bintree{}},
 			"minimize.jpg": &bintree{resourcesAppMinimizeJpg, map[string]*bintree{}},
 			"minimize.png": &bintree{resourcesAppMinimizePng, map[string]*bintree{}},
 			"settings.png": &bintree{resourcesAppSettingsPng, map[string]*bintree{}},
@@ -487,10 +488,10 @@ var _bintree = &bintree{nil, map[string]*bintree{
 					"base.css": &bintree{resourcesAppStaticCssBaseCss, map[string]*bintree{}},
 				}},
 				"fonts": &bintree{nil, map[string]*bintree{
-					"NotoSans-Bold-webfont.ttf": &bintree{resourcesAppStaticFontsNotosansBoldWebfontTtf, map[string]*bintree{}},
+					"NotoSans-Bold-webfont.ttf":       &bintree{resourcesAppStaticFontsNotosansBoldWebfontTtf, map[string]*bintree{}},
 					"NotoSans-BoldItalic-webfont.ttf": &bintree{resourcesAppStaticFontsNotosansBolditalicWebfontTtf, map[string]*bintree{}},
-					"NotoSans-Italic-webfont.ttf": &bintree{resourcesAppStaticFontsNotosansItalicWebfontTtf, map[string]*bintree{}},
-					"NotoSans-Regular-webfont.ttf": &bintree{resourcesAppStaticFontsNotosansRegularWebfontTtf, map[string]*bintree{}},
+					"NotoSans-Italic-webfont.ttf":     &bintree{resourcesAppStaticFontsNotosansItalicWebfontTtf, map[string]*bintree{}},
+					"NotoSans-Regular-webfont.ttf":    &bintree{resourcesAppStaticFontsNotosansRegularWebfontTtf, map[string]*bintree{}},
 				}},
 			}},
 		}},
@@ -543,4 +544,3 @@ func _filePath(dir, name string) string {
 	cannonicalName := strings.Replace(name, "\\", "/", -1)
 	return filepath.Join(append([]string{dir}, strings.Split(cannonicalName, "/")...)...)
 }
-
