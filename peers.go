@@ -27,6 +27,8 @@ var (
 	defaultPort uint16
 )
 
+var SFNodeBitcoinCash wire.ServiceFlag = 1 << 5
+
 type PeerManagerConfig struct {
 
 	// The network parameters to use
@@ -221,7 +223,8 @@ func (pm *PeerManager) onConnection(req *connmgr.ConnReq, conn net.Conn) {
 func (pm *PeerManager) onVerack(p *peer.Peer, msg *wire.MsgVerAck) {
 	// Check this peer offers bloom filtering services. If not dump them.
 	p.NA().Services = p.Services()
-	if !(p.NA().HasService(wire.SFNodeBloom) && p.NA().HasService(wire.SFNodeNetwork)) {
+	if !(p.NA().HasService(wire.SFNodeBloom) && p.NA().HasService(wire.SFNodeNetwork)) ||
+		p.NA().HasService(SFNodeBitcoinCash) { // Don't connect to bitcoin cash nodes
 		pm.peerMutex.Lock()
 		for id, peer := range pm.connectedPeers {
 			if peer.ID() == p.ID() {
