@@ -2,6 +2,7 @@ package spvwallet
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -27,7 +28,7 @@ func (s *SPVWallet) Broadcast(tx *wire.MsgTx) error {
 		return err
 	}
 
-	// Make an inv message instead of a tx message to be polite
+	// make an inv message instead of a tx message to be polite
 	txid := tx.TxHash()
 	iv1 := wire.NewInvVect(wire.InvTypeTx, &txid)
 	invMsg := wire.NewMsgInv()
@@ -266,7 +267,10 @@ func (w *SPVWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int,
 	if err != nil {
 		return nil, nil, err
 	}
-	addr, err = btc.NewAddressScriptHash(redeemScript, w.params)
+
+	witnessProgram := sha256.Sum256(redeemScript)
+
+	addr, err = btc.NewAddressWitnessScriptHash(witnessProgram[:], w.params)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -314,7 +318,7 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 	}
 
 	for i := range tx.TxIn {
-		sig, err := txscript.RawTxInSignature(tx, i, redeemScript, txscript.SigHashAll, signingKey)
+		sig, err := txscript.RawTxInWitnessSignature(tx, txscript.NewTxSigHashes(tx), i, ins[i].Value, redeemScript, txscript.SigHashAll, signingKey)
 		if err != nil {
 			continue
 		}
@@ -389,11 +393,11 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 		}
 
 		builder.AddData(redeemScript)
-		scriptSig, err := builder.Script()
+		witness, err := builder.Script()
 		if err != nil {
 			return nil, err
 		}
-		input.SignatureScript = scriptSig
+		input.Witness = wire.TxWitness{witness}
 	}
 	// broadcast
 	if broadcast {
