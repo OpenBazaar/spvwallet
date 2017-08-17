@@ -138,10 +138,9 @@ const (
 	//
 	//   - 32 bytes previous tx
 	//   - 4 bytes output index
-	//   - 1 byte compact int encoding value 107
 	//   - 107 bytes signature script
 	//   - 4 bytes sequence
-	RedeemP2PKHInputSize = 32 + 4 + 1 + RedeemP2PKHSigScriptSize + 4
+	RedeemP2PKHInputSize = 32 + 4 + RedeemP2PKHSigScriptSize + 4
 
 	// RedeemP2SH2of3MultisigInputSize is the worst case (largest) serialize size of a
 	// transaction input redeeming a compressed P2SH 2 of 3 multisig output.  It is
@@ -149,10 +148,9 @@ const (
 	//
 	//   - 32 bytes previous tx
 	//   - 4 bytes output index
-	//   - 1 byte compact int encoding value 107
-	//   - signature script
 	//   - 4 bytes sequence
-	RedeemP2SH2of3MultisigInputSize = 32 + 4 + 1 + RedeemP2SH2of3MultisigSigScriptSize + 4
+	///  - witness discounted signature script
+	RedeemP2SH2of3MultisigInputSize = 32 + 4 + 4 + (RedeemP2SH2of3MultisigSigScriptSize / 4)
 
 	// RedeemP2SH1of2MultisigInputSize is the worst case (largest) serialize size of a
 	// transaction input redeeming a compressed P2SH 2 of 3 multisig output.  It is
@@ -160,10 +158,9 @@ const (
 	//
 	//   - 32 bytes previous tx
 	//   - 4 bytes output index
-	//   - 1 byte compact int encoding value 107
-	//   - signature script
 	//   - 4 bytes sequence
-	RedeemP2SH1of2MultisigInputSize = 32 + 4 + 1 + RedeemP2SH1of2MultisigSigScriptSize + 4
+	///  - witness discounted signature script
+	RedeemP2SH1of2MultisigInputSize = 32 + 4 + 4 + (RedeemP2SH1of2MultisigSigScriptSize / 4)
 
 	// RedeemP2SHMultisigTimelock1InputSize is the worst case (largest) serialize size of a
 	// transaction input redeeming a compressed p2sh timelocked multig output with using the timeout.  It is
@@ -171,10 +168,9 @@ const (
 	//
 	//   - 32 bytes previous tx
 	//   - 4 bytes output index
-	//   - 1 byte compact int encoding value 107
-	//   - signature script
 	//   - 4 bytes sequence
-	RedeemP2SHMultisigTimelock1InputSize = 32 + 4 + 1 + RedeemP2SHMultisigTimelock1SigScriptSize + 4
+	///  - witness discounted signature script
+	RedeemP2SHMultisigTimelock1InputSize = 32 + 4 + 4 + (RedeemP2SHMultisigTimelock1SigScriptSize / 4)
 
 	// RedeemP2SHMultisigTimelock2InputSize is the worst case (largest) serialize size of a
 	// transaction input redeeming a compressed P2SH timelocked multisig output without using the timeout.  It is
@@ -182,10 +178,9 @@ const (
 	//
 	//   - 32 bytes previous tx
 	//   - 4 bytes output index
-	//   - 1 byte compact int encoding value 107
-	//   - signature script
 	//   - 4 bytes sequence
-	RedeemP2SHMultisigTimelock2InputSize = 32 + 4 + 1 + RedeemP2SHMultisigTimelock2SigScriptSize + 4
+	///  - witness discounted signature script
+	RedeemP2SHMultisigTimelock2InputSize = 32 + 4 + 4 + (RedeemP2SHMultisigTimelock2SigScriptSize / 4)
 
 	// P2PKHOutputSize is the serialize size of a transaction output with a
 	// P2PKH output script.  It is calculated as:
