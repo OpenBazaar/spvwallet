@@ -71,7 +71,8 @@ func (s *server) NewAddress(ctx context.Context, in *pb.KeySelection) (*pb.Addre
 }
 
 func (s *server) ChainTip(ctx context.Context, in *pb.Empty) (*pb.Height, error) {
-	return &pb.Height{s.w.ChainTip()}, nil
+	h, _ := s.w.ChainTip()
+	return &pb.Height{h}, nil
 }
 
 func (s *server) Balance(ctx context.Context, in *pb.Empty) (*pb.Balances, error) {
