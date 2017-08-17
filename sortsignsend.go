@@ -383,21 +383,15 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 				break
 			}
 		}
-		builder := txscript.NewScriptBuilder()
-		builder.AddOp(txscript.OP_0)
-		builder.AddData(sig1)
-		builder.AddData(sig2)
+
+		witness := wire.TxWitness{[]byte{0x00}, sig1, sig2}
 
 		if timeLocked {
-			builder.AddOp(txscript.OP_1)
+			witness = append(witness, []byte{0x01})
 		}
 
-		builder.AddData(redeemScript)
-		witness, err := builder.Script()
-		if err != nil {
-			return nil, err
-		}
-		input.Witness = wire.TxWitness{witness}
+		witness = append(witness, redeemScript)
+		input.Witness = witness
 	}
 	// broadcast
 	if broadcast {
@@ -497,7 +491,7 @@ func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.Ext
 	}
 
 	for i, txIn := range tx.TxIn {
-		if !timeLocked {
+		if redeemScript == nil {
 			prevOutScript := additionalPrevScripts[txIn.PreviousOutPoint]
 			script, err := txscript.SignTxOutput(w.params,
 				tx, i, prevOutScript, txscript.SigHashAll, getKey,
@@ -511,22 +505,21 @@ func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.Ext
 			if err != nil {
 				return nil, err
 			}
-			script, err := txscript.RawTxInSignature(tx, i, *redeemScript, txscript.SigHashAll, priv)
+			sig, err := txscript.RawTxInWitnessSignature(tx, txscript.NewTxSigHashes(tx), i, utxos[i].Value, *redeemScript, txscript.SigHashAll, priv)
 			if err != nil {
 				return nil, err
 			}
-			builder := txscript.NewScriptBuilder().
-				AddData(script).
-				AddOp(txscript.OP_0).
-				AddData(*redeemScript)
-			scriptSig, _ := builder.Script()
-			txIn.SignatureScript = scriptSig
-			tx.Version = 2
-			locktime, err := LockTimeFromRedeemScript(*redeemScript)
-			if err != nil {
-				return nil, err
+			txIn.Witness = wire.TxWitness{[]byte{0x00}, sig}
+			if timeLocked {
+				tx.Version = 2
+				locktime, err := LockTimeFromRedeemScript(*redeemScript)
+				if err != nil {
+					return nil, err
+				}
+				txIn.Sequence = locktime
+				txIn.Witness = append(txIn.Witness, []byte{0x00})
 			}
-			txIn.Sequence = locktime
+			txIn.Witness = append(txIn.Witness, *redeemScript)
 		}
 	}
 
