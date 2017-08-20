@@ -100,7 +100,7 @@ func TestMBlockCheckMBlock(t *testing.T) {
 	}
 	merkleBlock := &wire.MsgMerkleBlock{}
 	r := bytes.NewReader(rawBlock)
-	merkleBlock.BtcDecode(r, 70002)
+	merkleBlock.BtcDecode(r, 70002, wire.WitnessEncoding)
 	hashes, err := checkMBlock(merkleBlock)
 	if err != nil {
 		t.Error(err)
