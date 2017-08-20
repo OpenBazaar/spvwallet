@@ -279,7 +279,7 @@ func (w *SPVWallet) GenerateMultisigScript(keys []hd.ExtendedKey, threshold int,
 
 func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []TransactionOutput, key *hd.ExtendedKey, redeemScript []byte, feePerByte uint64) ([]Signature, error) {
 	var sigs []Signature
-	tx := new(wire.MsgTx)
+	tx := wire.NewMsgTx(1)
 	for _, in := range ins {
 		ch, err := chainhash.NewHashFromStr(hex.EncodeToString(in.OutpointHash))
 		if err != nil {
@@ -317,8 +317,9 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 		return sigs, err
 	}
 
+	hashes := txscript.NewTxSigHashes(tx)
 	for i := range tx.TxIn {
-		sig, err := txscript.RawTxInWitnessSignature(tx, txscript.NewTxSigHashes(tx), i, ins[i].Value, redeemScript, txscript.SigHashAll, signingKey)
+		sig, err := txscript.RawTxInWitnessSignature(tx, hashes, i, ins[i].Value, redeemScript, txscript.SigHashAll, signingKey)
 		if err != nil {
 			continue
 		}
@@ -329,7 +330,7 @@ func (w *SPVWallet) CreateMultisigSignature(ins []TransactionInput, outs []Trans
 }
 
 func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, sigs1 []Signature, sigs2 []Signature, redeemScript []byte, feePerByte uint64, broadcast bool) ([]byte, error) {
-	tx := new(wire.MsgTx)
+	tx := wire.NewMsgTx(1)
 	for _, in := range ins {
 		ch, err := chainhash.NewHashFromStr(hex.EncodeToString(in.OutpointHash))
 		if err != nil {
@@ -384,12 +385,11 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 			}
 		}
 
-		witness := wire.TxWitness{[]byte{0x00}, sig1, sig2}
+		witness := wire.TxWitness{[]byte{}, sig1, sig2}
 
 		if timeLocked {
 			witness = append(witness, []byte{0x01})
 		}
-
 		witness = append(witness, redeemScript)
 		input.Witness = witness
 	}
@@ -398,11 +398,10 @@ func (w *SPVWallet) Multisign(ins []TransactionInput, outs []TransactionOutput, 
 		w.Broadcast(tx)
 	}
 	var buf bytes.Buffer
-	tx.BtcEncode(&buf, 1, wire.WitnessEncoding)
+	tx.BtcEncode(&buf, wire.ProtocolVersion, wire.WitnessEncoding)
 	return buf.Bytes(), nil
 }
 
-// TODO: once segwit activates this will need to build segwit transactions if the utxo script is a witness program
 func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.ExtendedKey, redeemScript *[]byte, feeLevel FeeLevel) (*chainhash.Hash, error) {
 	var internalAddr btc.Address
 	if address != nil {
@@ -490,6 +489,7 @@ func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.Ext
 		}
 	}
 
+	hashes := txscript.NewTxSigHashes(tx)
 	for i, txIn := range tx.TxIn {
 		if redeemScript == nil {
 			prevOutScript := additionalPrevScripts[txIn.PreviousOutPoint]
@@ -505,11 +505,11 @@ func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.Ext
 			if err != nil {
 				return nil, err
 			}
-			sig, err := txscript.RawTxInWitnessSignature(tx, txscript.NewTxSigHashes(tx), i, utxos[i].Value, *redeemScript, txscript.SigHashAll, priv)
+			sig, err := txscript.RawTxInWitnessSignature(tx, hashes, i, utxos[i].Value, *redeemScript, txscript.SigHashAll, priv)
 			if err != nil {
 				return nil, err
 			}
-			txIn.Witness = wire.TxWitness{[]byte{0x00}, sig}
+			witness := wire.TxWitness{[]byte{}, sig}
 			if timeLocked {
 				tx.Version = 2
 				locktime, err := LockTimeFromRedeemScript(*redeemScript)
@@ -517,9 +517,10 @@ func (w *SPVWallet) SweepAddress(utxos []Utxo, address *btc.Address, key *hd.Ext
 					return nil, err
 				}
 				txIn.Sequence = locktime
-				txIn.Witness = append(txIn.Witness, []byte{0x00})
+				witness = append(txIn.Witness, []byte{})
 			}
-			txIn.Witness = append(txIn.Witness, *redeemScript)
+			witness = append(witness, *redeemScript)
+			txIn.Witness = witness
 		}
 	}
 

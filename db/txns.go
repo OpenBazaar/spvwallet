@@ -29,7 +29,7 @@ func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, wa
 		return err
 	}
 	var buf bytes.Buffer
-	txn.Serialize(&buf)
+	txn.BtcEncode(&buf, wire.ProtocolVersion, wire.WitnessEncoding)
 	watchOnlyInt := 0
 	if watchOnly {
 		watchOnlyInt = 1

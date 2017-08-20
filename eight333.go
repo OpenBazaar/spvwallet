@@ -190,7 +190,7 @@ func (w *SPVWallet) onGetData(p *peer.Peer, m *wire.MsgGetData) {
 				log.Errorf("Error getting tx %s: %s", thing.Hash.String(), err.Error())
 				continue
 			}
-			p.QueueMessage(tx, nil)
+			p.QueueMessageWithEncoding(tx, nil, wire.WitnessEncoding)
 			sent++
 			continue
 		}
