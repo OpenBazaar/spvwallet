@@ -105,9 +105,12 @@ func TestDeserializeHeader(t *testing.T) {
 }
 
 func TestHeaderDB_Put(t *testing.T) {
-	headers := NewHeaderDB("")
+	headers, err := NewHeaderDB("")
+	if err != nil {
+		t.Error(err)
+	}
 	// Test put with new tip
-	err := headers.Put(testSh1, true)
+	err = headers.Put(testSh1, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -194,8 +197,11 @@ func TestHeaderDB_Put(t *testing.T) {
 }
 
 func TestHeaderDB_GetPreviousHeader(t *testing.T) {
-	headers := NewHeaderDB("")
-	err := headers.Put(testSh1, false)
+	headers, err := NewHeaderDB("")
+	if err != nil {
+		t.Error(err)
+	}
+	err = headers.Put(testSh1, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -212,8 +218,11 @@ func TestHeaderDB_GetPreviousHeader(t *testing.T) {
 }
 
 func TestHeaderDB_GetBestHeader(t *testing.T) {
-	headers := NewHeaderDB("")
-	err := headers.Put(testSh1, false)
+	headers, err := NewHeaderDB("")
+	if err != nil {
+		t.Error(err)
+	}
+	err = headers.Put(testSh1, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -249,8 +258,11 @@ func TestHeaderDB_GetBestHeader(t *testing.T) {
 }
 
 func TestHeaderDB_Height(t *testing.T) {
-	headers := NewHeaderDB("")
-	err := headers.Put(testSh1, true)
+	headers, err := NewHeaderDB("")
+	if err != nil {
+		t.Error(err)
+	}
+	err = headers.Put(testSh1, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -265,7 +277,10 @@ func TestHeaderDB_Height(t *testing.T) {
 }
 
 func TestHeaderDB_Prune(t *testing.T) {
-	headers := NewHeaderDB("")
+	headers, err := NewHeaderDB("")
+	if err != nil {
+		t.Error(err)
+	}
 	var toDelete []chainhash.Hash
 	var toStay []chainhash.Hash
 	for i := 0; i < 2500; i++ {
@@ -289,7 +304,7 @@ func TestHeaderDB_Prune(t *testing.T) {
 		}
 	}
 
-	err := headers.Prune()
+	err = headers.Prune()
 	if err != nil {
 		t.Error(err)
 	}
@@ -317,9 +332,12 @@ func TestHeaderDB_Prune(t *testing.T) {
 }
 
 func TestHeaderDB_Print(t *testing.T) {
-	headers := NewHeaderDB("")
+	headers, err := NewHeaderDB("")
+	if err != nil {
+		t.Error(err)
+	}
 	// Test put with new tip
-	err := headers.Put(testSh1, true)
+	err = headers.Put(testSh1, true)
 	if err != nil {
 		t.Error(err)
 	}

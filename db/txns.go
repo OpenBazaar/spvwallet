@@ -29,7 +29,7 @@ func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, wa
 		return err
 	}
 	var buf bytes.Buffer
-	txn.Serialize(&buf)
+	txn.BtcEncode(&buf, wire.ProtocolVersion, wire.WitnessEncoding)
 	watchOnlyInt := 0
 	if watchOnly {
 		watchOnlyInt = 1
@@ -63,7 +63,7 @@ func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, spvwallet.Txn, error) {
 	}
 	r := bytes.NewReader(ret)
 	msgTx := wire.NewMsgTx(1)
-	msgTx.BtcDecode(r, 1)
+	msgTx.BtcDecode(r, 1, wire.WitnessEncoding)
 	watchOnly := false
 	if watchOnlyInt > 0 {
 		watchOnly = true
@@ -99,7 +99,7 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]spvwallet.Txn, error) {
 		}
 		r := bytes.NewReader(tx)
 		msgTx := wire.NewMsgTx(1)
-		msgTx.BtcDecode(r, 1)
+		msgTx.BtcDecode(r, 1, wire.WitnessEncoding)
 		watchOnly := false
 		if watchOnlyInt > 0 {
 			if !includeWatchOnly {

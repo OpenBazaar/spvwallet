@@ -98,8 +98,8 @@ func TestImportKey(t *testing.T) {
 	if purpose != -1 {
 		t.Errorf(`Expected -1 got %d`, purpose)
 	}
-	if used != 0 {
-		t.Errorf(`Expected 0 got %s`, used)
+	if used != 1 {
+		t.Errorf(`Expected 0 got %d`, used)
 	}
 	keyBytes, err := hex.DecodeString(keyHex)
 	if err != nil {

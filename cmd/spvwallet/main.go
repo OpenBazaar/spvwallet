@@ -303,7 +303,8 @@ func (x *Start) Execute(args []string) error {
 
 		txc := make(chan uint32)
 		listener := func(spvwallet.TransactionCallback) {
-			txc <- wallet.ChainTip()
+			h, _ := wallet.ChainTip()
+			txc <- h
 		}
 		wallet.AddTransactionListener(listener)
 
@@ -359,7 +360,7 @@ func (x *Start) Execute(args []string) error {
 					}
 					btcVal := float64(confirmed) / 100000000
 					fiatVal := float64(btcVal) * rate
-					height := wallet.ChainTip()
+					height, _ := wallet.ChainTip()
 
 					st := Stats{
 						Confirmed:    confirmed,
