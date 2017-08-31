@@ -11,6 +11,7 @@ import (
 	"github.com/OpenBazaar/spvwallet/db"
 	"github.com/OpenBazaar/spvwallet/gui"
 	"github.com/OpenBazaar/spvwallet/gui/bootstrap"
+	wi "github.com/OpenBazaar/wallet-interface"
 	"github.com/asticode/go-astilectron"
 	"github.com/asticode/go-astilog"
 	"github.com/atotto/clipboard"
@@ -302,7 +303,7 @@ func (x *Start) Execute(args []string) error {
 		}
 
 		txc := make(chan uint32)
-		listener := func(spvwallet.TransactionCallback) {
+		listener := func(wi.TransactionCallback) {
 			h, _ := wallet.ChainTip()
 			txc <- h
 		}
@@ -371,7 +372,7 @@ func (x *Start) Execute(args []string) error {
 					}
 					w.Send(bootstrap.MessageOut{Name: "statsUpdate", Payload: st})
 				case "getAddress":
-					addr := wallet.CurrentAddress(spvwallet.EXTERNAL)
+					addr := wallet.CurrentAddress(wi.EXTERNAL)
 					w.Send(bootstrap.MessageOut{Name: "address", Payload: addr.EncodeAddress()})
 				case "send":
 					type P struct {
@@ -385,16 +386,16 @@ func (x *Start) Execute(args []string) error {
 						astilog.Errorf("Unmarshaling %s failed", m.Payload)
 						return
 					}
-					var feeLevel spvwallet.FeeLevel
+					var feeLevel wi.FeeLevel
 					switch strings.ToLower(p.FeeLevel) {
 					case "priority":
-						feeLevel = spvwallet.PRIOIRTY
+						feeLevel = wi.PRIOIRTY
 					case "normal":
-						feeLevel = spvwallet.NORMAL
+						feeLevel = wi.NORMAL
 					case "economic":
-						feeLevel = spvwallet.ECONOMIC
+						feeLevel = wi.ECONOMIC
 					default:
-						feeLevel = spvwallet.NORMAL
+						feeLevel = wi.NORMAL
 					}
 					addr, err := btcutil.DecodeAddress(p.Address, wallet.Params())
 					if err != nil {

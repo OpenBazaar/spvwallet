@@ -2,7 +2,7 @@ package db
 
 import (
 	"database/sql"
-	"github.com/OpenBazaar/spvwallet"
+	"github.com/OpenBazaar/wallet-interface"
 	_ "github.com/mattn/go-sqlite3"
 	"path"
 	"sync"
@@ -12,11 +12,11 @@ import (
 // This database is mostly just an example implementation used for testing.
 // End users are free to user their own database.
 type SQLiteDatastore struct {
-	keys           spvwallet.Keys
-	utxos          spvwallet.Utxos
-	stxos          spvwallet.Stxos
-	txns           spvwallet.Txns
-	watchedScripts spvwallet.WatchedScripts
+	keys           wallet.Keys
+	utxos          wallet.Utxos
+	stxos          wallet.Stxos
+	txns           wallet.Txns
+	watchedScripts wallet.WatchedScripts
 	db             *sql.DB
 	lock           *sync.RWMutex
 }
@@ -57,19 +57,19 @@ func Create(repoPath string) (*SQLiteDatastore, error) {
 	return sqliteDB, nil
 }
 
-func (db *SQLiteDatastore) Keys() spvwallet.Keys {
+func (db *SQLiteDatastore) Keys() wallet.Keys {
 	return db.keys
 }
-func (db *SQLiteDatastore) Utxos() spvwallet.Utxos {
+func (db *SQLiteDatastore) Utxos() wallet.Utxos {
 	return db.utxos
 }
-func (db *SQLiteDatastore) Stxos() spvwallet.Stxos {
+func (db *SQLiteDatastore) Stxos() wallet.Stxos {
 	return db.stxos
 }
-func (db *SQLiteDatastore) Txns() spvwallet.Txns {
+func (db *SQLiteDatastore) Txns() wallet.Txns {
 	return db.txns
 }
-func (db *SQLiteDatastore) WatchedScripts() spvwallet.WatchedScripts {
+func (db *SQLiteDatastore) WatchedScripts() wallet.WatchedScripts {
 	return db.watchedScripts
 }
 
