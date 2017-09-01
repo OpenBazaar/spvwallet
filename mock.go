@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"errors"
+	"github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -14,36 +15,36 @@ import (
 )
 
 type MockDatastore struct {
-	keys           Keys
-	utxos          Utxos
-	stxos          Stxos
-	txns           Txns
-	watchedScripts WatchedScripts
+	keys           wallet.Keys
+	utxos          wallet.Utxos
+	stxos          wallet.Stxos
+	txns           wallet.Txns
+	watchedScripts wallet.WatchedScripts
 }
 
-func (m *MockDatastore) Keys() Keys {
+func (m *MockDatastore) Keys() wallet.Keys {
 	return m.keys
 }
 
-func (m *MockDatastore) Utxos() Utxos {
+func (m *MockDatastore) Utxos() wallet.Utxos {
 	return m.utxos
 }
 
-func (m *MockDatastore) Stxos() Stxos {
+func (m *MockDatastore) Stxos() wallet.Stxos {
 	return m.stxos
 }
 
-func (m *MockDatastore) Txns() Txns {
+func (m *MockDatastore) Txns() wallet.Txns {
 	return m.txns
 }
 
-func (m *MockDatastore) WatchedScripts() WatchedScripts {
+func (m *MockDatastore) WatchedScripts() wallet.WatchedScripts {
 	return m.watchedScripts
 }
 
 type keyStoreEntry struct {
 	scriptAddress []byte
-	path          KeyPath
+	path          wallet.KeyPath
 	used          bool
 	key           *btcec.PrivateKey
 }
@@ -52,13 +53,13 @@ type mockKeyStore struct {
 	keys map[string]*keyStoreEntry
 }
 
-func (m *mockKeyStore) Put(scriptAddress []byte, keyPath KeyPath) error {
+func (m *mockKeyStore) Put(scriptAddress []byte, keyPath wallet.KeyPath) error {
 	m.keys[hex.EncodeToString(scriptAddress)] = &keyStoreEntry{scriptAddress, keyPath, false, nil}
 	return nil
 }
 
 func (m *mockKeyStore) ImportKey(scriptAddress []byte, key *btcec.PrivateKey) error {
-	kp := KeyPath{Purpose: EXTERNAL, Index: -1}
+	kp := wallet.KeyPath{Purpose: wallet.EXTERNAL, Index: -1}
 	m.keys[hex.EncodeToString(scriptAddress)] = &keyStoreEntry{scriptAddress, kp, false, key}
 	return nil
 }
@@ -72,7 +73,7 @@ func (m *mockKeyStore) MarkKeyAsUsed(scriptAddress []byte) error {
 	return nil
 }
 
-func (m *mockKeyStore) GetLastKeyIndex(purpose KeyPurpose) (int, bool, error) {
+func (m *mockKeyStore) GetLastKeyIndex(purpose wallet.KeyPurpose) (int, bool, error) {
 	i := -1
 	used := false
 	for _, key := range m.keys {
@@ -87,10 +88,10 @@ func (m *mockKeyStore) GetLastKeyIndex(purpose KeyPurpose) (int, bool, error) {
 	return i, used, nil
 }
 
-func (m *mockKeyStore) GetPathForKey(scriptAddress []byte) (KeyPath, error) {
+func (m *mockKeyStore) GetPathForKey(scriptAddress []byte) (wallet.KeyPath, error) {
 	key, ok := m.keys[hex.EncodeToString(scriptAddress)]
 	if !ok || key.path.Index == -1 {
-		return KeyPath{}, errors.New("key does not exist")
+		return wallet.KeyPath{}, errors.New("key does not exist")
 	}
 	return key.path, nil
 }
@@ -104,7 +105,7 @@ func (m *mockKeyStore) GetKey(scriptAddress []byte) (*btcec.PrivateKey, error) {
 	return nil, errors.New("Not found")
 }
 
-func (m *mockKeyStore) GetUnused(purpose KeyPurpose) ([]int, error) {
+func (m *mockKeyStore) GetUnused(purpose wallet.KeyPurpose) ([]int, error) {
 	var i []int
 	for _, key := range m.keys {
 		if !key.used && key.path.Purpose == purpose {
@@ -115,60 +116,60 @@ func (m *mockKeyStore) GetUnused(purpose KeyPurpose) ([]int, error) {
 	return i, nil
 }
 
-func (m *mockKeyStore) GetAll() ([]KeyPath, error) {
-	var kp []KeyPath
+func (m *mockKeyStore) GetAll() ([]wallet.KeyPath, error) {
+	var kp []wallet.KeyPath
 	for _, key := range m.keys {
 		kp = append(kp, key.path)
 	}
 	return kp, nil
 }
 
-func (m *mockKeyStore) GetLookaheadWindows() map[KeyPurpose]int {
+func (m *mockKeyStore) GetLookaheadWindows() map[wallet.KeyPurpose]int {
 	internalLastUsed := -1
 	externalLastUsed := -1
 	for _, key := range m.keys {
-		if key.path.Purpose == INTERNAL && key.used && key.path.Index > internalLastUsed {
+		if key.path.Purpose == wallet.INTERNAL && key.used && key.path.Index > internalLastUsed {
 			internalLastUsed = key.path.Index
 		}
-		if key.path.Purpose == EXTERNAL && key.used && key.path.Index > externalLastUsed {
+		if key.path.Purpose == wallet.EXTERNAL && key.used && key.path.Index > externalLastUsed {
 			externalLastUsed = key.path.Index
 		}
 	}
 	internalUnused := 0
 	externalUnused := 0
 	for _, key := range m.keys {
-		if key.path.Purpose == INTERNAL && !key.used && key.path.Index > internalLastUsed {
+		if key.path.Purpose == wallet.INTERNAL && !key.used && key.path.Index > internalLastUsed {
 			internalUnused++
 		}
-		if key.path.Purpose == EXTERNAL && !key.used && key.path.Index > externalLastUsed {
+		if key.path.Purpose == wallet.EXTERNAL && !key.used && key.path.Index > externalLastUsed {
 			externalUnused++
 		}
 	}
-	mp := make(map[KeyPurpose]int)
-	mp[INTERNAL] = internalUnused
-	mp[EXTERNAL] = externalUnused
+	mp := make(map[wallet.KeyPurpose]int)
+	mp[wallet.INTERNAL] = internalUnused
+	mp[wallet.EXTERNAL] = externalUnused
 	return mp
 }
 
 type mockUtxoStore struct {
-	utxos map[string]*Utxo
+	utxos map[string]*wallet.Utxo
 }
 
-func (m *mockUtxoStore) Put(utxo Utxo) error {
+func (m *mockUtxoStore) Put(utxo wallet.Utxo) error {
 	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
 	m.utxos[key] = &utxo
 	return nil
 }
 
-func (m *mockUtxoStore) GetAll() ([]Utxo, error) {
-	var utxos []Utxo
+func (m *mockUtxoStore) GetAll() ([]wallet.Utxo, error) {
+	var utxos []wallet.Utxo
 	for _, v := range m.utxos {
 		utxos = append(utxos, *v)
 	}
 	return utxos, nil
 }
 
-func (m *mockUtxoStore) SetWatchOnly(utxo Utxo) error {
+func (m *mockUtxoStore) SetWatchOnly(utxo wallet.Utxo) error {
 	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
 	u, ok := m.utxos[key]
 	if !ok {
@@ -178,7 +179,7 @@ func (m *mockUtxoStore) SetWatchOnly(utxo Utxo) error {
 	return nil
 }
 
-func (m *mockUtxoStore) Delete(utxo Utxo) error {
+func (m *mockUtxoStore) Delete(utxo wallet.Utxo) error {
 	key := utxo.Op.Hash.String() + ":" + strconv.Itoa(int(utxo.Op.Index))
 	_, ok := m.utxos[key]
 	if !ok {
@@ -189,23 +190,23 @@ func (m *mockUtxoStore) Delete(utxo Utxo) error {
 }
 
 type mockStxoStore struct {
-	stxos map[string]*Stxo
+	stxos map[string]*wallet.Stxo
 }
 
-func (m *mockStxoStore) Put(stxo Stxo) error {
+func (m *mockStxoStore) Put(stxo wallet.Stxo) error {
 	m.stxos[stxo.SpendTxid.String()] = &stxo
 	return nil
 }
 
-func (m *mockStxoStore) GetAll() ([]Stxo, error) {
-	var stxos []Stxo
+func (m *mockStxoStore) GetAll() ([]wallet.Stxo, error) {
+	var stxos []wallet.Stxo
 	for _, v := range m.stxos {
 		stxos = append(stxos, *v)
 	}
 	return stxos, nil
 }
 
-func (m *mockStxoStore) Delete(stxo Stxo) error {
+func (m *mockStxoStore) Delete(stxo wallet.Stxo) error {
 	_, ok := m.stxos[stxo.SpendTxid.String()]
 	if !ok {
 		return errors.New("Not found")
@@ -237,22 +238,22 @@ func (m *mockTxnStore) Put(txn *wire.MsgTx, value, height int, timestamp time.Ti
 	return nil
 }
 
-func (m *mockTxnStore) Get(txid chainhash.Hash) (*wire.MsgTx, Txn, error) {
+func (m *mockTxnStore) Get(txid chainhash.Hash) (*wire.MsgTx, wallet.Txn, error) {
 	t, ok := m.txns[txid.String()]
 	if !ok {
-		return nil, Txn{}, errors.New("Not found")
+		return nil, wallet.Txn{}, errors.New("Not found")
 	}
 	var buf bytes.Buffer
 	t.txn.Serialize(&buf)
-	return t.txn, Txn{txid.String(), int64(t.value), int32(t.height), t.timestamp, t.watchOnly, buf.Bytes()}, nil
+	return t.txn, wallet.Txn{txid.String(), int64(t.value), int32(t.height), t.timestamp, t.watchOnly, buf.Bytes()}, nil
 }
 
-func (m *mockTxnStore) GetAll(includeWatchOnly bool) ([]Txn, error) {
-	var txns []Txn
+func (m *mockTxnStore) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
+	var txns []wallet.Txn
 	for _, t := range m.txns {
 		var buf bytes.Buffer
 		t.txn.Serialize(&buf)
-		txn := Txn{t.txn.TxHash().String(), int64(t.value), int32(t.height), t.timestamp, t.watchOnly, buf.Bytes()}
+		txn := wallet.Txn{t.txn.TxHash().String(), int64(t.value), int32(t.height), t.timestamp, t.watchOnly, buf.Bytes()}
 		txns = append(txns, txn)
 	}
 	return txns, nil
@@ -308,7 +309,7 @@ func TestUtxo_IsEqual(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	u := &Utxo{
+	u := &wallet.Utxo{
 		Op:           *wire.NewOutPoint(h, 0),
 		ScriptPubkey: make([]byte, 32),
 		AtHeight:     400000,
@@ -356,14 +357,14 @@ func TestStxo_IsEqual(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	u := &Utxo{
+	u := &wallet.Utxo{
 		Op:           *wire.NewOutPoint(h, 0),
 		ScriptPubkey: make([]byte, 32),
 		AtHeight:     400000,
 		Value:        1000000,
 	}
 	h2, err := chainhash.NewHashFromStr("1f64249abbf2fcc83fc060a64f69a91391e9f5d98c5d3135fe9716838283aa4c")
-	s := &Stxo{
+	s := &wallet.Stxo{
 		Utxo:        *u,
 		SpendHeight: 400001,
 		SpendTxid:   *h2,

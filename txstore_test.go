@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/hex"
+	"github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -16,8 +17,8 @@ import (
 func createTxStore() (*TxStore, error) {
 	mockDb := MockDatastore{
 		&mockKeyStore{make(map[string]*keyStoreEntry)},
-		&mockUtxoStore{make(map[string]*Utxo)},
-		&mockStxoStore{make(map[string]*Stxo)},
+		&mockUtxoStore{make(map[string]*wallet.Utxo)},
+		&mockStxoStore{make(map[string]*wallet.Stxo)},
 		&mockTxnStore{make(map[string]*txnStoreEntry)},
 		&mockWatchedScriptsStore{make(map[string][]byte)},
 	}
@@ -96,12 +97,12 @@ func TestTxStore_GimmeFilter(t *testing.T) {
 		t.Error(err)
 	}
 	op := wire.NewOutPoint(maxHash, 0)
-	err = txStore.Utxos().Put(Utxo{Op: *op})
+	err = txStore.Utxos().Put(wallet.Utxo{Op: *op})
 	if err != nil {
 		t.Error(err)
 	}
 	op2 := wire.NewOutPoint(maxHash, 1)
-	err = txStore.Stxos().Put(Stxo{Utxo: Utxo{Op: *op2}})
+	err = txStore.Stxos().Put(wallet.Stxo{Utxo: wallet.Utxo{Op: *op2}})
 	if err != nil {
 		t.Error(err)
 	}
@@ -177,12 +178,12 @@ func TestTxStore_GetPendingInv(t *testing.T) {
 	}
 	h1, err := chainhash.NewHashFromStr("6f7a58ad92702601fcbaac0e039943a384f5274a205c16bb8bbab54f9ea2fbad")
 	op := wire.NewOutPoint(h1, 0)
-	err = txStore.Utxos().Put(Utxo{Op: *op})
+	err = txStore.Utxos().Put(wallet.Utxo{Op: *op})
 	if err != nil {
 		t.Error(err)
 	}
 	h2, err := chainhash.NewHashFromStr("a0d4cbcd8d0694e1132400b5e114b31bc3e0d8a2ac26e054f78727c95485b528")
-	err = txStore.Stxos().Put(Stxo{SpendTxid: *h2})
+	err = txStore.Stxos().Put(wallet.Stxo{SpendTxid: *h2})
 	if err != nil {
 		t.Error(err)
 	}
@@ -239,7 +240,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 
 	h1 := tx1.TxHash()
 	op := wire.NewOutPoint(&h1, 0)
-	err = txStore.Utxos().Put(Utxo{Op: *op})
+	err = txStore.Utxos().Put(wallet.Utxo{Op: *op})
 	if err != nil {
 		t.Error(err)
 	}
@@ -280,8 +281,8 @@ func TestTxStore_markAsDead(t *testing.T) {
 	txStore.Txns().Put(tx2, 100, 0, time.Now(), false)
 
 	op = wire.NewOutPoint(&h1, 0)
-	st := Stxo{
-		Utxo:        Utxo{Op: *op},
+	st := wallet.Stxo{
+		Utxo:        wallet.Utxo{Op: *op},
 		SpendHeight: 0,
 		SpendTxid:   tx2.TxHash(),
 	}
@@ -326,8 +327,8 @@ func TestTxStore_markAsDead(t *testing.T) {
 	txStore.Txns().Put(tx2, 100, 0, time.Now(), false)
 
 	op = wire.NewOutPoint(&h1, 0)
-	st = Stxo{
-		Utxo:        Utxo{Op: *op},
+	st = wallet.Stxo{
+		Utxo:        wallet.Utxo{Op: *op},
 		SpendHeight: 0,
 		SpendTxid:   tx2.TxHash(),
 	}
@@ -380,8 +381,8 @@ func TestTxStore_markAsDead(t *testing.T) {
 	txStore.Txns().Put(tx2, 100, 0, time.Now(), false)
 
 	op = wire.NewOutPoint(&h1, 0)
-	st = Stxo{
-		Utxo:        Utxo{Op: *op},
+	st = wallet.Stxo{
+		Utxo:        wallet.Utxo{Op: *op},
 		SpendHeight: 0,
 		SpendTxid:   tx2.TxHash(),
 	}
@@ -389,7 +390,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 
 	h2 := tx2.TxHash()
 	op2 := wire.NewOutPoint(&h2, 0)
-	err = txStore.Utxos().Put(Utxo{Op: *op2})
+	err = txStore.Utxos().Put(wallet.Utxo{Op: *op2})
 	if err != nil {
 		t.Error(err)
 	}
@@ -402,8 +403,8 @@ func TestTxStore_markAsDead(t *testing.T) {
 	txStore.Txns().Put(tx3, 100, 0, time.Now(), false)
 
 	op = wire.NewOutPoint(&h2, 0)
-	st = Stxo{
-		Utxo:        Utxo{Op: *op},
+	st = wallet.Stxo{
+		Utxo:        wallet.Utxo{Op: *op},
 		SpendHeight: 0,
 		SpendTxid:   tx3.TxHash(),
 	}
@@ -490,8 +491,8 @@ func TestTxStore_processReorg(t *testing.T) {
 
 	h1 := tx1.TxHash()
 	op := wire.NewOutPoint(&h1, 0)
-	st := Stxo{
-		Utxo:        Utxo{Op: *op},
+	st := wallet.Stxo{
+		Utxo:        wallet.Utxo{Op: *op},
 		SpendHeight: 0,
 		SpendTxid:   tx2.TxHash(),
 	}
@@ -499,11 +500,11 @@ func TestTxStore_processReorg(t *testing.T) {
 
 	h2 := tx2.TxHash()
 	op2 := wire.NewOutPoint(&h2, 0)
-	txStore.Utxos().Put(Utxo{Op: *op2})
+	txStore.Utxos().Put(wallet.Utxo{Op: *op2})
 
 	op = wire.NewOutPoint(&h2, 0)
-	st = Stxo{
-		Utxo:        Utxo{Op: *op},
+	st = wallet.Stxo{
+		Utxo:        wallet.Utxo{Op: *op},
 		SpendHeight: 0,
 		SpendTxid:   tx3.TxHash(),
 	}
@@ -578,7 +579,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	}
 
 	// Ingest output hit
-	key, err := txStore.keyManager.GetCurrentKey(EXTERNAL)
+	key, err := txStore.keyManager.GetCurrentKey(wallet.EXTERNAL)
 	if err != nil {
 		t.Error(err)
 	}

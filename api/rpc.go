@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api/pb"
+	"github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/txscript"
@@ -45,11 +46,11 @@ func (s *server) Stop(ctx context.Context, in *pb.Empty) (*pb.Empty, error) {
 }
 
 func (s *server) CurrentAddress(ctx context.Context, in *pb.KeySelection) (*pb.Address, error) {
-	var purpose spvwallet.KeyPurpose
+	var purpose wallet.KeyPurpose
 	if in.Purpose == pb.KeyPurpose_INTERNAL {
-		purpose = spvwallet.INTERNAL
+		purpose = wallet.INTERNAL
 	} else if in.Purpose == pb.KeyPurpose_EXTERNAL {
-		purpose = spvwallet.EXTERNAL
+		purpose = wallet.EXTERNAL
 	} else {
 		return nil, errors.New("Unknown key purpose")
 	}
@@ -58,11 +59,11 @@ func (s *server) CurrentAddress(ctx context.Context, in *pb.KeySelection) (*pb.A
 }
 
 func (s *server) NewAddress(ctx context.Context, in *pb.KeySelection) (*pb.Address, error) {
-	var purpose spvwallet.KeyPurpose
+	var purpose wallet.KeyPurpose
 	if in.Purpose == pb.KeyPurpose_INTERNAL {
-		purpose = spvwallet.INTERNAL
+		purpose = wallet.INTERNAL
 	} else if in.Purpose == pb.KeyPurpose_EXTERNAL {
-		purpose = spvwallet.EXTERNAL
+		purpose = wallet.EXTERNAL
 	} else {
 		return nil, errors.New("Unknown key purpose")
 	}
@@ -164,14 +165,14 @@ func (s *server) GetTransaction(ctx context.Context, in *pb.Txid) (*pb.Tx, error
 }
 
 func (s *server) GetFeePerByte(ctx context.Context, in *pb.FeeLevelSelection) (*pb.FeePerByte, error) {
-	var feeLevel spvwallet.FeeLevel
+	var feeLevel wallet.FeeLevel
 	switch in.FeeLevel {
 	case pb.FeeLevel_ECONOMIC:
-		feeLevel = spvwallet.ECONOMIC
+		feeLevel = wallet.ECONOMIC
 	case pb.FeeLevel_NORMAL:
-		feeLevel = spvwallet.NORMAL
+		feeLevel = wallet.NORMAL
 	case pb.FeeLevel_PRIORITY:
-		feeLevel = spvwallet.PRIOIRTY
+		feeLevel = wallet.PRIOIRTY
 	default:
 		return nil, errors.New("Unknown fee level")
 	}
@@ -194,14 +195,14 @@ func (s *server) Spend(ctx context.Context, in *pb.SpendInfo) (*pb.Txid, error) 
 	default:
 		return nil, errors.New("Unknown network parameters")
 	}
-	var feeLevel spvwallet.FeeLevel
+	var feeLevel wallet.FeeLevel
 	switch in.FeeLevel {
 	case pb.FeeLevel_ECONOMIC:
-		feeLevel = spvwallet.ECONOMIC
+		feeLevel = wallet.ECONOMIC
 	case pb.FeeLevel_NORMAL:
-		feeLevel = spvwallet.NORMAL
+		feeLevel = wallet.NORMAL
 	case pb.FeeLevel_PRIORITY:
-		feeLevel = spvwallet.PRIOIRTY
+		feeLevel = wallet.PRIOIRTY
 	default:
 		return nil, errors.New("Unknown fee level")
 	}
@@ -298,14 +299,14 @@ func (s *server) GetConfirmations(ctx context.Context, in *pb.Txid) (*pb.Confirm
 }
 
 func (s *server) SweepAddress(ctx context.Context, in *pb.SweepInfo) (*pb.Txid, error) {
-	var utxos []spvwallet.Utxo
+	var utxos []wallet.Utxo
 	for _, u := range in.Utxos {
 		h, err := chainhash.NewHashFromStr(u.Txid)
 		if err != nil {
 			return nil, err
 		}
 		op := wire.NewOutPoint(h, u.Index)
-		utxo := spvwallet.Utxo{
+		utxo := wallet.Utxo{
 			Op:    *op,
 			Value: int64(u.Value),
 		}
@@ -369,14 +370,14 @@ func (s *server) SweepAddress(ctx context.Context, in *pb.SweepInfo) (*pb.Txid, 
 	if len(in.RedeemScript) > 0 {
 		rs = &in.RedeemScript
 	}
-	var feeLevel spvwallet.FeeLevel
+	var feeLevel wallet.FeeLevel
 	switch in.FeeLevel {
 	case pb.FeeLevel_ECONOMIC:
-		feeLevel = spvwallet.ECONOMIC
+		feeLevel = wallet.ECONOMIC
 	case pb.FeeLevel_NORMAL:
-		feeLevel = spvwallet.NORMAL
+		feeLevel = wallet.NORMAL
 	case pb.FeeLevel_PRIORITY:
-		feeLevel = spvwallet.PRIOIRTY
+		feeLevel = wallet.PRIOIRTY
 	default:
 		return nil, errors.New("Unknown fee level")
 	}
@@ -393,21 +394,21 @@ func (s *server) ReSyncBlockchain(ctx context.Context, in *pb.Height) (*pb.Empty
 }
 
 func (s *server) CreateMultisigSignature(ctx context.Context, in *pb.CreateMultisigInfo) (*pb.SignatureList, error) {
-	var ins []spvwallet.TransactionInput
+	var ins []wallet.TransactionInput
 	for _, input := range in.Inputs {
 		h, err := hex.DecodeString(input.Txid)
 		if err != nil {
 			return nil, err
 		}
-		i := spvwallet.TransactionInput{
+		i := wallet.TransactionInput{
 			OutpointHash:  h,
 			OutpointIndex: input.Index,
 		}
 		ins = append(ins, i)
 	}
-	var outs []spvwallet.TransactionOutput
+	var outs []wallet.TransactionOutput
 	for _, output := range in.Outputs {
-		o := spvwallet.TransactionOutput{
+		o := wallet.TransactionOutput{
 			ScriptPubKey: output.ScriptPubKey,
 			Value:        int64(output.Value),
 		}
@@ -473,37 +474,37 @@ func (s *server) CreateMultisigSignature(ctx context.Context, in *pb.CreateMulti
 }
 
 func (s *server) Multisign(ctx context.Context, in *pb.MultisignInfo) (*pb.RawTx, error) {
-	var ins []spvwallet.TransactionInput
+	var ins []wallet.TransactionInput
 	for _, input := range in.Inputs {
 		h, err := hex.DecodeString(input.Txid)
 		if err != nil {
 			return nil, err
 		}
-		i := spvwallet.TransactionInput{
+		i := wallet.TransactionInput{
 			OutpointHash:  h,
 			OutpointIndex: input.Index,
 		}
 		ins = append(ins, i)
 	}
-	var outs []spvwallet.TransactionOutput
+	var outs []wallet.TransactionOutput
 	for _, output := range in.Outputs {
-		o := spvwallet.TransactionOutput{
+		o := wallet.TransactionOutput{
 			ScriptPubKey: output.ScriptPubKey,
 			Value:        int64(output.Value),
 		}
 		outs = append(outs, o)
 	}
-	var sig1 []spvwallet.Signature
+	var sig1 []wallet.Signature
 	for _, s := range in.Sig1 {
-		sig := spvwallet.Signature{
+		sig := wallet.Signature{
 			InputIndex: s.Index,
 			Signature:  s.Signature,
 		}
 		sig1 = append(sig1, sig)
 	}
-	var sig2 []spvwallet.Signature
+	var sig2 []wallet.Signature
 	for _, s := range in.Sig2 {
-		sig := spvwallet.Signature{
+		sig := wallet.Signature{
 			InputIndex: s.Index,
 			Signature:  s.Signature,
 		}
@@ -517,21 +518,21 @@ func (s *server) Multisign(ctx context.Context, in *pb.MultisignInfo) (*pb.RawTx
 }
 
 func (s *server) EstimateFee(ctx context.Context, in *pb.EstimateFeeData) (*pb.Fee, error) {
-	var ins []spvwallet.TransactionInput
+	var ins []wallet.TransactionInput
 	for _, input := range in.Inputs {
 		h, err := hex.DecodeString(input.Txid)
 		if err != nil {
 			return nil, err
 		}
-		i := spvwallet.TransactionInput{
+		i := wallet.TransactionInput{
 			OutpointHash:  h,
 			OutpointIndex: input.Index,
 		}
 		ins = append(ins, i)
 	}
-	var outs []spvwallet.TransactionOutput
+	var outs []wallet.TransactionOutput
 	for _, output := range in.Outputs {
-		o := spvwallet.TransactionOutput{
+		o := wallet.TransactionOutput{
 			ScriptPubKey: output.ScriptPubKey,
 			Value:        int64(output.Value),
 		}
@@ -542,7 +543,7 @@ func (s *server) EstimateFee(ctx context.Context, in *pb.EstimateFeeData) (*pb.F
 }
 
 func (s *server) WalletNotify(in *pb.Empty, stream pb.API_WalletNotifyServer) error {
-	cb := func(tx spvwallet.TransactionCallback) {
+	cb := func(tx wallet.TransactionCallback) {
 		ts, err := ptypes.TimestampProto(tx.Timestamp)
 		if err != nil {
 			return

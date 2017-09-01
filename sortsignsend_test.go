@@ -2,6 +2,7 @@ package spvwallet
 
 import (
 	"bytes"
+	"github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -26,12 +27,12 @@ func MockWallet() *SPVWallet {
 }
 
 func Test_gatherCoins(t *testing.T) {
-	wallet := MockWallet()
+	w := MockWallet()
 	h1, err := chainhash.NewHashFromStr("6f7a58ad92702601fcbaac0e039943a384f5274a205c16bb8bbab54f9ea2fbad")
 	if err != nil {
 		t.Error(err)
 	}
-	key1, err := wallet.keyManager.GetFreshKey(EXTERNAL)
+	key1, err := w.keyManager.GetFreshKey(wallet.EXTERNAL)
 	if err != nil {
 		t.Error(err)
 	}
@@ -39,16 +40,16 @@ func Test_gatherCoins(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	script1, err := wallet.AddressToScript(addr1)
+	script1, err := w.AddressToScript(addr1)
 	if err != nil {
 		t.Error(err)
 	}
 	op := wire.NewOutPoint(h1, 0)
-	err = wallet.txstore.Utxos().Put(Utxo{Op: *op, ScriptPubkey: script1, AtHeight: 5, Value: 10000})
+	err = w.txstore.Utxos().Put(wallet.Utxo{Op: *op, ScriptPubkey: script1, AtHeight: 5, Value: 10000})
 	if err != nil {
 		t.Error(err)
 	}
-	coinmap := wallet.gatherCoins()
+	coinmap := w.gatherCoins()
 	for coin, key := range coinmap {
 		if !bytes.Equal(coin.PkScript(), script1) {
 			t.Error("Pubkey script in coin is incorrect")
@@ -59,7 +60,7 @@ func Test_gatherCoins(t *testing.T) {
 		if !coin.Hash().IsEqual(h1) {
 			t.Error("Returned incorrect hash")
 		}
-		height, _ := wallet.blockchain.db.Height()
+		height, _ := w.blockchain.db.Height()
 		if coin.NumConfs() != int64(height-5) {
 			t.Error("Returned incorrect number of confirmations")
 		}
