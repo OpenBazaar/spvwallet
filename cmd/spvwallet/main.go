@@ -454,7 +454,7 @@ func (x *Start) Execute(args []string) error {
 					}
 					open.Run(url)
 				case "resync":
-					wallet.ReSyncBlockchain(0)
+					wallet.ReSyncBlockchain(time.Time{})
 				case "restore":
 					var mnemonic string
 					if err := json.Unmarshal(m.Payload, &mnemonic); err != nil {
