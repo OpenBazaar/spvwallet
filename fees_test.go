@@ -18,7 +18,7 @@ func (cb *ClosingBuffer) Close() (err error) {
 type mockHttpClient struct{}
 
 func (m *mockHttpClient) Get(url string) (*http.Response, error) {
-	data := `{"fastestFee":450,"halfHourFee":420,"hourFee":390}`
+	data := `{"priority":450,"normal":420,"economic":390}`
 	cb := &ClosingBuffer{bytes.NewBufferString(data)}
 	resp := &http.Response{
 		Body: cb,
@@ -27,7 +27,7 @@ func (m *mockHttpClient) Get(url string) (*http.Response, error) {
 }
 
 func TestFeeProvider_GetFeePerByte(t *testing.T) {
-	fp := NewFeeProvider(2000, 360, 320, 280, "https://bitcoinfees.21.co/api/v1/fees/recommended", nil)
+	fp := NewFeeProvider(2000, 360, 320, 280, "https://btc.fees.openbazaar.org", nil)
 	fp.httpClient = new(mockHttpClient)
 
 	// Test fetch from API

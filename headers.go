@@ -110,7 +110,7 @@ func (h *HeaderDB) Put(sh StoredHeader, newBestHeader bool) error {
 	if newBestHeader {
 		h.bestCache = &sh
 	}
-	return h.db.Update(func(btx *bolt.Tx) error {
+	go h.db.Update(func(btx *bolt.Tx) error {
 		hdrs := btx.Bucket(BKTHeaders)
 		ser, err := serializeHeader(sh)
 		if err != nil {
@@ -130,6 +130,7 @@ func (h *HeaderDB) Put(sh StoredHeader, newBestHeader bool) error {
 		}
 		return nil
 	})
+	return nil
 }
 
 func (h *HeaderDB) Prune() error {
