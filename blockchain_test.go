@@ -66,7 +66,7 @@ func createBlockChain(bc *Blockchain) error {
 			height:    x,
 			totalWork: big.NewInt(0),
 		}
-		bc.db.Put(sh, true)
+		bc.db.(*HeaderDB).put(sh, true)
 		last = hdr
 	}
 	return nil
