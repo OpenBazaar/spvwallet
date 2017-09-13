@@ -104,13 +104,23 @@ func NewHeaderDB(filePath string) (*HeaderDB, error) {
 }
 
 func (h *HeaderDB) Put(sh StoredHeader, newBestHeader bool) error {
+	go func() {
+		err := h.put(sh, newBestHeader)
+		if err != nil {
+			log.Error(err)
+		}
+	}()
+	return nil
+}
+
+func (h *HeaderDB) put(sh StoredHeader, newBestHeader bool) error {
 	h.lock.Lock()
 	defer h.lock.Unlock()
 	h.cache.Set(sh)
 	if newBestHeader {
 		h.bestCache = &sh
 	}
-	go h.db.Update(func(btx *bolt.Tx) error {
+	return h.db.Update(func(btx *bolt.Tx) error {
 		hdrs := btx.Bucket(BKTHeaders)
 		ser, err := serializeHeader(sh)
 		if err != nil {
@@ -130,7 +140,6 @@ func (h *HeaderDB) Put(sh StoredHeader, newBestHeader bool) error {
 		}
 		return nil
 	})
-	return nil
 }
 
 func (h *HeaderDB) Prune() error {

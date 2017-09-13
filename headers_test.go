@@ -104,13 +104,13 @@ func TestDeserializeHeader(t *testing.T) {
 	}
 }
 
-func TestHeaderDB_Put(t *testing.T) {
+func TestHeaderDB_put(t *testing.T) {
 	headers, err := NewHeaderDB("")
 	if err != nil {
 		t.Error(err)
 	}
 	// Test put with new tip
-	err = headers.Put(testSh1, true)
+	err = headers.put(testSh1, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -150,7 +150,7 @@ func TestHeaderDB_Put(t *testing.T) {
 	}
 
 	// Test header without new tip
-	err = headers.Put(testSh2, false)
+	err = headers.put(testSh2, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -189,7 +189,7 @@ func TestHeaderDB_Put(t *testing.T) {
 		t.Error(err)
 	}
 	// Test put duplicate
-	err = headers.Put(testSh2, true)
+	err = headers.put(testSh2, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -201,7 +201,7 @@ func TestHeaderDB_GetPreviousHeader(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = headers.Put(testSh1, false)
+	err = headers.put(testSh1, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -222,7 +222,7 @@ func TestHeaderDB_GetBestHeader(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = headers.Put(testSh1, false)
+	err = headers.put(testSh1, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -231,11 +231,11 @@ func TestHeaderDB_GetBestHeader(t *testing.T) {
 		t.Error("Didn't receive error when fetching best header without one set")
 	}
 
-	err = headers.Put(testSh1, true)
+	err = headers.put(testSh1, true)
 	if err != nil {
 		t.Error(err)
 	}
-	err = headers.Put(testSh2, false)
+	err = headers.put(testSh2, false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -262,7 +262,7 @@ func TestHeaderDB_Height(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	err = headers.Put(testSh1, true)
+	err = headers.put(testSh1, true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -293,7 +293,7 @@ func TestHeaderDB_Prune(t *testing.T) {
 			t.Error(err)
 		}
 		hdr.header.PrevBlock = *prevHash
-		err = headers.Put(hdr, true)
+		err = headers.put(hdr, true)
 		if err != nil {
 			t.Error(err)
 		}
@@ -337,15 +337,15 @@ func TestHeaderDB_Print(t *testing.T) {
 		t.Error(err)
 	}
 	// Test put with new tip
-	err = headers.Put(testSh1, true)
+	err = headers.put(testSh1, true)
 	if err != nil {
 		t.Error(err)
 	}
-	err = headers.Put(testSh2, true)
+	err = headers.put(testSh2, true)
 	if err != nil {
 		t.Error(err)
 	}
-	err = headers.Put(testSh3, true)
+	err = headers.put(testSh3, true)
 	if err != nil {
 		t.Error(err)
 	}
