@@ -346,6 +346,8 @@ func (b *Blockchain) GetCommonAncestor(bestHeader, prevBestHeader StoredHeader) 
 // Rollback the header database to the last header before time t.
 // We shouldn't go back further than the checkpoint
 func (b *Blockchain) Rollback(t time.Time) error {
+	b.lock.Lock()
+	defer b.lock.Unlock()
 	checkpoint := GetCheckpoint(b.crationDate, b.params)
 	checkPointHash := checkpoint.Header.BlockHash()
 	sh, err := b.db.GetBestHeader()
