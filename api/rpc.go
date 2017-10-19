@@ -13,12 +13,12 @@ import (
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"net"
 	"sync"
-	"time"
 )
 
 const Addr = "127.0.0.1:8234"
@@ -389,9 +389,13 @@ func (s *server) SweepAddress(ctx context.Context, in *pb.SweepInfo) (*pb.Txid, 
 	return &pb.Txid{newTxid.String()}, nil
 }
 
-func (s *server) ReSyncBlockchain(ctx context.Context, in *pb.Height) (*pb.Empty, error) {
-	s.w.ReSyncBlockchain(time.Time{})
-	return nil, nil
+func (s *server) ReSyncBlockchain(ctx context.Context, in *timestamp.Timestamp) (*pb.Empty, error) {
+	t, err := ptypes.Timestamp(in)
+	if err != nil {
+		return nil, err
+	}
+	s.w.ReSyncBlockchain(t)
+	return &pb.Empty{}, nil
 }
 
 func (s *server) CreateMultisigSignature(ctx context.Context, in *pb.CreateMultisigInfo) (*pb.SignatureList, error) {
