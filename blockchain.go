@@ -364,6 +364,9 @@ func (b *Blockchain) Rollback(t time.Time) error {
 	rollbackHeight := uint32(0)
 	for {
 		sh, err = b.db.GetPreviousHeader(sh.header)
+		if err != nil {
+			return err
+		}
 		checkHash := sh.header.BlockHash()
 		// If we rolled back to the checkpoint then stop here and set the checkpoint as the tip
 		if checkHash.IsEqual(&checkPointHash) {
