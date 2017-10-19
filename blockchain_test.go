@@ -652,3 +652,43 @@ func TestBlockchain_calcRequiredWork(t *testing.T) {
 	}
 	os.RemoveAll("headers.bin")
 }
+
+func TestBlockchain_Rollback(t *testing.T) {
+	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	err = createBlockChain(bc)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	sh, err := bc.db.GetBestHeader()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	for i := 0; i < 1000; i++ {
+		sh, err = bc.db.GetPreviousHeader(sh.header)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+	}
+
+	err = bc.Rollback(sh.header.Timestamp)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	h, err := bc.db.Height()
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	if h != sh.height-1 {
+		t.Error("Failed to roll back the blockchain to the correct height")
+	}
+	os.RemoveAll("headers.bin")
+}
