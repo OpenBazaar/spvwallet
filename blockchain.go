@@ -352,11 +352,11 @@ func (b *Blockchain) Rollback(t time.Time) error {
 	if err != nil {
 		return err
 	}
-	// If t is greater than the timestamp at the dip then do nothing
+	// If t is greater than the timestamp at the tip then do nothing
 	if sh.header.Timestamp.Before(t) {
 		return nil
 	}
-	// If the tip is out checkpoint then do nothing
+	// If the tip is our checkpoint then do nothing
 	checkHash := sh.header.BlockHash()
 	if checkHash.IsEqual(&checkPointHash) {
 		return nil
