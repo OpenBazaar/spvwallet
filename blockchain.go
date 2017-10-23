@@ -364,7 +364,7 @@ func (b *Blockchain) Rollback(t time.Time) error {
 		return nil
 	}
 	rollbackHeight := uint32(0)
-	for {
+	for i := 0; i < 1000000000; i++ {
 		sh, err = b.db.GetPreviousHeader(sh.header)
 		if err != nil {
 			return err
