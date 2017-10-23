@@ -23,7 +23,7 @@ service API {
   rpc AddWatchedScript (Address) returns (Empty) {}
   rpc GetConfirmations (Txid) returns (Confirmations) {}
   rpc SweepAddress (SweepInfo) returns (Txid) {}
-  rpc ReSyncBlockchain (Height) returns (Empty) {}
+  rpc ReSyncBlockchain (google.protobuf.Timestamp) returns (Empty) {}
   rpc CreateMultisigSignature (CreateMultisigInfo) returns (SignatureList) {}
   rpc Multisign (MultisignInfo) returns (RawTx) {}
   rpc EstimateFee (EstimateFeeData) returns (Fee) {}

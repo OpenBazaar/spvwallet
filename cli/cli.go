@@ -11,6 +11,8 @@ import (
 	"github.com/OpenBazaar/spvwallet/api"
 	"github.com/OpenBazaar/spvwallet/api/pb"
 	"github.com/btcsuite/btcd/wire"
+	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/jessevdk/go-flags"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -190,9 +192,9 @@ func SetupCli(parser *flags.Parser) {
 		"re-download the chain of headers",
 		"Will download all headers from the given height. Try this to uncover missing transasctions\n\n"+
 			"Args:\n"+
-			"1. height       (integer default=0) The starting height for the resync.\n\n"+
+			"1. timestamp       (RFC3339 formatted timestamp) The starting time for the resync.\n\n"+
 			"Examples:\n"+
-			"> spvwallet resyncblockchain 400000\n"+
+			"> spvwallet resyncblockchain 2017-10-06T16:00:17Z\n"+
 			"> spvwallet resyncblockchain",
 		&reSyncBlockchain)
 	parser.AddCommand("createmultisigsignature",
@@ -829,17 +831,20 @@ func (x *ReSyncBlockchain) Execute(args []string) error {
 		return err
 	}
 	defer conn.Close()
-	var height uint32
+	var ts *timestamp.Timestamp
 	if len(args) <= 0 {
 		return errors.New("Txid is required")
 	} else {
-		i, err := strconv.Atoi(args[0])
+		t, err := time.Parse(time.RFC3339, args[0])
 		if err != nil {
 			return err
 		}
-		height = uint32(i)
+		ts, err = ptypes.TimestampProto(t)
+		if err != nil {
+			return err
+		}
 	}
-	_, err = client.ReSyncBlockchain(context.Background(), &pb.Height{height})
+	_, err = client.ReSyncBlockchain(context.Background(), ts)
 	if err != nil {
 		return err
 	}

@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -360,6 +361,61 @@ func TestHeaderDB_Print(t *testing.T) {
 	}
 	if out[2] != `Height: 200.1, Hash: abe7bc6da630b6e0be7167ce23a4cf42d614543206e3725d21ebe829618a94af, Parent: 000000000000012a8ab8bccd1d3b09f3d1179850ad99ba7b978a870c59ef8141` {
 		t.Error("Print function had incorrect return")
+	}
+	os.RemoveAll("headers.bin")
+}
+
+func TestHeaderDB_DeleteAfter(t *testing.T) {
+	headers, err := NewHeaderDB("")
+	if err != nil {
+		t.Error(err)
+	}
+	var toDelete []chainhash.Hash
+	var toStay []chainhash.Hash
+	for i := 0; i < 2500; i++ {
+		hdr := testSh1
+		hdr.height = uint32(i)
+		prev := make([]byte, 32)
+		rand.Read(prev)
+		prevHash, err := chainhash.NewHash(prev)
+		if err != nil {
+			t.Error(err)
+		}
+		hdr.header.PrevBlock = *prevHash
+		hdr.header.Timestamp = time.Now().Add(time.Minute * time.Duration(i))
+		err = headers.put(hdr, true)
+		if err != nil {
+			t.Error(err)
+		}
+		if i > 500 {
+			toDelete = append(toDelete, hdr.header.BlockHash())
+		} else {
+			toStay = append(toStay, hdr.header.BlockHash())
+		}
+	}
+
+	err = headers.DeleteAfter(500)
+	if err != nil {
+		t.Error(err)
+	}
+	err = headers.db.View(func(btx *bolt.Tx) error {
+		hdrs := btx.Bucket(BKTHeaders)
+		for _, hash := range toStay {
+			b := hdrs.Get(hash.CloneBytes())
+			if b == nil {
+				t.Error("Pruned a header that should have stayed")
+			}
+		}
+		for _, hash := range toDelete {
+			b := hdrs.Get(hash.CloneBytes())
+			if b != nil {
+				t.Error("Failed to prune a header")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Error(err)
 	}
 	os.RemoveAll("headers.bin")
 }
