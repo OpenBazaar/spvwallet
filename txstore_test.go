@@ -598,7 +598,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if hits != 1 {
+	if hits < 1 {
 		t.Error("Failed to correctly ingest tx")
 	}
 	txns, err := txStore.Txns().GetAll(true)
@@ -695,7 +695,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if hits != 1 {
+	if hits < 1 {
 		t.Error("Failed to ingest matching input")
 	}
 
