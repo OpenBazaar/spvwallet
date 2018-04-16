@@ -19,7 +19,7 @@ func createTxStore() (*TxStore, error) {
 		&mockKeyStore{make(map[string]*keyStoreEntry)},
 		&mockUtxoStore{make(map[string]*wallet.Utxo)},
 		&mockStxoStore{make(map[string]*wallet.Stxo)},
-		&mockTxnStore{make(map[string]*txnStoreEntry)},
+		&mockTxnStore{make(map[string]*wallet.Txn)},
 		&mockWatchedScriptsStore{make(map[string][]byte)},
 	}
 	seed := make([]byte, 32)
@@ -72,7 +72,7 @@ func TestTxStore_PopulateAdrs(t *testing.T) {
 	tx := wire.NewMsgTx(1)
 	tx.BtcDecode(r, 1, wire.WitnessEncoding)
 
-	err = txStore.Txns().Put(tx, 100000, 0, time.Now(), false)
+	err = txStore.Txns().Put(tx1Bytes, tx.TxHash().String(), 100000, 0, time.Now(), false)
 	err = txStore.PopulateAdrs()
 	if err != nil {
 		t.Error(err)
@@ -146,7 +146,7 @@ func TestTxStore_CheckDoubleSpends(t *testing.T) {
 	r := bytes.NewReader(tx1Bytes)
 	tx1 := wire.NewMsgTx(1)
 	tx1.BtcDecode(r, 1, wire.WitnessEncoding)
-	txStore.Txns().Put(tx1, 100, 400000, time.Now(), false)
+	txStore.Txns().Put(tx1Bytes, tx1.TxHash().String(), 100, 400000, time.Now(), false)
 	doubles, err := txStore.CheckDoubleSpends(tx1)
 	if err != nil {
 		t.Error(err)
@@ -236,7 +236,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 	r := bytes.NewReader(tx1Bytes)
 	tx1 := wire.NewMsgTx(1)
 	tx1.BtcDecode(r, 1, wire.WitnessEncoding)
-	txStore.Txns().Put(tx1, 100, 0, time.Now(), false)
+	txStore.Txns().Put(tx1Bytes, tx1.TxHash().String(), 100, 0, time.Now(), false)
 
 	h1 := tx1.TxHash()
 	op := wire.NewOutPoint(&h1, 0)
@@ -249,7 +249,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	_, checkTx, err := txStore.Txns().Get(tx1.TxHash())
+	checkTx, err := txStore.Txns().Get(tx1.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -271,14 +271,14 @@ func TestTxStore_markAsDead(t *testing.T) {
 		t.Error(err)
 	}
 
-	txStore.Txns().Put(tx1, 100, 400000, time.Now(), false)
+	txStore.Txns().Put(tx1Bytes, tx1.TxHash().String(), 100, 400000, time.Now(), false)
 
 	tx2Hex := "01000000018dce6a1748a0b35475903ae654bb0c000fa004a8a83f16a18464de473da42b1c010000006a473044022001c7c890110c94a22bbb004b75364b03b157cb0f71a97c419a4ed80f0155649b0220257f54fbda579e0c4063f980ddd2ea9bfa591c42e759cc0cd78370bd1d24afba01210245a1619fc1feb837ed54a9dfa71d7abea445ef193fd1f9fa0d5b4141980bff11ffffffff0280a4bf070000000017a9143cb6156a7f8b5c8e72b764e00fbdfe31e77fe86187084cd600010000001976a914a4cf57fd8d825995d5fd5104675ccedd39cf924988ac00000000"
 	tx2Bytes, err := hex.DecodeString(tx2Hex)
 	r = bytes.NewReader(tx2Bytes)
 	tx2 := wire.NewMsgTx(1)
 	tx2.BtcDecode(r, 1, wire.WitnessEncoding)
-	txStore.Txns().Put(tx2, 100, 0, time.Now(), false)
+	txStore.Txns().Put(tx2Bytes, tx2.TxHash().String(), 100, 0, time.Now(), false)
 
 	op = wire.NewOutPoint(&h1, 0)
 	st := wallet.Stxo{
@@ -293,7 +293,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 		t.Error(err)
 	}
 
-	_, checkTx, err = txStore.Txns().Get(tx2.TxHash())
+	checkTx, err = txStore.Txns().Get(tx2.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -323,8 +323,8 @@ func TestTxStore_markAsDead(t *testing.T) {
 		t.Error(err)
 	}
 
-	txStore.Txns().Put(tx1, 100, 0, time.Now(), false)
-	txStore.Txns().Put(tx2, 100, 0, time.Now(), false)
+	txStore.Txns().Put(tx1Bytes, tx1.TxHash().String(), 100, 0, time.Now(), false)
+	txStore.Txns().Put(tx2Bytes, tx2.TxHash().String(), 100, 0, time.Now(), false)
 
 	op = wire.NewOutPoint(&h1, 0)
 	st = wallet.Stxo{
@@ -339,7 +339,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 		t.Error(err)
 	}
 
-	_, checkTx, err = txStore.Txns().Get(tx1.TxHash())
+	checkTx, err = txStore.Txns().Get(tx1.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -347,7 +347,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 		t.Error("Failed to mark tx as dead")
 	}
 
-	_, checkTx, err = txStore.Txns().Get(tx2.TxHash())
+	checkTx, err = txStore.Txns().Get(tx2.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -377,8 +377,8 @@ func TestTxStore_markAsDead(t *testing.T) {
 		t.Error(err)
 	}
 
-	txStore.Txns().Put(tx1, 100, 0, time.Now(), false)
-	txStore.Txns().Put(tx2, 100, 0, time.Now(), false)
+	txStore.Txns().Put(tx1Bytes, tx1.TxHash().String(), 100, 0, time.Now(), false)
+	txStore.Txns().Put(tx2Bytes, tx2.TxHash().String(), 100, 0, time.Now(), false)
 
 	op = wire.NewOutPoint(&h1, 0)
 	st = wallet.Stxo{
@@ -400,7 +400,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 	r = bytes.NewReader(tx3Bytes)
 	tx3 := wire.NewMsgTx(1)
 	tx3.BtcDecode(r, 1, wire.WitnessEncoding)
-	txStore.Txns().Put(tx3, 100, 0, time.Now(), false)
+	txStore.Txns().Put(tx3Bytes, tx3.TxHash().String(), 100, 0, time.Now(), false)
 
 	op = wire.NewOutPoint(&h2, 0)
 	st = wallet.Stxo{
@@ -415,7 +415,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 		t.Error(err)
 	}
 
-	_, checkTx, err = txStore.Txns().Get(tx1.TxHash())
+	checkTx, err = txStore.Txns().Get(tx1.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -423,7 +423,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 		t.Error("Failed to mark tx as dead")
 	}
 
-	_, checkTx, err = txStore.Txns().Get(tx2.TxHash())
+	checkTx, err = txStore.Txns().Get(tx2.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -431,7 +431,7 @@ func TestTxStore_markAsDead(t *testing.T) {
 		t.Error("Failed to mark tx as dead")
 	}
 
-	_, checkTx, err = txStore.Txns().Get(tx3.TxHash())
+	checkTx, err = txStore.Txns().Get(tx3.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -473,21 +473,21 @@ func TestTxStore_processReorg(t *testing.T) {
 	r := bytes.NewReader(tx1Bytes)
 	tx1 := wire.NewMsgTx(1)
 	tx1.BtcDecode(r, 1, wire.WitnessEncoding)
-	txStore.Txns().Put(tx1, 100, 400000, time.Now(), false)
+	txStore.Txns().Put(tx1Bytes, tx1.TxHash().String(), 100, 400000, time.Now(), false)
 
 	tx2Hex := "01000000018dce6a1748a0b35475903ae654bb0c000fa004a8a83f16a18464de473da42b1c010000006a473044022001c7c890110c94a22bbb004b75364b03b157cb0f71a97c419a4ed80f0155649b0220257f54fbda579e0c4063f980ddd2ea9bfa591c42e759cc0cd78370bd1d24afba01210245a1619fc1feb837ed54a9dfa71d7abea445ef193fd1f9fa0d5b4141980bff11ffffffff0280a4bf070000000017a9143cb6156a7f8b5c8e72b764e00fbdfe31e77fe86187084cd600010000001976a914a4cf57fd8d825995d5fd5104675ccedd39cf924988ac00000000"
 	tx2Bytes, err := hex.DecodeString(tx2Hex)
 	r = bytes.NewReader(tx2Bytes)
 	tx2 := wire.NewMsgTx(1)
 	tx2.BtcDecode(r, 1, wire.WitnessEncoding)
-	txStore.Txns().Put(tx2, 100, 400001, time.Now(), false)
+	txStore.Txns().Put(tx2Bytes, tx2.TxHash().String(), 100, 400001, time.Now(), false)
 
 	tx3Hex := "0100000001dc8910ef79c4bc690cdf3e335c0f88757ba176e00057cb63ccbae6a13205d4cf010000006a47304402203c5203c53b463ac459c93954513ffb32c7056c5f2a6c825362afba21f5d1c88202207a121f13fa0f2cfe1392d2b2a4139485cc4251058a6cccc1e3c25970104df5cd012102530f811d7da235aad895cba33e2d42d1092140d1c6e6b4d965db861f5988d64affffffff02fc2f0600000000001976a9145d9e4978b7998369cda5ce3ae79c6db25957e91d88ac29dc6a16000000001976a9145cd1285c75daa5adc4c5b979b0f96c01dd08dfec88ac00000000"
 	tx3Bytes, err := hex.DecodeString(tx3Hex)
 	r = bytes.NewReader(tx3Bytes)
 	tx3 := wire.NewMsgTx(1)
 	tx3.BtcDecode(r, 1, wire.WitnessEncoding)
-	txStore.Txns().Put(tx3, 100, 400002, time.Now(), false)
+	txStore.Txns().Put(tx3Bytes, tx3.TxHash().String(), 100, 400002, time.Now(), false)
 
 	h1 := tx1.TxHash()
 	op := wire.NewOutPoint(&h1, 0)
@@ -531,7 +531,7 @@ func TestTxStore_processReorg(t *testing.T) {
 		t.Error("Failed to delete dead stxo")
 	}
 
-	_, checkTx, err := txStore.Txns().Get(tx1.TxHash())
+	checkTx, err := txStore.Txns().Get(tx1.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -539,7 +539,7 @@ func TestTxStore_processReorg(t *testing.T) {
 		t.Error("Failed to mark tx as dead")
 	}
 
-	_, checkTx, err = txStore.Txns().Get(tx2.TxHash())
+	checkTx, err = txStore.Txns().Get(tx2.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -547,7 +547,7 @@ func TestTxStore_processReorg(t *testing.T) {
 		t.Error("Failed to mark tx as dead")
 	}
 
-	_, checkTx, err = txStore.Txns().Get(tx3.TxHash())
+	checkTx, err = txStore.Txns().Get(tx3.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -638,7 +638,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	_, checkTx, err := txStore.Txns().Get(tx1.TxHash())
+	checkTx, err := txStore.Txns().Get(tx1.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
@@ -671,7 +671,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	_, checkTx, err = txStore.Txns().Get(tx3.TxHash())
+	checkTx, err = txStore.Txns().Get(tx3.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
