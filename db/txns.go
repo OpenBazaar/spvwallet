@@ -15,7 +15,7 @@ type TxnsDB struct {
 	lock *sync.RWMutex
 }
 
-func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, watchOnly bool) error {
+func (t *TxnsDB) Put(txn []byte, txid string, value, height int, timestamp time.Time, watchOnly bool) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	tx, err := t.db.Begin()
@@ -28,13 +28,11 @@ func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, wa
 		tx.Rollback()
 		return err
 	}
-	var buf bytes.Buffer
-	txn.BtcEncode(&buf, wire.ProtocolVersion, wire.WitnessEncoding)
 	watchOnlyInt := 0
 	if watchOnly {
 		watchOnlyInt = 1
 	}
-	_, err = stmt.Exec(txn.TxHash().String(), value, height, int(timestamp.Unix()), watchOnlyInt, buf.Bytes())
+	_, err = stmt.Exec(txid, value, height, int(timestamp.Unix()), watchOnlyInt, txn)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -43,13 +41,13 @@ func (t *TxnsDB) Put(txn *wire.MsgTx, value, height int, timestamp time.Time, wa
 	return nil
 }
 
-func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, wallet.Txn, error) {
+func (t *TxnsDB) Get(txid chainhash.Hash) (wallet.Txn, error) {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	var txn wallet.Txn
 	stmt, err := t.db.Prepare("select tx, value, height, timestamp, watchOnly from txns where txid=?")
 	if err != nil {
-		return nil, txn, err
+		return txn, err
 	}
 	defer stmt.Close()
 	var ret []byte
@@ -59,7 +57,7 @@ func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, wallet.Txn, error) {
 	var watchOnlyInt int
 	err = stmt.QueryRow(txid.String()).Scan(&ret, &value, &height, &timestamp, &watchOnlyInt)
 	if err != nil {
-		return nil, txn, err
+		return txn, err
 	}
 	r := bytes.NewReader(ret)
 	msgTx := wire.NewMsgTx(1)
@@ -74,8 +72,9 @@ func (t *TxnsDB) Get(txid chainhash.Hash) (*wire.MsgTx, wallet.Txn, error) {
 		Height:    int32(height),
 		Timestamp: time.Unix(int64(timestamp), 0),
 		WatchOnly: watchOnly,
+		Bytes:     ret,
 	}
-	return msgTx, txn, nil
+	return txn, nil
 }
 
 func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
