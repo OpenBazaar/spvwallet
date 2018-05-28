@@ -16,7 +16,6 @@ func MockWallet() *SPVWallet {
 	peerCfg := &PeerManagerConfig{
 		UserAgentVersion: WALLET_VERSION,
 		Params:           &chaincfg.TestNet3Params,
-		GetFilter:        txstore.GimmeFilter,
 	}
 
 	bc, _ := NewBlockchain("", MockCreationTime, &chaincfg.TestNet3Params)

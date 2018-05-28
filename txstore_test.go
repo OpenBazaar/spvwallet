@@ -96,12 +96,12 @@ func TestTxStore_GimmeFilter(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	op := wire.NewOutPoint(maxHash, 0)
+	op := wire.NewOutPoint(&zeroHash, 0)
 	err = txStore.Utxos().Put(wallet.Utxo{Op: *op})
 	if err != nil {
 		t.Error(err)
 	}
-	op2 := wire.NewOutPoint(maxHash, 1)
+	op2 := wire.NewOutPoint(&zeroHash, 1)
 	err = txStore.Stxos().Put(wallet.Stxo{Utxo: wallet.Utxo{Op: *op2}})
 	if err != nil {
 		t.Error(err)
