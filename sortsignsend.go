@@ -26,7 +26,7 @@ import (
 
 func (s *SPVWallet) Broadcast(tx *wire.MsgTx) error {
 	// Our own tx; don't keep track of false positives
-	_, err := s.txstore.Ingest(tx, 0)
+	_, err := s.txstore.Ingest(tx, 0, time.Now())
 	if err != nil {
 		return err
 	}

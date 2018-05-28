@@ -49,6 +49,11 @@ type invMsg struct {
 	peer *peerpkg.Peer
 }
 
+type heightAndTime struct {
+	height uint32
+	timestamp time.Time
+}
+
 // txMsg packages a bitcoin tx message and the peer it came from together
 // so the handler has access to that information.
 type txMsg struct {
@@ -72,7 +77,7 @@ type WireServiceConfig struct {
 type peerSyncState struct {
 	syncCandidate   bool
 	requestQueue    []*wire.InvVect
-	requestedTxns   map[chainhash.Hash]uint32
+	requestedTxns   map[chainhash.Hash]heightAndTime
 	requestedBlocks map[chainhash.Hash]struct{}
 	falsePositives  uint32
 }
@@ -84,7 +89,7 @@ type WireService struct {
 	walletCreationDate time.Time
 	syncPeer           *peerpkg.Peer
 	peerStates         map[*peerpkg.Peer]*peerSyncState
-	requestedTxns      map[chainhash.Hash]uint32
+	requestedTxns      map[chainhash.Hash]heightAndTime
 	requestedBlocks    map[chainhash.Hash]struct{}
 	mempool            map[chainhash.Hash]struct{}
 	msgChan            chan interface{}
@@ -100,7 +105,7 @@ func NewWireService(config *WireServiceConfig) *WireService {
 		minPeersForSync:    config.minPeersForSync,
 		txStore:            config.txStore,
 		peerStates:         make(map[*peerpkg.Peer]*peerSyncState),
-		requestedTxns:      make(map[chainhash.Hash]uint32),
+		requestedTxns:      make(map[chainhash.Hash]heightAndTime),
 		requestedBlocks:    make(map[chainhash.Hash]struct{}),
 		mempool:            make(map[chainhash.Hash]struct{}),
 		msgChan:            make(chan interface{}),
@@ -157,7 +162,7 @@ func (ws *WireService) handleNewPeerMsg(peer *peerpkg.Peer) {
 	// Initialize the peer state
 	ws.peerStates[peer] = &peerSyncState{
 		syncCandidate:   ws.isSyncCandidate(peer),
-		requestedTxns:   make(map[chainhash.Hash]uint32),
+		requestedTxns:   make(map[chainhash.Hash]heightAndTime),
 		requestedBlocks: make(map[chainhash.Hash]struct{}),
 	}
 
@@ -445,9 +450,9 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 	// Request the transactions in this block
 	gdmsg := wire.NewMsgGetData()
 	for _, txid := range txids {
-		ws.requestedTxns[*txid] = newHeight
+		ws.requestedTxns[*txid] = heightAndTime{newHeight, header.Timestamp}
 		limitMap(ws.requestedTxns, maxRequestedTxns)
-		state.requestedTxns[*txid] = newHeight
+		state.requestedTxns[*txid] = heightAndTime{newHeight, header.Timestamp}
 		iv := wire.NewInvVect(wire.InvTypeTx, txid)
 		gdmsg.AddInvVect(iv)
 	}
@@ -573,9 +578,9 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 		case wire.InvTypeTx:
 			// Transaction inventory can be requested in batches
 			if _, exists := ws.requestedTxns[iv.Hash]; !exists && numRequested < wire.MaxInvPerMsg {
-				ws.requestedTxns[iv.Hash] = 0 // unconfirmed tx
+				ws.requestedTxns[iv.Hash] = heightAndTime{0, time.Now()} // unconfirmed tx
 				limitMap(ws.requestedTxns, maxRequestedTxns)
-				state.requestedTxns[iv.Hash] = 0
+				state.requestedTxns[iv.Hash] = heightAndTime{0, time.Now()}
 
 				gdmsg.AddInvVect(iv)
 				numRequested++
@@ -611,14 +616,14 @@ func (ws *WireService) handleTxMsg(tmsg *txMsg) {
 		log.Warningf("Received tx message from unknown peer %s", peer)
 		return
 	}
-	height, ok := state.requestedTxns[tx.TxHash()]
+	ht, ok := state.requestedTxns[tx.TxHash()]
 	if !ok {
 		log.Warningf("Peer %s is sending us transactions we didn't request", peer)
 		peer.Disconnect()
 		return
 	}
 	ws.mempool[txHash] = struct{}{}
-	hits, err := ws.txStore.Ingest(tx, int32(height))
+	hits, err := ws.txStore.Ingest(tx, int32(ht.height), ht.timestamp)
 	if err != nil {
 		log.Errorf("Error ingesting tx: %s\n", err.Error())
 	}
@@ -635,7 +640,7 @@ func (ws *WireService) handleTxMsg(tmsg *txMsg) {
 		log.Debugf("Tx %s from Peer%d had no hits, filter false positive.", txHash.String(), peer.ID())
 		state.falsePositives++
 	} else {
-		log.Infof("Ingested new tx %s at height %d", txHash.String(), height)
+		log.Infof("Ingested new tx %s at height %d", txHash.String(), ht.height)
 	}
 
 	// Check to see if false positives exceeds the maximum allowed. If so, reset and resend the filter.
