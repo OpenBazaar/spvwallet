@@ -539,24 +539,10 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 		}
 	}
 
-	// Request the advertised inventory if we don't already have it.  Also,
-	// request parent blocks of orphans if we receive one we already have.
-	// Finally, attempt to detect potential stalls due to long side chains
-	// we already have and request more blocks to prevent them.
-	var invType wire.InvType
-	var requestQueue []*wire.InvVect
+	// Request the advertised inventory if we don't already have it
+	gdmsg := wire.NewMsgGetData()
+	numRequested := 0
 	for _, iv := range invVects {
-		// Ignore unsupported inventory types.
-		switch iv.Type {
-		case wire.InvTypeBlock:
-			invType = wire.InvTypeBlock
-		case wire.InvTypeFilteredBlock:
-			invType = wire.InvTypeFilteredBlock
-		case wire.InvTypeTx:
-			invType = wire.InvTypeTx
-		default:
-			continue
-		}
 
 		// Add the inventory to the cache of known inventory
 		// for the peer.
@@ -570,50 +556,44 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 				"processing: %v", err)
 			continue
 		}
-		if !haveInv {
-			// Add it to the request queue.
-			requestQueue = append(requestQueue, iv)
+		if haveInv {
+			continue
+		}
+
+		switch iv.Type {
+		case wire.InvTypeFilteredBlock:
+			fallthrough
+		case wire.InvTypeBlock:
+			// Block inventory goes into a request queue to be downloaded
+			// one at a time
+			if _, exists := ws.requestedBlocks[iv.Hash]; !exists {
+				iv.Type = wire.InvTypeFilteredBlock
+				state.requestQueue = append(state.requestQueue, iv)
+			}
+		case wire.InvTypeTx:
+			// Transaction inventory can be requested in batches
+			if _, exists := ws.requestedTxns[iv.Hash]; !exists && numRequested < wire.MaxInvPerMsg {
+				ws.requestedTxns[iv.Hash] = 0 // unconfirmed tx
+				limitMap(ws.requestedTxns, maxRequestedTxns)
+				state.requestedTxns[iv.Hash] = 0
+
+				gdmsg.AddInvVect(iv)
+				numRequested++
+			}
+		default:
 			continue
 		}
 	}
 
-	// Request as much as possible at once.  Anything that won't fit into
-	// the request will be requested on the next inv message.
-	numRequested := 0
-	gdmsg := wire.NewMsgGetData()
-	if invType == wire.InvTypeTx {
-		for len(requestQueue) != 0 {
-			iv := requestQueue[0]
-			requestQueue[0] = nil
-			if len(requestQueue) > 1 {
-				requestQueue = requestQueue[1:]
-			} else {
-				requestQueue = []*wire.InvVect{}
-			}
-
-			switch iv.Type {
-			case wire.InvTypeTx:
-				// Request the transaction if there is not already a
-				// pending request.
-				if _, exists := ws.requestedTxns[iv.Hash]; !exists {
-					ws.requestedTxns[iv.Hash] = 0 // unconfirmed tx
-					limitMap(ws.requestedTxns, maxRequestedTxns)
-					state.requestedTxns[iv.Hash] = 0
-
-					gdmsg.AddInvVect(iv)
-					numRequested++
-				}
-			}
-
-			if numRequested >= wire.MaxInvPerMsg {
-				break
-			}
-		}
-	} else {
-		iv := requestQueue[0]
-		iv.Type = wire.InvTypeFilteredBlock
+	// Pop the first block off the queue and request it
+	if len(state.requestQueue) > 0 {
+		iv := state.requestQueue[0]
 		gdmsg.AddInvVect(iv)
-		state.requestQueue = requestQueue[1:]
+		if len(state.requestQueue) > 1 {
+			state.requestQueue = state.requestQueue[1:]
+		} else {
+			state.requestQueue = []*wire.InvVect{}
+		}
 		state.requestedBlocks[iv.Hash] = struct{}{}
 	}
 	if len(gdmsg.InvList) > 0 {
