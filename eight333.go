@@ -80,6 +80,7 @@ type peerSyncState struct {
 	requestedTxns   map[chainhash.Hash]heightAndTime
 	requestedBlocks map[chainhash.Hash]struct{}
 	falsePositives  uint32
+	blockScore      int32
 }
 
 type WireService struct {
@@ -256,7 +257,7 @@ func (ws *WireService) startSync(syncPeer *peerpkg.Peer) {
 		locator := ws.chain.GetBlockLocator()
 
 		// If the best header we have was created before this wallet then we can sync just headers
-		// up to the wallet creation data since we know there wont be any transactions in those
+		// up to the wallet creation date since we know there wont be any transactions in those
 		// blocks we're interested in. However, if we're past the wallet creation date we need to
 		// start downloading merkle blocks so we learn of the wallet's transactions. We'll use a
 		// buffer of one week to make sure we don't miss anything.
@@ -352,10 +353,12 @@ func (ws *WireService) handleHeadersMsg(hmsg *headersMsg) {
 	// Process each header we received. Make sure when check that each one is before our
 	// wallet creation date (minus the buffer). If we pass the creation date we will exit
 	// request merkle blocks from this point forward and exit the function.
+	badHeaders := 0
 	for _, blockHeader := range msg.Headers {
 		if blockHeader.Timestamp.Before(ws.walletCreationDate.Add(-time.Hour * 24 * 7)) {
 			_, _, height, err := ws.chain.CommitHeader(*blockHeader)
 			if err != nil {
+				badHeaders++
 				log.Errorf("Commit header error: %s", err.Error())
 			}
 			log.Infof("Received header %s at height %d", blockHeader.BlockHash().String(), height)
@@ -365,6 +368,14 @@ func (ws *WireService) handleHeadersMsg(hmsg *headersMsg) {
 			peer.PushGetBlocksMsg(locator, &zeroHash)
 			return
 		}
+	}
+	// Usually the peer will send the header at the tip of the chain in each batch. This will trigger
+	// one commit error so we'll consider that acceptable, but anything more than that suggests misbehavior
+	// so we'll dump this peer.
+	if badHeaders > 1 {
+		log.Warningf("Disconnecting from peer %s because he sent us too many bad headers", peer)
+		peer.Disconnect()
+		return
 	}
 
 	// Request the next batch of headers
@@ -435,17 +446,26 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 		ws.requestedBlocks = make(map[chainhash.Hash]struct{})
 		ws.startSync(peer)
 		return
+	} else if err == OrphanHeaderError && !ws.Current() {
+		// The sync peer sent us an orphan header in the middle of a sync. This could
+		// just be the last block in the batch which represents the tip of the chain.
+		// In either case let's adjust the score for this peer downwards. If it goes
+		// negative it means he's slamming us with blocks that don't fit in our chain
+		// so disconnect.
+		state.blockScore--
+		if state.blockScore < 0 {
+			log.Warningf("Disconnecting from peer %s because he sent us too many bad blocks", peer)
+			peer.Disconnect()
+			return
+		}
+
 	} else if err != nil {
 		log.Error(err)
 		return
 	}
+	state.blockScore++
 
 	peer.UpdateLastBlockHeight(int32(newHeight))
-
-	// We can exit here if the block is already known
-	if !newBlock {
-		return
-	}
 
 	// Request the transactions in this block
 	gdmsg := wire.NewMsgGetData()
@@ -457,6 +477,11 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 		gdmsg.AddInvVect(iv)
 	}
 	peer.QueueMessage(gdmsg, nil)
+
+	// We can exit here if the block is already known
+	if !newBlock {
+		return
+	}
 
 	log.Infof("Received merkle block %s at height %d", blockHash.String(), newHeight)
 
@@ -561,23 +586,22 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 				"processing: %v", err)
 			continue
 		}
-		if haveInv {
-			continue
-		}
 
 		switch iv.Type {
 		case wire.InvTypeFilteredBlock:
 			fallthrough
 		case wire.InvTypeBlock:
 			// Block inventory goes into a request queue to be downloaded
-			// one at a time
-			if _, exists := ws.requestedBlocks[iv.Hash]; !exists {
+			// one at a time. Sadly we can't batch these because the remote
+			// peer  will not update the bloom filter until he's done processing
+			// the batch which means we will have a super high false positive rate.
+			if _, exists := ws.requestedBlocks[iv.Hash]; (!ws.Current() && !exists && !haveInv) || ws.Current() {
 				iv.Type = wire.InvTypeFilteredBlock
 				state.requestQueue = append(state.requestQueue, iv)
 			}
 		case wire.InvTypeTx:
 			// Transaction inventory can be requested in batches
-			if _, exists := ws.requestedTxns[iv.Hash]; !exists && numRequested < wire.MaxInvPerMsg {
+			if _, exists := ws.requestedTxns[iv.Hash]; !exists && numRequested < wire.MaxInvPerMsg && !haveInv {
 				ws.requestedTxns[iv.Hash] = heightAndTime{0, time.Now()} // unconfirmed tx
 				limitMap(ws.requestedTxns, maxRequestedTxns)
 				state.requestedTxns[iv.Hash] = heightAndTime{0, time.Now()}

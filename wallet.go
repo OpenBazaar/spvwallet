@@ -108,12 +108,15 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	minSync := 5
+	if config.TrustedPeer != nil {
+		minSync = 1
+	}
 	wireConfig := &WireServiceConfig{
 		txStore:            w.txstore,
 		chain:              w.blockchain,
 		walletCreationDate: w.creationDate,
-		minPeersForSync:    5,
+		minPeersForSync:    minSync,
 		params:             w.params,
 	}
 
