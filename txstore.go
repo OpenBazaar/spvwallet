@@ -354,7 +354,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 		}
 		// Let's check the height before committing so we don't allow rogue peers to send us a lose
 		// tx that resets our height to zero.
-		if txn.Height <= 0 {
+		if err == nil && txn.Height <= 0 {
 			ts.Txns().UpdateHeight(tx.TxHash(), int(height), txn.Timestamp)
 			ts.txids[tx.TxHash().String()] = height
 			if height > 0 {

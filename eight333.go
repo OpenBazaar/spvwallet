@@ -50,7 +50,7 @@ type invMsg struct {
 }
 
 type heightAndTime struct {
-	height uint32
+	height    uint32
 	timestamp time.Time
 }
 

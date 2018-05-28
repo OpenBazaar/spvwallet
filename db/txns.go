@@ -130,7 +130,7 @@ func (t *TxnsDB) UpdateHeight(txid chainhash.Hash, height int, timestamp time.Ti
 	if err != nil {
 		return err
 	}
-	stmt, err := tx.Prepare("update txns set height=? timestamp=? where txid=?")
+	stmt, err := tx.Prepare("update txns set height=?, timestamp=? where txid=?")
 	if err != nil {
 		return err
 	}
