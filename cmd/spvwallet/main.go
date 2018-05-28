@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/OpenBazaar/openbazaar-go/bitcoin/exchange"
+
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api"
 	"github.com/OpenBazaar/spvwallet/cli"
@@ -32,6 +32,8 @@ import (
 	"path"
 	"strings"
 	"time"
+	"github.com/OpenBazaar/spvwallet/exchangerates"
+	"sync"
 )
 
 var parser = flags.NewParser(nil, flags.Default)
@@ -174,6 +176,10 @@ func (x *Start) Execute(args []string) error {
 	if mn != "" {
 		config.Mnemonic = mn
 	}
+	cd, err := sqliteDatastore.GetCreationDate()
+	if err == nil {
+		config.CreationDate = cd
+	}
 
 	// Write version file
 	f, err := os.Create(path.Join(basepath, "version"))
@@ -262,14 +268,13 @@ func (x *Start) Execute(args []string) error {
 	config.MediumFee = settings.Fees.Normal
 	config.LowFee = settings.Fees.Economic
 
-	creationDate := time.Time{}
 	if x.WalletCreationDate != "" {
-		creationDate, err = time.Parse(time.RFC3339, x.WalletCreationDate)
+		creationDate, err := time.Parse(time.RFC3339, x.WalletCreationDate)
 		if err != nil {
 			return errors.New("Wallet creation date timestamp must be in RFC3339 format")
 		}
+		config.CreationDate = creationDate
 	}
-	config.CreationDate = creationDate
 
 	// Create the wallet
 	wallet, err = spvwallet.NewSPVWallet(config)
@@ -292,7 +297,7 @@ func (x *Start) Execute(args []string) error {
 	if x.Gui {
 		go wallet.Start()
 
-		exchangeRates := exchange.NewBitcoinPriceFetcher(nil)
+		exchangeRates := exchangerates.NewBitcoinPriceFetcher(nil)
 
 		type Stats struct {
 			Confirmed    int64  `json:"confirmed"`
@@ -370,10 +375,10 @@ func (x *Start) Execute(args []string) error {
 						Height:       height,
 						ExchangeRate: fmt.Sprintf("%.2f", rate),
 					}
-					w.Send(bootstrap.MessageOut{Name: "statsUpdate", Payload: st})
+					w.SendMessage(bootstrap.MessageOut{Name: "statsUpdate", Payload: st})
 				case "getAddress":
 					addr := wallet.CurrentAddress(wi.EXTERNAL)
-					w.Send(bootstrap.MessageOut{Name: "address", Payload: addr.EncodeAddress()})
+					w.SendMessage(bootstrap.MessageOut{Name: "address", Payload: addr.EncodeAddress()})
 				case "send":
 					type P struct {
 						Address  string  `json:"address"`
@@ -399,12 +404,12 @@ func (x *Start) Execute(args []string) error {
 					}
 					addr, err := btcutil.DecodeAddress(p.Address, wallet.Params())
 					if err != nil {
-						w.Send(bootstrap.MessageOut{Name: "spendError", Payload: "Invalid address"})
+						w.SendMessage(bootstrap.MessageOut{Name: "spendError", Payload: "Invalid address"})
 						return
 					}
 					_, err = wallet.Spend(int64(p.Amount), addr, feeLevel)
 					if err != nil {
-						w.Send(bootstrap.MessageOut{Name: "spendError", Payload: err.Error()})
+						w.SendMessage(bootstrap.MessageOut{Name: "spendError", Payload: err.Error()})
 					}
 				case "clipboard":
 					type P struct {
@@ -445,7 +450,7 @@ func (x *Start) Execute(args []string) error {
 					if err != nil {
 						astilog.Error(err.Error())
 					}
-					w.Send(bootstrap.MessageOut{Name: "settings", Payload: string(settings)})
+					w.SendMessage(bootstrap.MessageOut{Name: "settings", Payload: string(settings)})
 				case "openbrowser":
 					var url string
 					if err := json.Unmarshal(m.Payload, &url); err != nil {
@@ -487,15 +492,15 @@ func (x *Start) Execute(args []string) error {
 					}()
 					txs, err := wallet.Transactions()
 					if err != nil {
-						w.Send(bootstrap.MessageOut{Name: "txError", Payload: err.Error()})
+						w.SendMessage(bootstrap.MessageOut{Name: "txError", Payload: err.Error()})
 					}
-					w.Send(bootstrap.MessageOut{Name: "transactions", Payload: txs})
+					w.SendMessage(bootstrap.MessageOut{Name: "transactions", Payload: txs})
 				case "getTransactions":
 					txs, err := wallet.Transactions()
 					if err != nil {
-						w.Send(bootstrap.MessageOut{Name: "txError", Payload: err.Error()})
+						w.SendMessage(bootstrap.MessageOut{Name: "txError", Payload: err.Error()})
 					}
-					w.Send(bootstrap.MessageOut{Name: "transactions", Payload: txs})
+					w.SendMessage(bootstrap.MessageOut{Name: "transactions", Payload: txs})
 				case "hide":
 					go func() {
 						rc <- 341
@@ -505,7 +510,7 @@ func (x *Start) Execute(args []string) error {
 						rc <- 649
 					}()
 				case "getMnemonic":
-					w.Send(bootstrap.MessageOut{Name: "mnemonic", Payload: wallet.Mnemonic()})
+					w.SendMessage(bootstrap.MessageOut{Name: "mnemonic", Payload: wallet.Mnemonic()})
 				}
 			},
 			RestoreAssets: gui.RestoreAssets,
@@ -531,6 +536,9 @@ func (x *Start) Execute(args []string) error {
 		}
 	} else {
 		wallet.Start()
+		var wg sync.WaitGroup
+		wg.Add(1)
+		wg.Wait()
 	}
 	return nil
 }

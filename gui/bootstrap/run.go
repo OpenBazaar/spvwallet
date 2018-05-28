@@ -69,7 +69,7 @@ func Run(o Options) (err error) {
 
 	// Handle messages
 	if o.MessageHandler != nil {
-		w.On(astilectron.EventNameWindowEventMessage, handleMessages(w, o.MessageHandler))
+		w.OnMessage(handleMessages(w, o.MessageHandler))
 	}
 
 	// Create window
@@ -89,7 +89,7 @@ func Run(o Options) (err error) {
 			case n := <-o.ResizeChan:
 				w.Resize(621, n)
 			case height := <-o.TransactionChan:
-				w.Send(MessageOut{Name: "newTransaction", Payload: height})
+				w.SendMessage(MessageOut{Name: "newTransaction", Payload: height})
 			}
 		}
 	}()

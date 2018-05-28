@@ -34,9 +34,9 @@ type SPVWallet struct {
 	txstore     *TxStore
 	peerManager *PeerManager
 	keyManager  *KeyManager
+	wireService *WireService
 
 	fPositives    chan *peer.Peer
-	stopChan      chan int
 	fpAccumulator map[int32]int32
 	mutex         *sync.RWMutex
 
@@ -93,7 +93,6 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 			config.Proxy,
 		),
 		fPositives:    make(chan *peer.Peer),
-		stopChan:      make(chan int),
 		fpAccumulator: make(map[int32]int32),
 		mutex:         new(sync.RWMutex),
 	}
@@ -110,37 +109,24 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		return nil, err
 	}
 
-	listeners := &peer.MessageListeners{
-		OnMerkleBlock: w.onMerkleBlock,
-		OnInv:         w.onInv,
-		OnTx:          w.onTx,
-		OnGetData:     w.onGetData,
-		OnReject:      w.onReject,
+	wireConfig := &WireServiceConfig{
+		txStore: w.txstore,
+		chain: w.blockchain,
+		walletCreationDate: w.creationDate,
+		minPeersForSync: 6,
+		params: w.params,
 	}
 
-	getNewestBlock := func() (*chainhash.Hash, int32, error) {
-		storedHeader, err := w.blockchain.db.GetBestHeader()
-		if err != nil {
-			return nil, 0, err
-		}
-		height, err := w.blockchain.db.Height()
-		if err != nil {
-			return nil, 0, err
-		}
-		hash := storedHeader.header.BlockHash()
-		return &hash, int32(height), nil
-	}
+	ws := NewWireService(wireConfig)
+	w.wireService = ws
 
 	w.config = &PeerManagerConfig{
 		UserAgentName:      config.UserAgent,
 		UserAgentVersion:   WALLET_VERSION,
 		Params:             w.params,
 		AddressCacheDir:    config.RepoPath,
-		GetFilter:          w.txstore.GimmeFilter,
-		StartChainDownload: w.startChainDownload,
-		GetNewestBlock:     getNewestBlock,
-		Listeners:          listeners,
 		Proxy:              config.Proxy,
+		MsgChan:            ws.MsgChan(),
 	}
 
 	if config.TrustedPeer != nil {
@@ -157,8 +143,8 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 
 func (w *SPVWallet) Start() {
 	w.running = true
+	go w.wireService.Start()
 	go w.peerManager.Start()
-	w.fPositiveHandler(w.stopChan)
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -192,7 +178,7 @@ func (w *SPVWallet) Mnemonic() string {
 }
 
 func (w *SPVWallet) ConnectedPeers() []*peer.Peer {
-	return w.peerManager.ReadyPeers()
+	return w.peerManager.ConnectedPeers()
 }
 
 func (w *SPVWallet) CurrentAddress(purpose wallet.KeyPurpose) btc.Address {
@@ -353,9 +339,7 @@ func (w *SPVWallet) AddWatchedScript(script []byte) error {
 	err := w.txstore.WatchedScripts().Put(script)
 	w.txstore.PopulateAdrs()
 
-	for _, peer := range w.peerManager.ReadyPeers() {
-		w.updateFilterAndSend(peer)
-	}
+	w.wireService.MsgChan() <- updateFiltersMsg{}
 	return err
 }
 
@@ -368,20 +352,21 @@ func (w *SPVWallet) Close() {
 		log.Info("Disconnecting from peers and shutting down")
 		w.peerManager.Stop()
 		w.blockchain.Close()
-		w.stopChan <- 1
+		w.wireService.Stop()
 		w.running = false
 	}
 }
 
 func (w *SPVWallet) ReSyncBlockchain(fromDate time.Time) {
 	w.peerManager.Stop()
+	w.wireService.Stop()
 	w.blockchain.Rollback(fromDate)
-	w.blockchain.SetChainState(SYNCING)
 	w.txstore.PopulateAdrs()
 	var err error
 	w.peerManager, err = NewPeerManager(w.config)
 	if err != nil {
 		return
 	}
+	go w.wireService.Start()
 	go w.peerManager.Start()
 }

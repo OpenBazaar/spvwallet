@@ -20,13 +20,13 @@ type MessageIn struct {
 }
 
 // handleMessages handles messages
-func handleMessages(w *astilectron.Window, messageHandler MessageHandler) astilectron.Listener {
-	return func(e astilectron.Event) (deleteListener bool) {
+func handleMessages(w *astilectron.Window, messageHandler MessageHandler) astilectron.ListenerMessage {
+	return func(e *astilectron.EventMessage) (v interface{}) {
 		// Unmarshal message
 		var m MessageIn
 		var err error
-		if err = e.Message.Unmarshal(&m); err != nil {
-			astilog.Errorf("Unmarshaling message %+v failed", *e.Message)
+		if err = e.Unmarshal(&m); err != nil {
+			astilog.Errorf("Unmarshaling message %+v failed", *e)
 			return
 		}
 

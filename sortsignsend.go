@@ -25,26 +25,16 @@ import (
 )
 
 func (s *SPVWallet) Broadcast(tx *wire.MsgTx) error {
-
 	// Our own tx; don't keep track of false positives
 	_, err := s.txstore.Ingest(tx, 0)
 	if err != nil {
 		return err
 	}
 
-	// make an inv message instead of a tx message to be polite
-	txid := tx.TxHash()
-	iv1 := wire.NewInvVect(wire.InvTypeTx, &txid)
-	invMsg := wire.NewMsgInv()
-	err = invMsg.AddInvVect(iv1)
-	if err != nil {
-		return err
-	}
-
 	log.Debugf("Broadcasting tx %s to peers", tx.TxHash().String())
-	for _, peer := range s.peerManager.ReadyPeers() {
-		peer.QueueMessage(invMsg, nil)
-		s.updateFilterAndSend(peer)
+	for _, peer := range s.peerManager.ConnectedPeers() {
+		peer.QueueMessage(tx, nil)
+		s.wireService.MsgChan() <- updateFiltersMsg{}
 	}
 	return nil
 }
