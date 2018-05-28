@@ -110,23 +110,23 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 	}
 
 	wireConfig := &WireServiceConfig{
-		txStore: w.txstore,
-		chain: w.blockchain,
+		txStore:            w.txstore,
+		chain:              w.blockchain,
 		walletCreationDate: w.creationDate,
-		minPeersForSync: 4,
-		params: w.params,
+		minPeersForSync:    5,
+		params:             w.params,
 	}
 
 	ws := NewWireService(wireConfig)
 	w.wireService = ws
 
 	w.config = &PeerManagerConfig{
-		UserAgentName:      config.UserAgent,
-		UserAgentVersion:   WALLET_VERSION,
-		Params:             w.params,
-		AddressCacheDir:    config.RepoPath,
-		Proxy:              config.Proxy,
-		MsgChan:            ws.MsgChan(),
+		UserAgentName:    config.UserAgent,
+		UserAgentVersion: WALLET_VERSION,
+		Params:           w.params,
+		AddressCacheDir:  config.RepoPath,
+		Proxy:            config.Proxy,
+		MsgChan:          ws.MsgChan(),
 	}
 
 	if config.TrustedPeer != nil {

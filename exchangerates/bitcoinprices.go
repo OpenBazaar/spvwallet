@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
-	
+
 	"github.com/op/go-logging"
 	"golang.org/x/net/proxy"
 	"strings"

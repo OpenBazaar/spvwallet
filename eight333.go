@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	maxRequestedBlocks = 10
-	maxRequestedTxns   = wire.MaxInvPerMsg
-	maxFalsePositives  = 7
+	maxRequestedTxns  = wire.MaxInvPerMsg
+	maxFalsePositives = 7
 )
 
 var (
@@ -425,6 +424,10 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 	// we should be. To make sure this isn't the case, let's sync from the peer who
 	// sent us this orphan block.
 	if err == OrphanHeaderError && ws.Current() {
+		log.Notice("Received orphan header, checking peer for more blocks")
+		state.requestQueue = []*wire.InvVect{}
+		state.requestedBlocks = make(map[chainhash.Hash]struct{})
+		ws.requestedBlocks = make(map[chainhash.Hash]struct{})
 		ws.startSync(peer)
 		return
 	} else if err != nil {
@@ -452,18 +455,42 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 
 	log.Infof("Received merkle block %s at height %d", blockHash.String(), newHeight)
 
+	// Check reorg
 	if reorg != nil && ws.Current() {
-		// TODO: handle reorg
+		// Rollback the appropriate transactions in our database
+		err := ws.txStore.processReorg(reorg.height)
+		if err != nil {
+			log.Error(err)
+		}
+		// Set the reorg block as current best block in the header db
+		// This will cause a new chain sync from the reorg point
+		err = ws.chain.db.Put(*reorg, true)
+		if err != nil {
+			log.Error(err)
+		}
+
+		// Clear request state for new sync
+		state.requestQueue = []*wire.InvVect{}
+		state.requestedBlocks = make(map[chainhash.Hash]struct{})
+		ws.requestedBlocks = make(map[chainhash.Hash]struct{})
 	}
 
 	// Clear mempool
 	ws.mempool = make(map[chainhash.Hash]struct{})
 
-	// If we're not current and we've downloaded everything we've requested send another getblocks message
-	if !ws.Current() && len(state.requestedBlocks) == 0 {
+	// If we're not current and we've downloaded everything we've requested send another getblocks message.
+	// Otherwise we'll request the next block in the queue.
+	if !ws.Current() && len(state.requestQueue) == 0 {
 		locator := ws.chain.GetBlockLocator()
 		peer.PushGetBlocksMsg(locator, &zeroHash)
-		return
+	} else if !ws.Current() && len(state.requestQueue) > 0 {
+		iv := state.requestQueue[0]
+		iv.Type = wire.InvTypeFilteredBlock
+		state.requestQueue = state.requestQueue[1:]
+		state.requestedBlocks[iv.Hash] = struct{}{}
+		gdmsg2 := wire.NewMsgGetData()
+		gdmsg2.AddInvVect(iv)
+		peer.QueueMessage(gdmsg2, nil)
 	}
 }
 
@@ -516,12 +543,17 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 	// request parent blocks of orphans if we receive one we already have.
 	// Finally, attempt to detect potential stalls due to long side chains
 	// we already have and request more blocks to prevent them.
+	var invType wire.InvType
+	var requestQueue []*wire.InvVect
 	for _, iv := range invVects {
 		// Ignore unsupported inventory types.
 		switch iv.Type {
 		case wire.InvTypeBlock:
+			invType = wire.InvTypeBlock
 		case wire.InvTypeFilteredBlock:
+			invType = wire.InvTypeFilteredBlock
 		case wire.InvTypeTx:
+			invType = wire.InvTypeTx
 		default:
 			continue
 		}
@@ -540,7 +572,7 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 		}
 		if !haveInv {
 			// Add it to the request queue.
-			state.requestQueue = append(state.requestQueue, iv)
+			requestQueue = append(requestQueue, iv)
 			continue
 		}
 	}
@@ -549,45 +581,41 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 	// the request will be requested on the next inv message.
 	numRequested := 0
 	gdmsg := wire.NewMsgGetData()
-	requestQueue := state.requestQueue
-	for len(requestQueue) != 0 {
+	if invType == wire.InvTypeTx {
+		for len(requestQueue) != 0 {
+			iv := requestQueue[0]
+			requestQueue[0] = nil
+			if len(requestQueue) > 1 {
+				requestQueue = requestQueue[1:]
+			} else {
+				requestQueue = []*wire.InvVect{}
+			}
+
+			switch iv.Type {
+			case wire.InvTypeTx:
+				// Request the transaction if there is not already a
+				// pending request.
+				if _, exists := ws.requestedTxns[iv.Hash]; !exists {
+					ws.requestedTxns[iv.Hash] = 0 // unconfirmed tx
+					limitMap(ws.requestedTxns, maxRequestedTxns)
+					state.requestedTxns[iv.Hash] = 0
+
+					gdmsg.AddInvVect(iv)
+					numRequested++
+				}
+			}
+
+			if numRequested >= wire.MaxInvPerMsg {
+				break
+			}
+		}
+	} else {
 		iv := requestQueue[0]
-		requestQueue[0] = nil
-		requestQueue = requestQueue[1:]
-
-		switch iv.Type {
-		case wire.InvTypeBlock:
-			// Request the block if there is not already a pending
-			// request.
-			if _, exists := ws.requestedBlocks[iv.Hash]; !exists {
-				ws.requestedBlocks[iv.Hash] = struct{}{}
-				limitMap(ws.requestedBlocks, maxRequestedBlocks)
-				state.requestedBlocks[iv.Hash] = struct{}{}
-
-				iv.Type = wire.InvTypeFilteredBlock
-
-				gdmsg.AddInvVect(iv)
-				numRequested++
-			}
-
-		case wire.InvTypeTx:
-			// Request the transaction if there is not already a
-			// pending request.
-			if _, exists := ws.requestedTxns[iv.Hash]; !exists {
-				ws.requestedTxns[iv.Hash] = 0 // unconfirmed tx
-				limitMap(ws.requestedTxns, maxRequestedTxns)
-				state.requestedTxns[iv.Hash] = 0
-
-				gdmsg.AddInvVect(iv)
-				numRequested++
-			}
-		}
-
-		if numRequested >= wire.MaxInvPerMsg {
-			break
-		}
+		iv.Type = wire.InvTypeFilteredBlock
+		gdmsg.AddInvVect(iv)
+		state.requestQueue = requestQueue[1:]
+		state.requestedBlocks[iv.Hash] = struct{}{}
 	}
-	state.requestQueue = requestQueue
 	if len(gdmsg.InvList) > 0 {
 		peer.QueueMessage(gdmsg, nil)
 	}
@@ -627,7 +655,7 @@ func (ws *WireService) handleTxMsg(tmsg *txMsg) {
 		log.Debugf("Tx %s from Peer%d had no hits, filter false positive.", txHash.String(), peer.ID())
 		state.falsePositives++
 	} else {
-		log.Infof("Ingested new tx %s", txHash.String())
+		log.Infof("Ingested new tx %s at height %d", txHash.String(), height)
 	}
 
 	// Check to see if false positives exceeds the maximum allowed. If so, reset and resend the filter.

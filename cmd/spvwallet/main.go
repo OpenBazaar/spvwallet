@@ -9,6 +9,7 @@ import (
 	"github.com/OpenBazaar/spvwallet/api"
 	"github.com/OpenBazaar/spvwallet/cli"
 	"github.com/OpenBazaar/spvwallet/db"
+	"github.com/OpenBazaar/spvwallet/exchangerates"
 	"github.com/OpenBazaar/spvwallet/gui"
 	"github.com/OpenBazaar/spvwallet/gui/bootstrap"
 	wi "github.com/OpenBazaar/wallet-interface"
@@ -31,9 +32,8 @@ import (
 	"os/signal"
 	"path"
 	"strings"
-	"time"
-	"github.com/OpenBazaar/spvwallet/exchangerates"
 	"sync"
+	"time"
 )
 
 var parser = flags.NewParser(nil, flags.Default)
