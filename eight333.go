@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	maxRequestedBlocks = wire.MaxInvPerMsg
+	maxRequestedBlocks = 10
 	maxRequestedTxns   = wire.MaxInvPerMsg
 	maxFalsePositives  = 7
 )
@@ -117,6 +117,11 @@ func (ws *WireService) MsgChan() chan interface{} {
 // threaded which means all messages are processed sequentially removing the need for complex
 // locking.
 func (ws *WireService) Start() {
+	best, err := ws.chain.BestBlock()
+	if err != nil {
+		log.Error(err)
+	}
+	log.Infof("Starting wire service at height %d", int(best.height))
 out:
 	for {
 		select {
@@ -415,9 +420,13 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 	}
 
 	newBlock, reorg, newHeight, err := ws.chain.CommitHeader(header)
+	// If this is an orphan block which doesn't connect to the chain, it's possible
+	// that we might be synced on the longest chain, but not the most-work chain like
+	// we should be. To make sure this isn't the case, let's sync from the peer who
+	// sent us this orphan block.
 	if err == OrphanHeaderError && ws.Current() {
-		// TODO: if this block does not connect to our chain (orphan) try resyncing from the peer
-		// to make sure we are actually on the most work chain
+		ws.startSync(peer)
+		return
 	} else if err != nil {
 		log.Error(err)
 		return
@@ -455,9 +464,6 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 		locator := ws.chain.GetBlockLocator()
 		peer.PushGetBlocksMsg(locator, &zeroHash)
 		return
-	}
-	if ws.Current() && len(state.requestedBlocks) == 0 {
-		log.Info("Chain download complete")
 	}
 }
 
@@ -500,9 +506,9 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 	// If our chain is current and a peer announces a block we already
 	// know of, then update their current block height.
 	if lastBlock != -1 && ws.Current() {
-		blkHeight, err := ws.chain.BlockHeightByHash(&invVects[lastBlock].Hash)
+		sh, err := ws.chain.GetHeader(&invVects[lastBlock].Hash)
 		if err == nil {
-			peer.UpdateLastBlockHeight(int32(blkHeight))
+			peer.UpdateLastBlockHeight(int32(sh.height))
 		}
 	}
 
@@ -514,6 +520,7 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 		// Ignore unsupported inventory types.
 		switch iv.Type {
 		case wire.InvTypeBlock:
+		case wire.InvTypeFilteredBlock:
 		case wire.InvTypeTx:
 		default:
 			continue
@@ -619,6 +626,8 @@ func (ws *WireService) handleTxMsg(tmsg *txMsg) {
 	if hits == 0 {
 		log.Debugf("Tx %s from Peer%d had no hits, filter false positive.", txHash.String(), peer.ID())
 		state.falsePositives++
+	} else {
+		log.Infof("Ingested new tx %s", txHash.String())
 	}
 
 	// Check to see if false positives exceeds the maximum allowed. If so, reset and resend the filter.
@@ -632,11 +641,11 @@ func (ws *WireService) updateFilterAndSend(peer *peerpkg.Peer) {
 	if ws.txStore != nil {
 		filter, err := ws.txStore.GimmeFilter()
 		if err == nil {
+			log.Debugf("Sending filter to peer %s", peer)
 			peer.QueueMessage(filter.MsgFilterLoad(), nil)
 		} else {
 			log.Errorf("Error loading bloom filter: %s", err.Error())
 		}
-
 	}
 }
 
@@ -659,7 +668,7 @@ func (ws *WireService) haveInventory(invVect *wire.InvVect) (bool, error) {
 	case wire.InvTypeBlock:
 		// Ask chain if the block is known to it in any form (main
 		// chain, side chain, or orphan).
-		_, err := ws.chain.BlockHeightByHash(&invVect.Hash)
+		_, err := ws.chain.GetHeader(&invVect.Hash)
 		if err != nil {
 			return false, nil
 		}

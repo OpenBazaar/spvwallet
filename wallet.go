@@ -113,7 +113,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 		txStore: w.txstore,
 		chain: w.blockchain,
 		walletCreationDate: w.creationDate,
-		minPeersForSync: 6,
+		minPeersForSync: 4,
 		params: w.params,
 	}
 

@@ -393,37 +393,12 @@ func (b *Blockchain) BestBlock() (StoredHeader, error) {
 	return sh, nil
 }
 
-func (b *Blockchain) BlockHeightByHash(hash *chainhash.Hash) (uint32, error) {
+func (b *Blockchain) GetHeader(hash *chainhash.Hash) (StoredHeader, error) {
 	sh, err := b.db.GetHeader(*hash)
 	if err != nil {
-		return 0, err
+		return sh, err
 	}
-	return sh.height, nil
-}
-
-func (b *Blockchain) IsKnownOrphan(hash *chainhash.Hash) bool {
-	header, err := b.db.GetHeader(*hash)
-	if err != nil {
-		return false
-	}
-
-	parent, err := b.db.GetBestHeader()
-	if err != nil {
-		return false
-	}
-
-	height := header.height
-	for parent.height >= height {
-		parent, err = b.db.GetPreviousHeader(parent.header)
-		if err != nil {
-			return false
-		}
-		h := parent.header.BlockHash()
-		if h.IsEqual(hash) {
-			return false
-		}
-	}
-	return true
+	return sh, nil
 }
 
 func (b *Blockchain) Close() {

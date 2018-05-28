@@ -184,6 +184,8 @@ func (pm *PeerManager) onConnection(req *connmgr.ConnReq, conn net.Conn) {
 	// Associate the connection with the peer
 	p.AssociateConnection(conn)
 
+	pm.connectedPeers[req.ID()] = p
+
 	// Tell the addr manager we made a connection
 	pm.addrManager.Connected(p.NA())
 
@@ -316,13 +318,13 @@ func (pm *PeerManager) queryDNSSeeds() {
 // If we have connected peers let's use them to get more addresses. If not, use the DNS seeds
 func (pm *PeerManager) getMoreAddresses() {
 	if pm.addrManager.NeedMoreAddresses() {
+		pm.peerMutex.RLock()
+		defer pm.peerMutex.RUnlock()
 		if len(pm.connectedPeers) > 0 {
-			pm.peerMutex.RLock()
 			log.Debug("Querying peers for more addresses")
 			for _, p := range pm.connectedPeers {
 				p.QueueMessage(wire.NewMsgGetAddr(), nil)
 			}
-			pm.peerMutex.RUnlock()
 		} else {
 			pm.queryDNSSeeds()
 		}
