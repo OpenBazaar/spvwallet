@@ -210,6 +210,7 @@ func (ws *WireService) startSync(syncPeer *peerpkg.Peer) {
 	if len(ws.peerStates) < ws.minPeersForSync {
 		return
 	}
+	ws.Rebroadcast()
 	bestBlock, err := ws.chain.BestBlock()
 	if err != nil {
 		log.Error(err)
@@ -671,6 +672,21 @@ func (ws *WireService) handleTxMsg(tmsg *txMsg) {
 	if state.falsePositives > maxFalsePositives {
 		state.falsePositives = 0
 		ws.updateFilterAndSend(peer)
+	}
+}
+
+func (ws *WireService) Rebroadcast() {
+	// get all unconfirmed txs
+	invMsg, err := ws.txStore.GetPendingInv()
+	if err != nil {
+		log.Errorf("Rebroadcast error: %s", err.Error())
+	}
+	// Nothing to broadcast, so don't
+	if len(invMsg.InvList) == 0 {
+		return
+	}
+	for peer := range ws.peerStates {
+		peer.QueueMessage(invMsg, nil)
 	}
 }
 
