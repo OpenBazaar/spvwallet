@@ -698,7 +698,6 @@ func (ws *WireService) updateFilterAndSend(peer *peerpkg.Peer) {
 
 // handleUpdateFiltersMsg sends a filter update message to all peers
 func (ws *WireService) handleUpdateFiltersMsg() {
-	log.Notice("handle update filter")
 	for peer := range ws.peerStates {
 		ws.updateFilterAndSend(peer)
 	}
