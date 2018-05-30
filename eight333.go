@@ -262,7 +262,7 @@ func (ws *WireService) startSync(syncPeer *peerpkg.Peer) {
 		// blocks we're interested in. However, if we're past the wallet creation date we need to
 		// start downloading merkle blocks so we learn of the wallet's transactions. We'll use a
 		// buffer of one week to make sure we don't miss anything.
-		log.Info("Starting chain download")
+		log.Infof("Starting chain download from %s", bestPeer)
 		if bestBlock.header.Timestamp.Before(ws.walletCreationDate.Add(-time.Hour * 24 * 7)) {
 			bestPeer.PushGetHeadersMsg(locator, &zeroHash)
 		} else {
@@ -296,7 +296,6 @@ func (ws *WireService) Current() bool {
 func (ws *WireService) handleDonePeerMsg(peer *peerpkg.Peer) {
 	state, exists := ws.peerStates[peer]
 	if !exists {
-		log.Warningf("Received done peer message for unknown peer %s", peer)
 		return
 	}
 
@@ -318,9 +317,8 @@ func (ws *WireService) handleDonePeerMsg(peer *peerpkg.Peer) {
 	}
 
 	// Attempt to find a new peer to sync from if the quitting peer is the
-	// sync peer.  Also, reset the headers-first state if in headers-first
-	// mode so
-	if ws.syncPeer == peer {
+	// sync peer.
+	if ws.syncPeer == peer && !ws.Current() {
 		log.Info("Sync peer disconnected")
 		ws.syncPeer = nil
 		ws.startSync(nil)
@@ -395,6 +393,7 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 
 	// We don't need to process blocks when we're syncing. They wont connect anyway
 	if peer != ws.syncPeer && !ws.Current() {
+		log.Warningf("Received block from %s when we aren't current", peer)
 		return
 	}
 	state, exists := ws.peerStates[peer]
@@ -430,7 +429,7 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 
 	txids, err := checkMBlock(merkleBlock)
 	if err != nil {
-		log.Errorf("Peer %s sent an invalid MerkleBlock", peer)
+		log.Warningf("Peer %s sent an invalid MerkleBlock", peer)
 		peer.Disconnect()
 		return
 	}
@@ -469,15 +468,11 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 	peer.UpdateLastBlockHeight(int32(newHeight))
 
 	// Request the transactions in this block
-	gdmsg := wire.NewMsgGetData()
 	for _, txid := range txids {
 		ws.requestedTxns[*txid] = heightAndTime{newHeight, header.Timestamp}
 		limitMap(ws.requestedTxns, maxRequestedTxns)
 		state.requestedTxns[*txid] = heightAndTime{newHeight, header.Timestamp}
-		iv := wire.NewInvVect(wire.InvTypeTx, txid)
-		gdmsg.AddInvVect(iv)
 	}
-	peer.QueueMessage(gdmsg, nil)
 
 	// We can exit here if the block is already known
 	if !newBlock {
@@ -665,7 +660,7 @@ func (ws *WireService) handleTxMsg(tmsg *txMsg) {
 		log.Debugf("Tx %s from Peer%d had no hits, filter false positive.", txHash.String(), peer.ID())
 		state.falsePositives++
 	} else {
-		log.Infof("Ingested new tx %s at height %d", txHash.String(), ht.height)
+		log.Noticef("Ingested new tx %s at height %d", txHash.String(), ht.height)
 	}
 
 	// Check to see if false positives exceeds the maximum allowed. If so, reset and resend the filter.
@@ -694,7 +689,6 @@ func (ws *WireService) updateFilterAndSend(peer *peerpkg.Peer) {
 	if ws.txStore != nil {
 		filter, err := ws.txStore.GimmeFilter()
 		if err == nil {
-			log.Debugf("Sending filter to peer %s", peer)
 			peer.QueueMessage(filter.MsgFilterLoad(), nil)
 		} else {
 			log.Errorf("Error loading bloom filter: %s", err.Error())
@@ -704,6 +698,7 @@ func (ws *WireService) updateFilterAndSend(peer *peerpkg.Peer) {
 
 // handleUpdateFiltersMsg sends a filter update message to all peers
 func (ws *WireService) handleUpdateFiltersMsg() {
+	log.Notice("handle update filter")
 	for peer := range ws.peerStates {
 		ws.updateFilterAndSend(peer)
 	}

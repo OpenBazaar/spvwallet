@@ -123,12 +123,22 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 	ws := NewWireService(wireConfig)
 	w.wireService = ws
 
+	getNewestBlock := func() (*chainhash.Hash, int32, error) {
+		sh, err := w.blockchain.BestBlock()
+		if err != nil {
+			return nil, 0, err
+		}
+		h := sh.header.BlockHash()
+		return &h, int32(sh.height), nil
+	}
+
 	w.config = &PeerManagerConfig{
 		UserAgentName:    config.UserAgent,
 		UserAgentVersion: WALLET_VERSION,
 		Params:           w.params,
 		AddressCacheDir:  config.RepoPath,
 		Proxy:            config.Proxy,
+		GetNewestBlock:   getNewestBlock,
 		MsgChan:          ws.MsgChan(),
 	}
 

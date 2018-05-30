@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/connmgr"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/wire"
@@ -62,6 +63,9 @@ type PeerManagerConfig struct {
 
 	// An optional proxy dialer. Will use net.Dial if nil.
 	Proxy proxy.Dialer
+
+	// Function to return current block hash and height
+	GetNewestBlock func() (hash *chainhash.Hash, height int32, err error)
 
 	// The main channel over which to send outgoing events
 	MsgChan chan interface{}
@@ -146,12 +150,14 @@ func NewPeerManager(config *PeerManagerConfig) (*PeerManager, error) {
 	listeners.OnMerkleBlock = pm.onMerkleBlock
 	listeners.OnInv = pm.onInv
 	listeners.OnTx = pm.onTx
+	listeners.OnReject = pm.onReject
 
 	pm.peerConfig = &peer.Config{
 		UserAgentName:    config.UserAgentName,
 		UserAgentVersion: config.UserAgentVersion,
 		ChainParams:      config.Params,
 		DisableRelayTx:   true,
+		NewestBlock:      config.GetNewestBlock,
 		Listeners:        *listeners,
 	}
 	if config.Proxy != nil {
@@ -203,6 +209,7 @@ func (pm *PeerManager) onVerack(p *peer.Peer, msg *wire.MsgVerAck) {
 		p.NA().HasService(SFNodeBitcoinCash) { // Don't connect to bitcoin cash nodes
 		// onDisconnection will be called
 		// which will remove the peer from openPeers
+		log.Warningf("Peer %s does not support bloom filtering, diconnecting", p)
 		p.Disconnect()
 		return
 	}
@@ -222,7 +229,7 @@ func (pm *PeerManager) onDisconnection(req *connmgr.ConnReq) {
 	if !ok {
 		return
 	}
-	log.Debugf("Peer%d disconnected", peer.ID())
+	log.Debugf("Peer %s disconnected", peer)
 	delete(pm.connectedPeers, req.ID())
 	if pm.msgChan != nil {
 		pm.msgChan <- donePeerMsg{peer}
@@ -357,6 +364,10 @@ func (pm *PeerManager) onTx(p *peer.Peer, msg *wire.MsgTx) {
 	if pm.msgChan != nil {
 		pm.msgChan <- txMsg{msg, p, nil}
 	}
+}
+
+func (pm *PeerManager) onReject(p *peer.Peer, msg *wire.MsgReject) {
+	log.Warningf("Received reject message from peer %d: Code: %s, Hash %s, Reason: %s", int(p.ID()), msg.Code.String(), msg.Hash.String(), msg.Reason)
 }
 
 func (pm *PeerManager) Start() {
