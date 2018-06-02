@@ -432,18 +432,6 @@ func TestBlockchain_checkProofOfWork(t *testing.T) {
 	}
 }
 
-func TestBlockchain_SetChainState(t *testing.T) {
-	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
-	if err != nil {
-		t.Error(err)
-	}
-	bc.SetChainState(WAITING)
-	if bc.ChainState() != WAITING {
-		t.Error("Failed to set chainstate correctly")
-	}
-	os.RemoveAll("headers.bin")
-}
-
 func TestBlockchain_calcDiffAdjust(t *testing.T) {
 
 	// Test calculation of next difficulty target with no constraints applying
@@ -487,7 +475,7 @@ func TestBlockchain_calcDiffAdjust(t *testing.T) {
 	}
 }
 
-func TestBlockchain_GetBlockLocatorHashes(t *testing.T) {
+func TestBlockchain_GetBlockLocator(t *testing.T) {
 	bc, err := NewBlockchain("", MockCreationTime, &chaincfg.RegressionNetParams)
 	if err != nil {
 		t.Error(err)
@@ -517,7 +505,7 @@ func TestBlockchain_GetBlockLocatorHashes(t *testing.T) {
 		headers = append(headers, hdr)
 	}
 
-	nHashes := bc.GetBlockLocatorHashes()
+	nHashes := bc.GetBlockLocator()
 	for i := 0; i < 10; i++ {
 		h := headers[(len(headers)-1)-i].BlockHash()
 		if !nHashes[i].IsEqual(&h) {

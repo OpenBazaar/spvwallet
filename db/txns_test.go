@@ -28,7 +28,7 @@ func TestTxnsPut(t *testing.T) {
 	r := bytes.NewReader(raw)
 	tx.Deserialize(r)
 
-	err := txdb.Put(tx, 5, 1, time.Now(), false)
+	err := txdb.Put(raw, tx.TxHash().String(), 5, 1, time.Now(), false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -64,15 +64,16 @@ func TestTxnsGet(t *testing.T) {
 	tx.Deserialize(r)
 
 	now := time.Now()
-	err := txdb.Put(tx, 0, 1, now, false)
+
+	err := txdb.Put(raw, tx.TxHash().String(), 0, 1, now, false)
 	if err != nil {
 		t.Error(err)
 	}
-	tx2, txn, err := txdb.Get(tx.TxHash())
+	txn, err := txdb.Get(tx.TxHash())
 	if err != nil {
 		t.Error(err)
 	}
-	if tx.TxHash().String() != tx2.TxHash().String() {
+	if tx.TxHash().String() != txn.Txid {
 		t.Error("Txn db get failed")
 	}
 	if txn.Height != 1 {
@@ -93,7 +94,7 @@ func TestTxnsGetAll(t *testing.T) {
 	r := bytes.NewReader(raw)
 	tx.Deserialize(r)
 
-	err := txdb.Put(tx, 1, 5, time.Now(), true)
+	err := txdb.Put(raw, tx.TxHash().String(), 1, 5, time.Now(), true)
 	if err != nil {
 		t.Error(err)
 	}
@@ -113,7 +114,7 @@ func TestDeleteTxns(t *testing.T) {
 	r := bytes.NewReader(raw)
 	tx.Deserialize(r)
 
-	err := txdb.Put(tx, 0, 1, time.Now(), false)
+	err := txdb.Put(raw, tx.TxHash().String(), 0, 1, time.Now(), false)
 	if err != nil {
 		t.Error(err)
 	}
@@ -140,15 +141,15 @@ func TestTxnsDB_UpdateHeight(t *testing.T) {
 	r := bytes.NewReader(raw)
 	tx.Deserialize(r)
 
-	err := txdb.Put(tx, 0, 1, time.Now(), false)
+	err := txdb.Put(raw, tx.TxHash().String(), 0, 1, time.Now(), false)
 	if err != nil {
 		t.Error(err)
 	}
-	err = txdb.UpdateHeight(tx.TxHash(), -1)
+	err = txdb.UpdateHeight(tx.TxHash(), -1, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
-	_, txn, err := txdb.Get(tx.TxHash())
+	txn, err := txdb.Get(tx.TxHash())
 	if txn.Height != -1 {
 		t.Error("Txn db failed to update height")
 	}

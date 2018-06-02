@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+var zeroHash chainhash.Hash
+
 func createTxStore() (*TxStore, error) {
 	mockDb := MockDatastore{
 		&mockKeyStore{make(map[string]*keyStoreEntry)},
@@ -96,12 +98,12 @@ func TestTxStore_GimmeFilter(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	op := wire.NewOutPoint(maxHash, 0)
+	op := wire.NewOutPoint(&zeroHash, 0)
 	err = txStore.Utxos().Put(wallet.Utxo{Op: *op})
 	if err != nil {
 		t.Error(err)
 	}
-	op2 := wire.NewOutPoint(maxHash, 1)
+	op2 := wire.NewOutPoint(&zeroHash, 1)
 	err = txStore.Stxos().Put(wallet.Stxo{Utxo: wallet.Utxo{Op: *op2}})
 	if err != nil {
 		t.Error(err)
@@ -570,7 +572,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	tx1.BtcDecode(r, 1, wire.WitnessEncoding)
 
 	// Ingest no hits
-	hits, err := txStore.Ingest(tx1, 0)
+	hits, err := txStore.Ingest(tx1, 0, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
@@ -594,7 +596,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	out := wire.NewTxOut(100000, script)
 	tx1.AddTxOut(out)
 
-	hits, err = txStore.Ingest(tx1, 0)
+	hits, err = txStore.Ingest(tx1, 0, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
@@ -610,7 +612,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	}
 
 	// Ingest duplicate
-	hits, err = txStore.Ingest(tx1, 0)
+	hits, err = txStore.Ingest(tx1, 0, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
@@ -625,7 +627,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	tx2 := wire.NewMsgTx(1)
 	tx2.BtcDecode(r, 1, wire.WitnessEncoding)
 	tx2.AddTxIn(tx1.TxIn[0])
-	hits, err = txStore.Ingest(tx2, 0)
+	hits, err = txStore.Ingest(tx2, 0, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
@@ -634,7 +636,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	}
 
 	// Ingest double spend that supersedes a previous committed tx
-	hits, err = txStore.Ingest(tx2, 50)
+	hits, err = txStore.Ingest(tx2, 50, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
@@ -667,7 +669,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	txStore.PopulateAdrs()
 	tx3.AddTxOut(wire.NewTxOut(400000, script))
 
-	_, err = txStore.Ingest(tx3, 0)
+	_, err = txStore.Ingest(tx3, 0, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
@@ -685,13 +687,13 @@ func TestTxStore_Ingest(t *testing.T) {
 	r = bytes.NewReader(tx4Bytes)
 	tx4 := wire.NewMsgTx(1)
 	tx4.BtcDecode(r, 1, wire.WitnessEncoding)
-	txStore.Ingest(tx1, 0)
+	txStore.Ingest(tx1, 0, time.Now())
 
 	h := tx1.TxHash()
 	op := wire.NewOutPoint(&h, 2)
 	tx4.AddTxIn(wire.NewTxIn(op, []byte{}, [][]byte{}))
 
-	hits, err = txStore.Ingest(tx4, 0)
+	hits, err = txStore.Ingest(tx4, 0, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
@@ -720,7 +722,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	op3 := wire.NewOutPoint(&h3, 2)
 	tx5.AddTxIn(wire.NewTxIn(op3, []byte{}, [][]byte{}))
 
-	hits, err = txStore.Ingest(tx5, 0)
+	hits, err = txStore.Ingest(tx5, 0, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
@@ -736,7 +738,7 @@ func TestTxStore_Ingest(t *testing.T) {
 	}
 
 	// Update stxo height
-	_, err = txStore.Ingest(tx5, 1000)
+	_, err = txStore.Ingest(tx5, 1000, time.Now())
 	if err != nil {
 		t.Error(err)
 	}
