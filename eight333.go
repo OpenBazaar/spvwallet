@@ -14,10 +14,6 @@ const (
 	maxFalsePositives = 7
 )
 
-var (
-	zeroHash chainhash.Hash
-)
-
 // newPeerMsg signifies a newly connected peer to the block handler.
 type newPeerMsg struct {
 	peer *peerpkg.Peer
@@ -96,6 +92,7 @@ type WireService struct {
 	msgChan            chan interface{}
 	quit               chan struct{}
 	minPeersForSync    int
+	zeroHash           chainhash.Hash
 }
 
 func NewWireService(config *WireServiceConfig) *WireService {
@@ -264,9 +261,9 @@ func (ws *WireService) startSync(syncPeer *peerpkg.Peer) {
 		// buffer of one week to make sure we don't miss anything.
 		log.Infof("Starting chain download from %s", bestPeer)
 		if bestBlock.header.Timestamp.Before(ws.walletCreationDate.Add(-time.Hour * 24 * 7)) {
-			bestPeer.PushGetHeadersMsg(locator, &zeroHash)
+			bestPeer.PushGetHeadersMsg(locator, &ws.zeroHash)
 		} else {
-			bestPeer.PushGetBlocksMsg(locator, &zeroHash)
+			bestPeer.PushGetBlocksMsg(locator, &ws.zeroHash)
 		}
 	} else {
 		log.Warning("No sync candidates available")
@@ -364,7 +361,7 @@ func (ws *WireService) handleHeadersMsg(hmsg *headersMsg) {
 		} else {
 			log.Info("Switching to downloading merkle blocks")
 			locator := ws.chain.GetBlockLocator()
-			peer.PushGetBlocksMsg(locator, &zeroHash)
+			peer.PushGetBlocksMsg(locator, &ws.zeroHash)
 			return
 		}
 	}
@@ -379,7 +376,7 @@ func (ws *WireService) handleHeadersMsg(hmsg *headersMsg) {
 
 	// Request the next batch of headers
 	locator := ws.chain.GetBlockLocator()
-	err := peer.PushGetHeadersMsg(locator, &zeroHash)
+	err := peer.PushGetHeadersMsg(locator, &ws.zeroHash)
 	if err != nil {
 		log.Warningf("Failed to send getheaders message to peer %s: %v", peer.Addr(), err)
 		return
@@ -508,7 +505,7 @@ func (ws *WireService) handleMerkleBlockMsg(bmsg *merkleBlockMsg) {
 	// Otherwise we'll request the next block in the queue.
 	if !ws.Current() && len(state.requestQueue) == 0 {
 		locator := ws.chain.GetBlockLocator()
-		peer.PushGetBlocksMsg(locator, &zeroHash)
+		peer.PushGetBlocksMsg(locator, &ws.zeroHash)
 	} else if !ws.Current() && len(state.requestQueue) > 0 {
 		iv := state.requestQueue[0]
 		iv.Type = wire.InvTypeFilteredBlock

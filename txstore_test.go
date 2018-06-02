@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+var zeroHash chainhash.Hash
+
 func createTxStore() (*TxStore, error) {
 	mockDb := MockDatastore{
 		&mockKeyStore{make(map[string]*keyStoreEntry)},
