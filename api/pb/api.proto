@@ -20,7 +20,7 @@ service API {
   rpc Spend (SpendInfo) returns (Txid) {}
   rpc BumpFee (Txid) returns (Txid) {}
   rpc Peers (Empty) returns (PeerList) {}
-  rpc AddWatchedScript (Address) returns (Empty) {}
+  rpc AddWatchedAddress (Address) returns (Empty) {}
   rpc GetConfirmations (Txid) returns (Confirmations) {}
   rpc SweepAddress (SweepInfo) returns (Txid) {}
   rpc ReSyncBlockchain (google.protobuf.Timestamp) returns (Empty) {}
