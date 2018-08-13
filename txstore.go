@@ -209,11 +209,10 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 	// Check to see if we've already processed this tx. If so, return.
 	ts.txidsMutex.Lock()
 	sh, ok := ts.txids[tx.TxHash().String()]
+	ts.txidsMutex.Unlock()
 	if ok && (sh > 0 || (sh == 0 && height == 0)) {
-		ts.txidsMutex.Unlock()
 		return 1, nil
 	}
-	ts.txidsMutex.Unlock()
 
 	// Check to see if this is a double spend
 	doubleSpends, err := ts.CheckDoubleSpends(tx)
