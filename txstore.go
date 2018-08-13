@@ -371,6 +371,9 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 				shouldCallback = true
 			}
 		}
+
+		ts.txidsMutex.Unlock()
+
 		cb.BlockTime = timestamp
 		if shouldCallback {
 			// Callback on listeners
@@ -378,7 +381,6 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 				listener(cb)
 			}
 		}
-		ts.txidsMutex.Unlock()
 		ts.cbMutex.Unlock()
 		ts.PopulateAdrs()
 		hits++
