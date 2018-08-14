@@ -239,6 +239,7 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 		// TODO: This will need to test both segwit and legacy once segwit activates
 		PKscripts[i], err = txscript.PayToAddrScript(ts.adrs[i])
 		if err != nil {
+			ts.addrMutex.Unlock()
 			return hits, err
 		}
 	}
@@ -371,10 +372,8 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 				shouldCallback = true
 			}
 		}
-
-		ts.txidsMutex.Unlock()
-
 		cb.BlockTime = timestamp
+		ts.txidsMutex.Unlock()
 		if shouldCallback {
 			// Callback on listeners
 			for _, listener := range ts.listeners {

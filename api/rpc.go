@@ -554,7 +554,7 @@ func (s *server) WalletNotify(in *pb.Empty, stream pb.API_WalletNotifyServer) er
 			return
 		}
 		resp := &pb.Tx{
-			Txid:      hex.EncodeToString(tx.Txid),
+			Txid:      tx.Txid,
 			Value:     tx.Value,
 			Height:    tx.Height,
 			Timestamp: ts,
