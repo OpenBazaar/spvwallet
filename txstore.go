@@ -22,7 +22,7 @@ type TxStore struct {
 	adrs           []btcutil.Address
 	watchedScripts [][]byte
 	txids          map[string]int32
-	txidsMutex     *sync.Mutex
+	txidsMutex     *sync.RWMutex
 	addrMutex      *sync.Mutex
 	cbMutex        *sync.Mutex
 
@@ -41,7 +41,7 @@ func NewTxStore(p *chaincfg.Params, db wallet.Datastore, keyManager *KeyManager)
 		keyManager: keyManager,
 		addrMutex:  new(sync.Mutex),
 		cbMutex:    new(sync.Mutex),
-		txidsMutex: new(sync.Mutex),
+		txidsMutex: new(sync.RWMutex),
 		txids:      make(map[string]int32),
 		Datastore:  db,
 	}
@@ -207,9 +207,9 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 	}
 
 	// Check to see if we've already processed this tx. If so, return.
-	ts.txidsMutex.Lock()
+	ts.txidsMutex.RLock()
 	sh, ok := ts.txids[tx.TxHash().String()]
-	ts.txidsMutex.Unlock()
+	ts.txidsMutex.RUnlock()
 	if ok && (sh > 0 || (sh == 0 && height == 0)) {
 		return 1, nil
 	}
@@ -372,6 +372,9 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 				shouldCallback = true
 			}
 		}
+
+		ts.txidsMutex.Unlock()
+
 		cb.BlockTime = timestamp
 		ts.txidsMutex.Unlock()
 		if shouldCallback {
