@@ -603,7 +603,7 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 			// one at a time. Sadly we can't batch these because the remote
 			// peer  will not update the bloom filter until he's done processing
 			// the batch which means we will have a super high false positive rate.
-			if _, exists := ws.requestedBlocks[iv.Hash]; (!ws.Current() && !exists && !haveInv && len(state.requestQueue) == 0) || ws.Current() {
+			if _, exists := ws.requestedBlocks[iv.Hash]; (!ws.Current() && !exists && !haveInv && shouldSendGetData) || ws.Current() {
 				iv.Type = wire.InvTypeFilteredBlock
 				state.requestQueue = append(state.requestQueue, iv)
 			}
