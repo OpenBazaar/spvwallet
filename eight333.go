@@ -623,7 +623,7 @@ func (ws *WireService) handleInvMsg(imsg *invMsg) {
 	}
 
 	// Pop the first block off the queue and request it
-	if len(state.requestQueue) > 0 && (shouldSendGetData || ws.Current()){
+	if len(state.requestQueue) > 0 && (shouldSendGetData || ws.Current()) {
 		iv := state.requestQueue[0]
 		gdmsg.AddInvVect(iv)
 		if len(state.requestQueue) > 1 {
