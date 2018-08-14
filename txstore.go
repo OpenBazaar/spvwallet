@@ -372,9 +372,6 @@ func (ts *TxStore) Ingest(tx *wire.MsgTx, height int32, timestamp time.Time) (ui
 				shouldCallback = true
 			}
 		}
-
-		ts.txidsMutex.Unlock()
-
 		cb.BlockTime = timestamp
 		ts.txidsMutex.Unlock()
 		if shouldCallback {
