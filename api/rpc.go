@@ -491,7 +491,7 @@ func (s *server) Multisign(ctx context.Context, in *pb.MultisignInfo) (*pb.RawTx
 		}
 		o := wallet.TransactionOutput{
 			Address: addr,
-			Value:        int64(output.Value),
+			Value:   int64(output.Value),
 		}
 		outs = append(outs, o)
 	}
@@ -539,7 +539,7 @@ func (s *server) EstimateFee(ctx context.Context, in *pb.EstimateFeeData) (*pb.F
 		}
 		o := wallet.TransactionOutput{
 			Address: addr,
-			Value:        int64(output.Value),
+			Value:   int64(output.Value),
 		}
 		outs = append(outs, o)
 	}
