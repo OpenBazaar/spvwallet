@@ -150,7 +150,7 @@ func SetupCli(parser *flags.Parser) {
 			"Examples:\n"+
 			"> spvwallet addwatchedscript 1DxGWC22a46VPEjq8YKoeVXSLzB7BA8sJS\n"+
 			"> spvwallet addwatchedscript 76a914f318374559bf8296228e9c7480578a357081d59988ac\n",
-		&addWatchedScript)
+		&addWatchedAddress)
 	parser.AddCommand("getconfirmations",
 		"get the number of confirmations for a tx",
 		"Returns the number of confirmations for the given transaction\n\n"+
@@ -758,11 +758,11 @@ func (x *Peers) Execute(args []string) error {
 	return nil
 }
 
-type AddWatchedScript struct{}
+type AddWatchedAddress struct{}
 
-var addWatchedScript AddWatchedScript
+var addWatchedAddress AddWatchedAddress
 
-func (x *AddWatchedScript) Execute(args []string) error {
+func (x *AddWatchedAddress) Execute(args []string) error {
 	client, conn, err := newGRPCClient()
 	if err != nil {
 		return err
@@ -771,7 +771,7 @@ func (x *AddWatchedScript) Execute(args []string) error {
 	if len(args) <= 0 {
 		return errors.New("Address or script required")
 	}
-	_, err = client.AddWatchedScript(context.Background(), &pb.Address{args[0]})
+	_, err = client.AddWatchedAddress(context.Background(), &pb.Address{args[0]})
 	return err
 }
 
