@@ -9,7 +9,6 @@ import (
 	"github.com/OpenBazaar/spvwallet/api"
 	"github.com/OpenBazaar/spvwallet/cli"
 	"github.com/OpenBazaar/spvwallet/db"
-	"github.com/OpenBazaar/spvwallet/exchangerates"
 	"github.com/OpenBazaar/spvwallet/gui"
 	"github.com/OpenBazaar/spvwallet/gui/bootstrap"
 	wi "github.com/OpenBazaar/wallet-interface"
@@ -304,8 +303,6 @@ func (x *Start) Execute(args []string) error {
 	if x.Gui {
 		go wallet.Start()
 
-		exchangeRates := exchangerates.NewBitcoinPriceFetcher(nil)
-
 		type Stats struct {
 			Confirmed    int64  `json:"confirmed"`
 			Fiat         string `json:"fiat"`
@@ -366,7 +363,7 @@ func (x *Start) Execute(args []string) error {
 						astilog.Errorf(err.Error())
 						return
 					}
-					rate, err := exchangeRates.GetExchangeRate(p.CurrencyCode)
+					rate, err := wallet.ExchangeRates().GetExchangeRate(p.CurrencyCode)
 					if err != nil {
 						astilog.Errorf("Failed to get exchange rate")
 						return
