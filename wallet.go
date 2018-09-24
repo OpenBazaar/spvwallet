@@ -2,6 +2,7 @@ package spvwallet
 
 import (
 	"errors"
+	"github.com/OpenBazaar/spvwallet/exchangerates"
 	"github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
@@ -16,7 +17,6 @@ import (
 	"io"
 	"sync"
 	"time"
-	"github.com/OpenBazaar/spvwallet/exchangerates"
 )
 
 type SPVWallet struct {
