@@ -97,7 +97,11 @@ func (b *BitcoinPriceFetcher) GetAllRates(cacheOK bool) (map[string]float64, err
 	}
 	b.Lock()
 	defer b.Unlock()
-	return b.cache, nil
+	copy := make(map[string]float64, len(b.cache))
+	for k, v := range b.cache {
+		copy[k] = v
+	}
+	return copy, nil
 }
 
 func (b *BitcoinPriceFetcher) UnitsPerCoin() int {
