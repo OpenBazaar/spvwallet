@@ -411,7 +411,7 @@ func (x *Start) Execute(args []string) error {
 						w.SendMessage(bootstrap.MessageOut{Name: "spendError", Payload: "Invalid address"})
 						return
 					}
-					_, err = wallet.Spend(int64(p.Amount), addr, feeLevel)
+					_, err = wallet.Spend(int64(p.Amount), addr, feeLevel, "", false)
 					if err != nil {
 						w.SendMessage(bootstrap.MessageOut{Name: "spendError", Payload: err.Error()})
 					}
