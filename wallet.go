@@ -2,8 +2,11 @@ package spvwallet
 
 import (
 	"errors"
-	"github.com/OpenBazaar/spvwallet/exchangerates"
-	"github.com/OpenBazaar/wallet-interface"
+	"io"
+	"math/big"
+	"sync"
+	"time"
+
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -14,9 +17,10 @@ import (
 	"github.com/btcsuite/btcwallet/wallet/txrules"
 	"github.com/op/go-logging"
 	b39 "github.com/tyler-smith/go-bip39"
-	"io"
-	"sync"
-	"time"
+
+	"github.com/OpenBazaar/wallet-interface"
+
+	"github.com/OpenBazaar/spvwallet/exchangerates"
 )
 
 type SPVWallet struct {
@@ -307,13 +311,14 @@ func (w *SPVWallet) Balance() (confirmed, unconfirmed int64) {
 	stxos, _ := w.txstore.Stxos().GetAll()
 	for _, utxo := range utxos {
 		if !utxo.WatchOnly {
+			val0, _ := new(big.Int).SetString(utxo.Value, 10)
 			if utxo.AtHeight > 0 {
-				confirmed += utxo.Value
+				confirmed += val0.Int64()
 			} else {
 				if w.checkIfStxoIsConfirmed(utxo, stxos) {
-					confirmed += utxo.Value
+					confirmed += val0.Int64()
 				} else {
-					unconfirmed += utxo.Value
+					unconfirmed += val0.Int64()
 				}
 			}
 		}

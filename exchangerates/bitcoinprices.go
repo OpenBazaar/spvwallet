@@ -103,8 +103,8 @@ func (b *BitcoinPriceFetcher) GetAllRates(cacheOK bool) (map[string]float64, err
 	return copy, nil
 }
 
-func (b *BitcoinPriceFetcher) UnitsPerCoin() int {
-	return SatoshiPerBTC
+func (b *BitcoinPriceFetcher) UnitsPerCoin() int64 {
+	return int64(SatoshiPerBTC)
 }
 
 func (b *BitcoinPriceFetcher) fetchCurrentRates() error {
