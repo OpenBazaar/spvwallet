@@ -229,10 +229,10 @@ type mockTxnStore struct {
 	txns map[string]*wallet.Txn
 }
 
-func (m *mockTxnStore) Put(raw []byte, txid string, value, height int, timestamp time.Time, watchOnly bool) error {
+func (m *mockTxnStore) Put(raw []byte, txid, value string, height int, timestamp time.Time, watchOnly bool) error {
 	m.txns[txid] = &wallet.Txn{
 		Txid:      txid,
-		Value:     strconv.Itoa(value),
+		Value:     value,
 		Height:    int32(height),
 		Timestamp: timestamp,
 		WatchOnly: watchOnly,
