@@ -2,12 +2,12 @@ package spvwallet
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"strconv"
 	"sync"
 	"time"
 
-	"fmt"
 	"github.com/btcsuite/btcd/addrmgr"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"

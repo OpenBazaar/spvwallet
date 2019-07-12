@@ -2,11 +2,13 @@ package db
 
 import (
 	"database/sql"
-	"github.com/OpenBazaar/wallet-interface"
-	_ "github.com/mattn/go-sqlite3"
 	"path"
 	"sync"
 	"time"
+
+	"github.com/OpenBazaar/wallet-interface"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // This database is mostly just an example implementation used for testing.

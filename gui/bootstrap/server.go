@@ -3,9 +3,8 @@ package bootstrap
 import (
 	"net"
 	"net/http"
-	"text/template"
-
 	"path/filepath"
+	"text/template"
 
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/template"

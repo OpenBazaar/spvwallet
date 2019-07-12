@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/hex"
-	"github.com/btcsuite/btcd/wire"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/btcsuite/btcd/wire"
 )
 
 var txdb TxnsDB

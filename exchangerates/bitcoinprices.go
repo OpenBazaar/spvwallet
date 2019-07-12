@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/op/go-logging"
 	"golang.org/x/net/proxy"
-	"strings"
 )
 
 const SatoshiPerBTC = 100000000

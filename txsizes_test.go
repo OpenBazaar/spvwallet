@@ -9,8 +9,9 @@ package spvwallet
 import (
 	"bytes"
 	"encoding/hex"
-	"github.com/btcsuite/btcd/wire"
 	"testing"
+
+	"github.com/btcsuite/btcd/wire"
 )
 
 const (

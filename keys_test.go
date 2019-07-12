@@ -3,13 +3,14 @@ package spvwallet
 import (
 	"bytes"
 	"encoding/hex"
+	"testing"
+
 	"github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/txscript"
 	"github.com/btcsuite/btcutil"
 	"github.com/btcsuite/btcutil/hdkeychain"
-	"testing"
 )
 
 func createKeyManager() (*KeyManager, error) {

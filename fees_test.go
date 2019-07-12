@@ -2,9 +2,10 @@ package spvwallet
 
 import (
 	"bytes"
-	"github.com/OpenBazaar/wallet-interface"
 	"net/http"
 	"testing"
+
+	"github.com/OpenBazaar/wallet-interface"
 )
 
 type ClosingBuffer struct {

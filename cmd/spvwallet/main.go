@@ -4,6 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"net"
+	"net/url"
+	"os"
+	"os/signal"
+	"path"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api"
@@ -24,15 +33,6 @@ import (
 	"github.com/skratchdot/open-golang/open"
 	"github.com/yawning/bulb"
 	"golang.org/x/net/proxy"
-	"io/ioutil"
-	"net"
-	"net/url"
-	"os"
-	"os/signal"
-	"path"
-	"strings"
-	"sync"
-	"time"
 )
 
 var parser = flags.NewParser(nil, flags.Default)
