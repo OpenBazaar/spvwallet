@@ -1,22 +1,28 @@
 package spvwallet
 
 import (
+	"bytes"
 	"errors"
-	"github.com/OpenBazaar/spvwallet/exchangerates"
+	"io"
+	"math/big"
+	"strconv"
+	"sync"
+	"time"
+
 	"github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/peer"
 	"github.com/btcsuite/btcd/txscript"
+	"github.com/btcsuite/btcd/wire"
 	btc "github.com/btcsuite/btcutil"
 	hd "github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/btcsuite/btcwallet/wallet/txrules"
 	"github.com/op/go-logging"
 	b39 "github.com/tyler-smith/go-bip39"
-	"io"
-	"sync"
-	"time"
+
+	"github.com/OpenBazaar/spvwallet/exchangerates"
 )
 
 type SPVWallet struct {
@@ -53,6 +59,13 @@ type SPVWallet struct {
 var log = logging.MustGetLogger("bitcoin")
 
 const WALLET_VERSION = "0.1.0"
+
+var (
+	BitcoinCurrencyDefinition = wallet.CurrencyDefinition{
+		Code:         "BTC",
+		Divisibility: 8,
+	}
+)
 
 func NewSPVWallet(config *Config) (*SPVWallet, error) {
 
@@ -183,8 +196,8 @@ func (w *SPVWallet) CurrencyCode() string {
 	}
 }
 
-func (w *SPVWallet) IsDust(amount int64) bool {
-	return txrules.IsDustAmount(btc.Amount(amount), 25, txrules.DefaultRelayFeePerKb)
+func (w *SPVWallet) IsDust(amount big.Int) bool {
+	return txrules.IsDustAmount(btc.Amount(amount.Int64()), 25, txrules.DefaultRelayFeePerKb)
 }
 
 func (w *SPVWallet) MasterPrivateKey() *hd.ExtendedKey {
@@ -302,23 +315,26 @@ func (w *SPVWallet) ListKeys() []btcec.PrivateKey {
 	return list
 }
 
-func (w *SPVWallet) Balance() (confirmed, unconfirmed int64) {
+func (w *SPVWallet) Balance() (wallet.CurrencyValue, wallet.CurrencyValue) {
 	utxos, _ := w.txstore.Utxos().GetAll()
 	stxos, _ := w.txstore.Stxos().GetAll()
+	var confirmed, unconfirmed int64
 	for _, utxo := range utxos {
+		val, _ := strconv.ParseInt(utxo.Value, 10, 64)
 		if !utxo.WatchOnly {
 			if utxo.AtHeight > 0 {
-				confirmed += utxo.Value
+				confirmed += val
 			} else {
 				if w.checkIfStxoIsConfirmed(utxo, stxos) {
-					confirmed += utxo.Value
+					confirmed += val
 				} else {
-					unconfirmed += utxo.Value
+					unconfirmed += val
 				}
 			}
 		}
 	}
-	return confirmed, unconfirmed
+	return wallet.CurrencyValue{Value: *big.NewInt(confirmed), Currency: BitcoinCurrencyDefinition},
+		wallet.CurrencyValue{Value: *big.NewInt(unconfirmed), Currency: BitcoinCurrencyDefinition}
 }
 
 func (w *SPVWallet) Transactions() ([]wallet.Txn, error) {
@@ -357,6 +373,34 @@ func (w *SPVWallet) Transactions() ([]wallet.Txn, error) {
 
 func (w *SPVWallet) GetTransaction(txid chainhash.Hash) (wallet.Txn, error) {
 	txn, err := w.txstore.Txns().Get(txid)
+	if err == nil {
+		tx := wire.NewMsgTx(1)
+		rbuf := bytes.NewReader(txn.Bytes)
+		err := tx.BtcDecode(rbuf, wire.ProtocolVersion, wire.WitnessEncoding)
+		if err != nil {
+			return txn, err
+		}
+		outs := []wallet.TransactionOutput{}
+		for i, out := range tx.TxOut {
+			var addr btc.Address
+			_, addrs, _, err := txscript.ExtractPkScriptAddrs(out.PkScript, w.params)
+			if err != nil {
+				log.Warningf("error extracting address from txn pkscript: %v\n", err)
+			}
+			if len(addrs) == 0 {
+				addr = nil
+			} else {
+				addr = addrs[0]
+			}
+			tout := wallet.TransactionOutput{
+				Address: addr,
+				Value:   *big.NewInt(out.Value),
+				Index:   uint32(i),
+			}
+			outs = append(outs, tout)
+		}
+		txn.Outputs = outs
+	}
 	return txn, err
 }
 
@@ -444,4 +488,11 @@ func (w *SPVWallet) ReSyncBlockchain(fromDate time.Time) {
 
 func (w *SPVWallet) ExchangeRates() wallet.ExchangeRates {
 	return w.exchangeRates
+}
+
+// AssociateTransactionWithOrder used for ORDER_PAYMENT message
+func (w *SPVWallet) AssociateTransactionWithOrder(cb wallet.TransactionCallback) {
+	for _, l := range w.txstore.listeners {
+		go l(cb)
+	}
 }
