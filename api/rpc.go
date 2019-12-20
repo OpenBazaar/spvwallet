@@ -272,7 +272,7 @@ func (s *server) AddWatchedAddress(ctx context.Context, in *pb.Address) (*pb.Emp
 	if err != nil {
 		return nil, err
 	}
-	return nil, s.w.AddWatchedAddress(addr)
+	return nil, s.w.AddWatchedAddresses(addr)
 }
 
 func (s *server) GetConfirmations(ctx context.Context, in *pb.Txid) (*pb.Confirmations, error) {
