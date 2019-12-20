@@ -30,6 +30,15 @@ func (w *WatchedScriptsDB) Put(scriptPubKey []byte) error {
 	return nil
 }
 
+func (w *WatchedScriptsDB) PutAll(scripts [][]byte) error {
+	for _, s := range scripts {
+		if err := w.Put(s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (w *WatchedScriptsDB) GetAll() ([][]byte, error) {
 	w.lock.RLock()
 	defer w.lock.RUnlock()

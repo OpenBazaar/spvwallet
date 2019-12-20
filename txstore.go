@@ -456,12 +456,12 @@ func (ts *TxStore) processReorg(lastGoodHeight uint32) error {
 		if txns[i].Height > int32(lastGoodHeight) {
 			txid, err := chainhash.NewHashFromStr(txns[i].Txid)
 			if err != nil {
-				log.Error(err)
+				log.Error(err.Error())
 				continue
 			}
 			err = ts.markAsDead(*txid)
 			if err != nil {
-				log.Error(err)
+				log.Error(err.Error())
 				continue
 			}
 		}
