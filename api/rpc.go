@@ -3,8 +3,11 @@ package api
 import (
 	"encoding/hex"
 	"errors"
-	"github.com/OpenBazaar/spvwallet"
-	"github.com/OpenBazaar/spvwallet/api/pb"
+	"math/big"
+	"net"
+	"strconv"
+	"sync"
+
 	"github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -15,8 +18,9 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"net"
-	"sync"
+
+	"github.com/OpenBazaar/spvwallet"
+	"github.com/OpenBazaar/spvwallet/api/pb"
 )
 
 const Addr = "127.0.0.1:8234"
@@ -126,9 +130,10 @@ func (s *server) Transactions(ctx context.Context, in *pb.Empty) (*pb.Transactio
 		if err != nil {
 			return nil, err
 		}
+		val0, _ := strconv.ParseInt(tx.Value, 10, 64)
 		respTx := &pb.Tx{
 			Txid:      tx.Txid,
-			Value:     tx.Value,
+			Value:     val0,
 			Height:    tx.Height,
 			WatchOnly: tx.WatchOnly,
 			Timestamp: ts,
@@ -152,9 +157,10 @@ func (s *server) GetTransaction(ctx context.Context, in *pb.Txid) (*pb.Tx, error
 	if err != nil {
 		return nil, err
 	}
+	val0, _ := strconv.ParseInt(tx.Value, 10, 64)
 	respTx := &pb.Tx{
 		Txid:      tx.Txid,
-		Value:     tx.Value,
+		Value:     val0,
 		Height:    tx.Height,
 		WatchOnly: tx.WatchOnly,
 		Timestamp: ts,
@@ -297,7 +303,7 @@ func (s *server) SweepAddress(ctx context.Context, in *pb.SweepInfo) (*pb.Txid, 
 		in := wallet.TransactionInput{
 			OutpointHash:  h.CloneBytes(),
 			OutpointIndex: u.Index,
-			Value:         int64(u.Value),
+			Value:         *big.NewInt(int64(u.Value)),
 		}
 		ins = append(ins, in)
 	}
@@ -407,7 +413,7 @@ func (s *server) CreateMultisigSignature(ctx context.Context, in *pb.CreateMulti
 		}
 		o := wallet.TransactionOutput{
 			Address: addr,
-			Value:   int64(output.Value),
+			Value:   *big.NewInt(int64(output.Value)),
 		}
 		outs = append(outs, o)
 	}
@@ -491,7 +497,7 @@ func (s *server) Multisign(ctx context.Context, in *pb.MultisignInfo) (*pb.RawTx
 		}
 		o := wallet.TransactionOutput{
 			Address: addr,
-			Value:   int64(output.Value),
+			Value:   *big.NewInt(int64(output.Value)),
 		}
 		outs = append(outs, o)
 	}
@@ -539,7 +545,7 @@ func (s *server) EstimateFee(ctx context.Context, in *pb.EstimateFeeData) (*pb.F
 		}
 		o := wallet.TransactionOutput{
 			Address: addr,
-			Value:   int64(output.Value),
+			Value:   *big.NewInt(int64(output.Value)),
 		}
 		outs = append(outs, o)
 	}
@@ -555,7 +561,7 @@ func (s *server) WalletNotify(in *pb.Empty, stream pb.API_WalletNotifyServer) er
 		}
 		resp := &pb.Tx{
 			Txid:      tx.Txid,
-			Value:     tx.Value,
+			Value:     tx.Value.Int64(),
 			Height:    tx.Height,
 			Timestamp: ts,
 			WatchOnly: tx.WatchOnly,
