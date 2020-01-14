@@ -4,6 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
+	"math/big"
+	"net"
+	"net/url"
+	"os"
+	"os/signal"
+	"path"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/OpenBazaar/spvwallet"
 	"github.com/OpenBazaar/spvwallet/api"
@@ -24,15 +34,6 @@ import (
 	"github.com/skratchdot/open-golang/open"
 	"github.com/yawning/bulb"
 	"golang.org/x/net/proxy"
-	"io/ioutil"
-	"net"
-	"net/url"
-	"os"
-	"os/signal"
-	"path"
-	"strings"
-	"sync"
-	"time"
 )
 
 var parser = flags.NewParser(nil, flags.Default)
@@ -368,12 +369,12 @@ func (x *Start) Execute(args []string) error {
 						astilog.Errorf("Failed to get exchange rate")
 						return
 					}
-					btcVal := float64(confirmed) / 100000000
-					fiatVal := float64(btcVal) * rate
+					btcVal := float64(confirmed.Value.Int64()) / 100000000.0
+					fiatVal := (btcVal) * rate
 					height, _ := wallet.ChainTip()
 
 					st := Stats{
-						Confirmed:    confirmed,
+						Confirmed:    confirmed.Value.Int64(),
 						Fiat:         fmt.Sprintf("%.2f", fiatVal),
 						Transactions: len(txs),
 						Height:       height,
@@ -411,7 +412,7 @@ func (x *Start) Execute(args []string) error {
 						w.SendMessage(bootstrap.MessageOut{Name: "spendError", Payload: "Invalid address"})
 						return
 					}
-					_, err = wallet.Spend(int64(p.Amount), addr, feeLevel, "", false)
+					_, err = wallet.Spend(*big.NewInt(int64(p.Amount)), addr, feeLevel, "", false)
 					if err != nil {
 						w.SendMessage(bootstrap.MessageOut{Name: "spendError", Payload: err.Error()})
 					}
