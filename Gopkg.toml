@@ -30,7 +30,7 @@
   name = "github.com/OpenBazaar/jsonpb"
 
 [[constraint]]
-  branch = "master"
+  branch = "ethereum-master"
   name = "github.com/OpenBazaar/wallet-interface"
 
 [[constraint]]

@@ -10,12 +10,12 @@
   revision = "37d32ddf4eefaab6c19a01c99f4e00df9b1be48f"
 
 [[projects]]
-  branch = "master"
-  digest = "1:41045b2cbf58bf6007d65103b1fb17cbc092777af415546eb40fe4e005da3780"
+  branch = "ethereum-master"
+  digest = "1:c411c1051b3ab7c823786bf82887580f2d93898be2504e145a67419afef5ba2d"
   name = "github.com/OpenBazaar/wallet-interface"
   packages = ["."]
   pruneopts = "UT"
-  revision = "ba95db86ca2f75d561554d3270623db4d5ed0467"
+  revision = "cbbb40466dcfe7d299f685fd0aa9a4fe9ea49147"
 
 [[projects]]
   digest = "1:83b8f1c165bb7860f9928e7be451e4b19d82a9b86a43542f5acce85a71a8bc8f"

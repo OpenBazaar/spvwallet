@@ -44,7 +44,7 @@ func Test_gatherCoins(t *testing.T) {
 		t.Error(err)
 	}
 	op := wire.NewOutPoint(h1, 0)
-	err = w.txstore.Utxos().Put(wallet.Utxo{Op: *op, ScriptPubkey: script1, AtHeight: 5, Value: 10000})
+	err = w.txstore.Utxos().Put(wallet.Utxo{Op: *op, ScriptPubkey: script1, AtHeight: 5, Value: "10000"})
 	if err != nil {
 		t.Error(err)
 	}

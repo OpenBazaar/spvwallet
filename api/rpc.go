@@ -3,8 +3,11 @@ package api
 import (
 	"encoding/hex"
 	"errors"
-	"github.com/OpenBazaar/spvwallet"
-	"github.com/OpenBazaar/spvwallet/api/pb"
+	"math/big"
+	"net"
+	"strconv"
+	"sync"
+
 	"github.com/OpenBazaar/wallet-interface"
 	"github.com/btcsuite/btcd/chaincfg"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -15,8 +18,9 @@ import (
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"net"
-	"sync"
+
+	"github.com/OpenBazaar/spvwallet"
+	"github.com/OpenBazaar/spvwallet/api/pb"
 )
 
 const Addr = "127.0.0.1:8234"
@@ -77,7 +81,7 @@ func (s *server) ChainTip(ctx context.Context, in *pb.Empty) (*pb.Height, error)
 
 func (s *server) Balance(ctx context.Context, in *pb.Empty) (*pb.Balances, error) {
 	confirmed, unconfirmed := s.w.Balance()
-	return &pb.Balances{uint64(confirmed), uint64(unconfirmed)}, nil
+	return &pb.Balances{confirmed.Value.Uint64(), unconfirmed.Value.Uint64()}, nil
 }
 
 func (s *server) MasterPrivateKey(ctx context.Context, in *pb.Empty) (*pb.Key, error) {
@@ -126,9 +130,10 @@ func (s *server) Transactions(ctx context.Context, in *pb.Empty) (*pb.Transactio
 		if err != nil {
 			return nil, err
 		}
+		val0, _ := strconv.ParseInt(tx.Value, 10, 64)
 		respTx := &pb.Tx{
 			Txid:      tx.Txid,
-			Value:     tx.Value,
+			Value:     val0,
 			Height:    tx.Height,
 			WatchOnly: tx.WatchOnly,
 			Timestamp: ts,
@@ -152,9 +157,10 @@ func (s *server) GetTransaction(ctx context.Context, in *pb.Txid) (*pb.Tx, error
 	if err != nil {
 		return nil, err
 	}
+	val0, _ := strconv.ParseInt(tx.Value, 10, 64)
 	respTx := &pb.Tx{
 		Txid:      tx.Txid,
-		Value:     tx.Value,
+		Value:     val0,
 		Height:    tx.Height,
 		WatchOnly: tx.WatchOnly,
 		Timestamp: ts,
@@ -175,7 +181,9 @@ func (s *server) GetFeePerByte(ctx context.Context, in *pb.FeeLevelSelection) (*
 	default:
 		return nil, errors.New("Unknown fee level")
 	}
-	return &pb.FeePerByte{s.w.GetFeePerByte(feeLevel)}, nil
+
+	var val = s.w.GetFeePerByte(feeLevel)
+	return &pb.FeePerByte{val.Uint64()}, nil
 }
 
 func (s *server) Spend(ctx context.Context, in *pb.SpendInfo) (*pb.Txid, error) {
@@ -209,7 +217,7 @@ func (s *server) Spend(ctx context.Context, in *pb.SpendInfo) (*pb.Txid, error) 
 	if err != nil {
 		return nil, err
 	}
-	txid, err := s.w.Spend(int64(in.Amount), addr, feeLevel, "", false)
+	txid, err := s.w.Spend(*big.NewInt(int64(in.Amount)), addr, feeLevel, "", false)
 	if err != nil {
 		return nil, err
 	}
@@ -297,7 +305,7 @@ func (s *server) SweepAddress(ctx context.Context, in *pb.SweepInfo) (*pb.Txid, 
 		in := wallet.TransactionInput{
 			OutpointHash:  h.CloneBytes(),
 			OutpointIndex: u.Index,
-			Value:         int64(u.Value),
+			Value:         *big.NewInt(int64(u.Value)),
 		}
 		ins = append(ins, in)
 	}
@@ -407,7 +415,7 @@ func (s *server) CreateMultisigSignature(ctx context.Context, in *pb.CreateMulti
 		}
 		o := wallet.TransactionOutput{
 			Address: addr,
-			Value:   int64(output.Value),
+			Value:   *big.NewInt(int64(output.Value)),
 		}
 		outs = append(outs, o)
 	}
@@ -455,7 +463,7 @@ func (s *server) CreateMultisigSignature(ctx context.Context, in *pb.CreateMulti
 			}
 		}
 	}
-	sigs, err := s.w.CreateMultisigSignature(ins, outs, key, in.RedeemScript, in.FeePerByte)
+	sigs, err := s.w.CreateMultisigSignature(ins, outs, key, in.RedeemScript, *big.NewInt(int64(in.FeePerByte)))
 	if err != nil {
 		return nil, err
 	}
@@ -491,7 +499,7 @@ func (s *server) Multisign(ctx context.Context, in *pb.MultisignInfo) (*pb.RawTx
 		}
 		o := wallet.TransactionOutput{
 			Address: addr,
-			Value:   int64(output.Value),
+			Value:   *big.NewInt(int64(output.Value)),
 		}
 		outs = append(outs, o)
 	}
@@ -511,7 +519,7 @@ func (s *server) Multisign(ctx context.Context, in *pb.MultisignInfo) (*pb.RawTx
 		}
 		sig2 = append(sig2, sig)
 	}
-	tx, err := s.w.Multisign(ins, outs, sig1, sig2, in.RedeemScript, in.FeePerByte, in.Broadcast)
+	tx, err := s.w.Multisign(ins, outs, sig1, sig2, in.RedeemScript, *big.NewInt(int64(in.FeePerByte)), in.Broadcast)
 	if err != nil {
 		return nil, err
 	}
@@ -539,12 +547,12 @@ func (s *server) EstimateFee(ctx context.Context, in *pb.EstimateFeeData) (*pb.F
 		}
 		o := wallet.TransactionOutput{
 			Address: addr,
-			Value:   int64(output.Value),
+			Value:   *big.NewInt(int64(output.Value)),
 		}
 		outs = append(outs, o)
 	}
-	fee := s.w.EstimateFee(ins, outs, in.FeePerByte)
-	return &pb.Fee{fee}, nil
+	fee := s.w.EstimateFee(ins, outs, *big.NewInt(int64(in.FeePerByte)))
+	return &pb.Fee{fee.Uint64()}, nil
 }
 
 func (s *server) WalletNotify(in *pb.Empty, stream pb.API_WalletNotifyServer) error {
@@ -555,7 +563,7 @@ func (s *server) WalletNotify(in *pb.Empty, stream pb.API_WalletNotifyServer) er
 		}
 		resp := &pb.Tx{
 			Txid:      tx.Txid,
-			Value:     tx.Value,
+			Value:     tx.Value.Int64(),
 			Height:    tx.Height,
 			Timestamp: ts,
 			WatchOnly: tx.WatchOnly,
