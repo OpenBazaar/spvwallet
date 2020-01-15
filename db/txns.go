@@ -15,7 +15,7 @@ type TxnsDB struct {
 	lock *sync.RWMutex
 }
 
-func (t *TxnsDB) Put(txn []byte, txid string, value, height int, timestamp time.Time, watchOnly bool) error {
+func (t *TxnsDB) Put(txn []byte, txid, value string, height int, timestamp time.Time, watchOnly bool) error {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 	tx, err := t.db.Begin()
@@ -51,7 +51,7 @@ func (t *TxnsDB) Get(txid chainhash.Hash) (wallet.Txn, error) {
 	}
 	defer stmt.Close()
 	var ret []byte
-	var value int
+	var value string
 	var height int
 	var timestamp int
 	var watchOnlyInt int
@@ -68,7 +68,7 @@ func (t *TxnsDB) Get(txid chainhash.Hash) (wallet.Txn, error) {
 	}
 	txn = wallet.Txn{
 		Txid:      msgTx.TxHash().String(),
-		Value:     int64(value),
+		Value:     value,
 		Height:    int32(height),
 		Timestamp: time.Unix(int64(timestamp), 0),
 		WatchOnly: watchOnly,
@@ -89,7 +89,7 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 	defer rows.Close()
 	for rows.Next() {
 		var tx []byte
-		var value int
+		var value string
 		var height int
 		var timestamp int
 		var watchOnlyInt int
@@ -109,7 +109,7 @@ func (t *TxnsDB) GetAll(includeWatchOnly bool) ([]wallet.Txn, error) {
 
 		txn := wallet.Txn{
 			Txid:      msgTx.TxHash().String(),
-			Value:     int64(value),
+			Value:     value,
 			Height:    int32(height),
 			Timestamp: time.Unix(int64(timestamp), 0),
 			WatchOnly: watchOnly,

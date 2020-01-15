@@ -31,7 +31,7 @@ func (u *UtxoDB) Put(utxo wallet.Utxo) error {
 	if utxo.WatchOnly {
 		watchOnly = 1
 	}
-	_, err = stmt.Exec(outpoint, int(utxo.Value), int(utxo.AtHeight), hex.EncodeToString(utxo.ScriptPubkey), watchOnly)
+	_, err = stmt.Exec(outpoint, utxo.Value, int(utxo.AtHeight), hex.EncodeToString(utxo.ScriptPubkey), watchOnly)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -52,7 +52,7 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 	}
 	for rows.Next() {
 		var outpoint string
-		var value int
+		var value string
 		var height int
 		var scriptPubKey string
 		var watchOnlyInt int
@@ -82,7 +82,7 @@ func (u *UtxoDB) GetAll() ([]wallet.Utxo, error) {
 		ret = append(ret, wallet.Utxo{
 			Op:           *wire.NewOutPoint(shaHash, uint32(index)),
 			AtHeight:     int32(height),
-			Value:        int64(value),
+			Value:        value,
 			ScriptPubkey: scriptBytes,
 			WatchOnly:    watchOnly,
 		})
