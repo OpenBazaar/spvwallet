@@ -35,15 +35,15 @@
 
 [[constraint]]
   name = "github.com/asticode/go-astilectron"
-  version = "0.9.3"
+  version = "0.11.0"
 
 [[constraint]]
   name = "github.com/asticode/go-astilog"
-  version = "1.2.0"
+  version = "1.5.0"
 
 [[constraint]]
   name = "github.com/asticode/go-astitools"
-  version = "1.2.2"
+  version = "1.3.0"
 
 [[constraint]]
   name = "github.com/atotto/clipboard"
@@ -75,7 +75,7 @@
 
 [[constraint]]
   name = "github.com/fatih/color"
-  version = "1.7.0"
+  version = "1.9.0"
 
 [[constraint]]
   name = "github.com/golang/protobuf"
@@ -107,7 +107,7 @@
 
 [[constraint]]
   name = "github.com/pkg/errors"
-  version = "0.8.1"
+  version = "0.9.1"
 
 [[constraint]]
   branch = "master"
