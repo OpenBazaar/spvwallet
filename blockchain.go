@@ -17,7 +17,7 @@ import (
 
 // Blockchain settings.  These are kindof Bitcoin specific, but not contained in
 // chaincfg.Params so they'll go here.  If you're into the [ANN]altcoin scene,
-// you may want to paramaterize these constants.
+// you may want to parameterize these constants.
 const (
 	targetTimespan      = time.Hour * 24 * 14
 	targetSpacing       = time.Minute * 10
@@ -32,10 +32,10 @@ var OrphanHeaderError = errors.New("header does not extend any known headers")
 
 // Wrapper around Headers implementation that handles all blockchain operations
 type Blockchain struct {
-	lock        *sync.Mutex
-	params      *chaincfg.Params
-	db          Headers
-	crationDate time.Time
+	lock         *sync.Mutex
+	params       *chaincfg.Params
+	db           Headers
+	creationDate time.Time
 }
 
 func NewBlockchain(filePath string, walletCreationDate time.Time, params *chaincfg.Params) (*Blockchain, error) {
@@ -44,10 +44,10 @@ func NewBlockchain(filePath string, walletCreationDate time.Time, params *chainc
 		return nil, err
 	}
 	b := &Blockchain{
-		lock:        new(sync.Mutex),
-		params:      params,
-		db:          hdb,
-		crationDate: walletCreationDate,
+		lock:         new(sync.Mutex),
+		params:       params,
+		db:           hdb,
+		creationDate: walletCreationDate,
 	}
 
 	h, err := b.db.Height()
@@ -82,7 +82,7 @@ func (b *Blockchain) CommitHeader(header wire.BlockHeader) (bool, *StoredHeader,
 	var parentHeader StoredHeader
 
 	// If the tip is also the parent of this header, then we can save a database read by skipping
-	// the lookup of the parent header. Otherwise (ophan?) we need to fetch the parent.
+	// the lookup of the parent header. Otherwise (orphan?) we need to fetch the parent.
 	if header.PrevBlock.IsEqual(&tipHash) {
 		parentHeader = bestHeader
 	} else {
@@ -146,7 +146,7 @@ func (b *Blockchain) CheckHeader(header wire.BlockHeader, prevHeader StoredHeade
 	if !b.params.ReduceMinDifficulty {
 		diffTarget, err := b.calcRequiredWork(header, int32(height+1), prevHeader)
 		if err != nil {
-			log.Errorf("Error calclating difficulty", err)
+			log.Errorf("Error calculating difficulty", err)
 			return false
 		}
 		if header.Bits != diffTarget {
@@ -345,7 +345,7 @@ func (b *Blockchain) GetCommonAncestor(bestHeader, prevBestHeader StoredHeader) 
 func (b *Blockchain) Rollback(t time.Time) error {
 	b.lock.Lock()
 	defer b.lock.Unlock()
-	checkpoint := GetCheckpoint(b.crationDate, b.params)
+	checkpoint := GetCheckpoint(b.creationDate, b.params)
 	checkPointHash := checkpoint.Header.BlockHash()
 	sh, err := b.db.GetBestHeader()
 	if err != nil {
@@ -412,7 +412,7 @@ func checkProofOfWork(header wire.BlockHeader, p *chaincfg.Params) bool {
 
 	// The target must more than 0.  Why can you even encode negative...
 	if target.Sign() <= 0 {
-		log.Debugf("Block target %064x is neagtive(??)\n", target.Bytes())
+		log.Debugf("Block target %064x is negative(??)\n", target.Bytes())
 		return false
 	}
 	// The target must be less than the maximum allowed (difficulty 1)
