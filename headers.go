@@ -65,7 +65,6 @@ type StoredHeader struct {
 type HeaderDB struct {
 	lock      *sync.Mutex
 	db        *bolt.DB
-	filePath  string
 	bestCache *StoredHeader
 	cache     *HeaderCache
 }
@@ -87,7 +86,6 @@ func NewHeaderDB(filePath string) (*HeaderDB, error) {
 	}
 	h.db = db
 	h.lock = new(sync.Mutex)
-	h.filePath = filePath
 	h.cache = &HeaderCache{ordered_map.NewOrderedMap(), sync.RWMutex{}, CACHE_SIZE}
 
 	db.Update(func(btx *bolt.Tx) error {
