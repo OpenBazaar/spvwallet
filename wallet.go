@@ -329,7 +329,7 @@ func (w *SPVWallet) Balance() (confirmed, unconfirmed int64) {
 
 func (w *SPVWallet) Transactions() ([]wallet.Txn, error) {
 	height, _ := w.ChainTip()
-	txns, err := w.txstore.Txns().GetAll(false)
+	txns, err := w.txstore.Txns().GetAll(true)
 	if err != nil {
 		return txns, err
 	}
