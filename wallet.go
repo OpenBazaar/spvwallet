@@ -98,6 +98,7 @@ func NewSPVWallet(config *Config) (*SPVWallet, error) {
 			config.HighFee,
 			config.MediumFee,
 			config.LowFee,
+			config.SuperLowFee,
 			config.FeeAPI.String(),
 			config.Proxy,
 		),
